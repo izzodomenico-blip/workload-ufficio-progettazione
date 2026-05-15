@@ -1,23 +1,28 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { AppData, Person, Status } from '../types'
+import type { Absence, AppData, Person, Status } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
 import {
   convertStudioToCommessa as svcConvertStudio,
+  createAbsence as svcCreateAbsence,
   createTask as svcCreateTask,
   createWorkItem as svcCreateWorkItem,
+  deleteAbsence as svcDeleteAbsence,
   deleteTask as svcDeleteTask,
   deleteWorkItem as svcDeleteWorkItem,
   setTaskStatus as svcSetTaskStatus,
   setWorkItemStatus as svcSetWorkItemStatus,
+  updateAbsence as svcUpdateAbsence,
   updatePerson as svcUpdatePerson,
   updateTask as svcUpdateTask,
   updateWorkItem as svcUpdateWorkItem,
 } from '../services/dataService'
 import type {
+  CreateAbsenceInput,
   CreateTaskInput,
   CreateWorkItemInput,
+  UpdateAbsenceInput,
   UpdatePersonInput,
   UpdateTaskInput,
   UpdateWorkItemInput,
@@ -25,6 +30,7 @@ import type {
 
 interface DataContextValue {
   data: AppData
+  absences: Absence[]
   // workItems
   createWorkItem: (input: CreateWorkItemInput) => string
   updateWorkItem: (id: string, patch: UpdateWorkItemInput) => void
@@ -38,8 +44,11 @@ interface DataContextValue {
   setTaskStatus: (id: string, status: Status) => void
   // people
   updatePerson: (id: string, patch: UpdatePersonInput) => void
-  // bulk people update (for PeopleSettingsModal batch save)
   updatePeople: (people: Person[]) => void
+  // absences
+  createAbsence: (input: CreateAbsenceInput) => string
+  updateAbsence: (id: string, patch: UpdateAbsenceInput) => void
+  deleteAbsence: (id: string) => void
   // import/export/reset
   importData: (next: AppData) => void
   exportData: () => void
@@ -111,6 +120,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setData((prev) => ({ ...prev, people: nextPeople }))
   }, [])
 
+  const createAbsence = useCallback((input: CreateAbsenceInput): string => {
+    let createdId = ''
+    setData((prev) => {
+      const result = svcCreateAbsence(prev, input)
+      createdId = result.id
+      return result.data
+    })
+    return createdId
+  }, [])
+
+  const updateAbsence = useCallback((id: string, patch: UpdateAbsenceInput) => {
+    setData((prev) => svcUpdateAbsence(prev, id, patch))
+  }, [])
+
+  const deleteAbsence = useCallback((id: string) => {
+    setData((prev) => svcDeleteAbsence(prev, id))
+  }, [])
+
   const importData = useCallback((next: AppData) => {
     setData(next)
   }, [])
@@ -125,6 +152,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<DataContextValue>(() => ({
     data,
+    absences: data.absences,
     createWorkItem,
     updateWorkItem,
     deleteWorkItem,
@@ -136,6 +164,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setTaskStatus,
     updatePerson,
     updatePeople,
+    createAbsence,
+    updateAbsence,
+    deleteAbsence,
     importData,
     exportData,
     resetData,
@@ -144,6 +175,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createWorkItem, updateWorkItem, deleteWorkItem, setWorkItemStatus, convertStudioToCommessa,
     createTask, updateTask, deleteTask, setTaskStatus,
     updatePerson, updatePeople,
+    createAbsence, updateAbsence, deleteAbsence,
     importData, exportData, resetData,
   ])
 

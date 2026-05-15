@@ -1,24 +1,34 @@
 import { useMemo } from 'react'
-import type { Person, Task } from '../types'
+import type { Absence, Person, Task } from '../types'
 import { computeWorkload, LOAD_BAR_CLASS, LOAD_LABELS, LOAD_RING_CLASS, LOAD_TEXT_CLASS, topTasksForPerson } from '../utils/workload'
 import { formatItalianShort, isOverdue } from '../utils/dates'
 
 interface Props {
   person: Person
   tasks: Task[]
+  absences: Absence[]
   onTaskClick?: (workItemId: string) => void
 }
 
-export function WorkloadPersonCard({ person, tasks, onTaskClick }: Props) {
-  const load = useMemo(() => computeWorkload(person, tasks), [person, tasks])
+export function WorkloadPersonCard({ person, tasks, absences, onTaskClick }: Props) {
+  const load = useMemo(() => computeWorkload(person, tasks, absences), [person, tasks, absences])
   const top = useMemo(() => topTasksForPerson(tasks, person.id, 3), [tasks, person.id])
 
-  const barWidth = Math.min(100, load.loadPercent)
-  const overflow = load.loadPercent > 100 ? load.loadPercent - 100 : 0
+  const ringClass = load.hasTasksDuringAbsence
+    ? 'ring-amber-500/40'
+    : LOAD_RING_CLASS[load.level]
+
   const initials = person.name.split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase()
 
+  // Critical: capacità zero con task assegnati
+  const criticalAbsence = load.isFullyAbsent && load.weekHours > 0
+  const halfCapacity = !load.isFullyAbsent && load.absenceHours > 0 && load.realCapacityHours < load.capacityHours / 2
+
+  const barWidth = load.realCapacityHours > 0 ? Math.min(100, load.loadPercent) : (load.weekHours > 0 ? 100 : 0)
+  const overflow = load.loadPercent > 100 ? load.loadPercent - 100 : 0
+
   return (
-    <div className={`panel relative p-4 ring-1 ring-inset ${LOAD_RING_CLASS[load.level]}`}>
+    <div className={`panel relative p-4 ring-1 ring-inset ${ringClass}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-slate-200">
@@ -30,8 +40,17 @@ export function WorkloadPersonCard({ person, tasks, onTaskClick }: Props) {
           </div>
         </div>
         <div className="text-right">
-          <div className={`text-lg font-semibold tabular-nums ${LOAD_TEXT_CLASS[load.level]}`}>{load.loadPercent}%</div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">{LOAD_LABELS[load.level]}</div>
+          {load.isFullyAbsent ? (
+            <>
+              <div className={`text-lg font-semibold tabular-nums ${LOAD_TEXT_CLASS.absent}`}>—</div>
+              <div className="text-[10px] uppercase tracking-wide text-zinc-400">assente</div>
+            </>
+          ) : (
+            <>
+              <div className={`text-lg font-semibold tabular-nums ${LOAD_TEXT_CLASS[load.level]}`}>{load.loadPercent}%</div>
+              <div className="text-[10px] uppercase tracking-wide text-slate-500">{LOAD_LABELS[load.level]}</div>
+            </>
+          )}
         </div>
       </div>
 
@@ -46,11 +65,48 @@ export function WorkloadPersonCard({ person, tasks, onTaskClick }: Props) {
             />
           )}
         </div>
-        <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
-          <span><span className="text-slate-200 tabular-nums">{load.weekHours}h</span> / {load.capacityHours}h</span>
-          <span>{load.taskCount} task questa settimana</span>
+        <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-slate-400">
+          <span>Capacità: <span className="text-slate-200">{load.capacityHours}h</span></span>
+          <span>Assegnate: <span className="text-slate-200">{load.weekHours}h</span></span>
+          <span>
+            Assenze:{' '}
+            {load.absenceHours > 0
+              ? <span className="text-amber-300">{load.absenceHours}h</span>
+              : <span className="text-slate-500">0h</span>}
+          </span>
+          <span>
+            Reali:{' '}
+            <span className={load.isFullyAbsent ? 'text-zinc-400' : halfCapacity ? 'text-amber-300' : 'text-slate-200'}>
+              {load.realCapacityHours}h
+            </span>
+          </span>
         </div>
       </div>
+
+      {(load.absenceHours > 0 || load.hasTasksDuringAbsence) && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {load.absenceHours > 0 && (
+            <span className="chip bg-amber-500/15 text-amber-200 ring-amber-500/40">
+              Assenza: {load.absenceHours}h
+            </span>
+          )}
+          {halfCapacity && !load.isFullyAbsent && (
+            <span className="chip bg-orange-500/15 text-orange-200 ring-orange-500/40">
+              Capacità ridotta
+            </span>
+          )}
+          {load.hasTasksDuringAbsence && (
+            <span className="chip bg-amber-500/15 text-amber-200 ring-amber-500/40" title="Almeno un task aperto cade in giorni di assenza dell’assegnatario">
+              ⚠ Task in giorni di assenza
+            </span>
+          )}
+          {criticalAbsence && (
+            <span className="chip bg-red-500/15 text-red-200 ring-red-500/40">
+              ⚠ Task assegnati con capacità zero
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 space-y-1.5">
         {top.length === 0 && (

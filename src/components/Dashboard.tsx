@@ -59,6 +59,7 @@ export function Dashboard() {
               key={p.id}
               person={p}
               tasks={data.tasks}
+              absences={data.absences}
               onTaskClick={(workItemId) => setSelectedId(workItemId)}
             />
           ))}

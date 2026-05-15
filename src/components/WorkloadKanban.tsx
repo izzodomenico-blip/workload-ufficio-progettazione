@@ -15,12 +15,12 @@ interface KanbanColumn {
 }
 
 const COLUMNS: KanbanColumn[] = [
-  { id: 'planned', title: 'Da pianificare', statuses: ['Da pianificare'], accent: 'bg-slate-500/40' },
-  { id: 'progress', title: 'In corso', statuses: ['Assegnato', 'In corso'], accent: 'bg-sky-500/60' },
-  { id: 'waiting', title: 'In attesa', statuses: ['In attesa input commerciale', 'In attesa input cliente', 'In attesa scelta tecnica'], accent: 'bg-amber-500/60' },
-  { id: 'review', title: 'In verifica', statuses: ['In verifica responsabile', 'Da correggere'], accent: 'bg-violet-500/60' },
-  { id: 'done', title: 'Pronto / Rilasciato', statuses: ['Pronto per rilascio', 'Rilasciato produzione'], accent: 'bg-emerald-500/60' },
-  { id: 'paused', title: 'Sospeso / Annullato', statuses: ['Sospeso', 'Annullato'], accent: 'bg-zinc-500/60' },
+  { id: 'todo', title: 'Da pianificare', statuses: ['Da pianificare'], accent: 'bg-slate-500/40' },
+  { id: 'planned', title: 'Pianificato', statuses: ['Pianificato'], accent: 'bg-indigo-500/60' },
+  { id: 'progress', title: 'In corso', statuses: ['In corso'], accent: 'bg-sky-500/60' },
+  { id: 'waiting', title: 'In attesa', statuses: ['In attesa'], accent: 'bg-amber-500/60' },
+  { id: 'review', title: 'In verifica', statuses: ['In verifica'], accent: 'bg-violet-500/60' },
+  { id: 'done', title: 'Completato / Sospeso', statuses: ['Completato', 'Sospeso'], accent: 'bg-emerald-500/60' },
 ]
 
 interface Props {

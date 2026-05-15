@@ -1,4 +1,4 @@
-import type { Person, Task, WorkItem } from '../types'
+import type { Absence, Person, Task, WorkItem } from '../types'
 
 export type ValidationErrors<T extends string> = Partial<Record<T, string>>
 export type ValidationResult<T extends string> =
@@ -81,6 +81,25 @@ export function validatePerson(input: Partial<Omit<Person, 'id'>>): ValidationRe
   if (!input.role || !input.role.trim()) errors.role = 'Il ruolo è obbligatorio'
   if (typeof input.weeklyCapacityHours !== 'number' || input.weeklyCapacityHours < 0 || input.weeklyCapacityHours > 80) {
     errors.weeklyCapacityHours = 'La capacità deve essere tra 0 e 80 ore'
+  }
+
+  return Object.keys(errors).length === 0 ? { ok: true } : { ok: false, errors }
+}
+
+export type AbsenceField = 'personId' | 'type' | 'startDate' | 'endDate' | 'hoursPerDay'
+
+export function validateAbsence(input: Partial<Omit<Absence, 'id'>>): ValidationResult<AbsenceField> {
+  const errors: ValidationErrors<AbsenceField> = {}
+
+  if (!input.personId) errors.personId = 'Seleziona la persona'
+  if (!input.type) errors.type = 'Seleziona il tipo di assenza'
+  if (!input.startDate) errors.startDate = 'Data di inizio obbligatoria'
+  if (!input.endDate) errors.endDate = 'Data di fine obbligatoria'
+  if (input.startDate && input.endDate && input.endDate < input.startDate) {
+    errors.endDate = 'La fine deve essere uguale o successiva all’inizio'
+  }
+  if (typeof input.hoursPerDay !== 'number' || input.hoursPerDay <= 0 || input.hoursPerDay > 8) {
+    errors.hoursPerDay = 'Le ore al giorno devono essere tra 1 e 8'
   }
 
   return Object.keys(errors).length === 0 ? { ok: true } : { ok: false, errors }

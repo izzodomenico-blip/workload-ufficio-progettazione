@@ -1,4 +1,4 @@
-import type { AppData, Person, Task, WorkItem } from '../types'
+import type { Absence, AppData, Person, Task, WorkItem } from '../types'
 import { addDays, formatISODate, startOfWeek } from '../utils/dates'
 
 const monday = startOfWeek(new Date())
@@ -79,7 +79,7 @@ const workItems: WorkItem[] = [
     title: 'Tendostruttura coperture stoccaggio',
     description: 'Tendostruttura 30×60 m con copertura PVC e cantilever laterali.',
     priority: 'critica',
-    status: 'In verifica responsabile',
+    status: 'In verifica',
     ownerId: 'p_domenico',
     assigneeIds: ['p_marco'],
     startDate: d(-28),
@@ -98,7 +98,7 @@ const workItems: WorkItem[] = [
     title: 'Cantilever magazzino ricambi',
     description: 'Scaffalature cantilever per magazzino verticale, 12 campate.',
     priority: 'media',
-    status: 'Assegnato',
+    status: 'Pianificato',
     ownerId: 'p_domenico',
     assigneeIds: ['p_marco', 'p_nicola'],
     startDate: d(0),
@@ -134,7 +134,7 @@ const workItems: WorkItem[] = [
     title: 'Stazione carico/scarico semoventi',
     description: 'Adeguamento stazione carico con guide cantilever modulari.',
     priority: 'media',
-    status: 'Pronto per rilascio',
+    status: 'Completato',
     ownerId: 'p_domenico',
     assigneeIds: ['p_vincenzo'],
     startDate: d(-49),
@@ -153,7 +153,7 @@ const workItems: WorkItem[] = [
     title: 'Preventivo linea montaggio inverter',
     description: 'Studio preliminare layout per nuova linea inverter, 4 stazioni con buffer.',
     priority: 'alta',
-    status: 'In attesa input commerciale',
+    status: 'In attesa',
     ownerId: 'p_domenico',
     assigneeIds: ['p_camillo'],
     startDate: d(-10),
@@ -191,7 +191,7 @@ const workItems: WorkItem[] = [
     title: 'Preventivo linea pesatura e dosaggio',
     description: 'Studio preliminare nuova linea pesatura per stabilimento sud.',
     priority: 'bassa',
-    status: 'In attesa input cliente',
+    status: 'In attesa',
     ownerId: 'p_domenico',
     assigneeIds: ['p_nicola'],
     startDate: d(-14),
@@ -248,7 +248,7 @@ const workItems: WorkItem[] = [
     title: 'Procedura rilascio produzione',
     description: 'Definizione procedura formale di rilascio documentazione alla produzione.',
     priority: 'media',
-    status: 'In attesa scelta tecnica',
+    status: 'In attesa',
     ownerId: 'p_domenico',
     assigneeIds: ['p_vincenzo', 'p_domenico'],
     startDate: d(-7),
@@ -265,28 +265,28 @@ const tasks: Task[] = [
   { id: 't1', workItemId: 'w_cm014', title: 'Layout generale linea', assigneeId: 'p_camillo', status: 'In corso', startDate: d(-14), dueDate: d(7), estimatedHours: 40, loggedHours: 22, progressPercent: 60, blockers: [] },
   { id: 't2', workItemId: 'w_cm014', title: 'Assiemi stazione 1 e 2', assigneeId: 'p_nicola', status: 'In corso', startDate: d(-7), dueDate: d(21), estimatedHours: 60, loggedHours: 18, progressPercent: 35, blockers: [] },
   { id: 't3', workItemId: 'w_cm014', title: 'Distinte stazione 1', assigneeId: 'p_vincenzo', status: 'Da pianificare', startDate: d(14), dueDate: d(28), estimatedHours: 24, loggedHours: 0, progressPercent: 0, blockers: [] },
-  { id: 't4', workItemId: 'w_cm014', title: 'Verifica tecnica intermedia', assigneeId: 'p_domenico', status: 'In verifica responsabile', startDate: d(0), dueDate: d(7), estimatedHours: 8, loggedHours: 2, progressPercent: 25, blockers: [] },
+  { id: 't4', workItemId: 'w_cm014', title: 'Verifica tecnica intermedia', assigneeId: 'p_domenico', status: 'In verifica', startDate: d(0), dueDate: d(7), estimatedHours: 8, loggedHours: 2, progressPercent: 25, blockers: [] },
 
   // CM-2026-019
-  { id: 't5', workItemId: 'w_cm019', title: 'Calcolo strutturale travi principali', assigneeId: 'p_marco', status: 'In verifica responsabile', startDate: d(-14), dueDate: d(2), estimatedHours: 30, loggedHours: 28, progressPercent: 95, blockers: ['Verifica responsabile ancora aperta'] },
+  { id: 't5', workItemId: 'w_cm019', title: 'Calcolo strutturale travi principali', assigneeId: 'p_marco', status: 'In verifica', startDate: d(-14), dueDate: d(2), estimatedHours: 30, loggedHours: 28, progressPercent: 95, blockers: ['Verifica responsabile ancora aperta'] },
   { id: 't6', workItemId: 'w_cm019', title: 'Assemblaggio cantilever laterali', assigneeId: 'p_marco', status: 'In corso', startDate: d(-3), dueDate: d(7), estimatedHours: 16, loggedHours: 8, progressPercent: 50, blockers: [] },
   { id: 't7', workItemId: 'w_cm019', title: 'Documentazione cliente', assigneeId: 'p_vincenzo', status: 'Da pianificare', startDate: d(7), dueDate: d(14), estimatedHours: 12, loggedHours: 0, progressPercent: 0, blockers: [] },
 
   // CM-2026-023
-  { id: 't8', workItemId: 'w_cm023', title: 'Layout cantilever 12 campate', assigneeId: 'p_marco', status: 'Assegnato', startDate: d(0), dueDate: d(14), estimatedHours: 24, loggedHours: 0, progressPercent: 0, blockers: [] },
+  { id: 't8', workItemId: 'w_cm023', title: 'Layout cantilever 12 campate', assigneeId: 'p_marco', status: 'Pianificato', startDate: d(0), dueDate: d(14), estimatedHours: 24, loggedHours: 0, progressPercent: 0, blockers: [] },
   { id: 't9', workItemId: 'w_cm023', title: 'Disegni dettaglio attacchi', assigneeId: 'p_nicola', status: 'Da pianificare', startDate: d(7), dueDate: d(21), estimatedHours: 30, loggedHours: 0, progressPercent: 0, blockers: [] },
 
   // CM-2026-027
   { id: 't10', workItemId: 'w_cm027', title: 'Layout linea generale', assigneeId: 'p_camillo', status: 'In corso', startDate: d(-7), dueDate: d(14), estimatedHours: 32, loggedHours: 16, progressPercent: 50, blockers: [] },
   { id: 't11', workItemId: 'w_cm027', title: 'Assiemi stazione etichettatura', assigneeId: 'p_nicola', status: 'In corso', startDate: d(0), dueDate: d(21), estimatedHours: 40, loggedHours: 6, progressPercent: 15, blockers: [] },
-  { id: 't12', workItemId: 'w_cm027', title: 'Studio palettizzazione', assigneeId: 'p_camillo', status: 'Da correggere', startDate: d(-3), dueDate: d(10), estimatedHours: 20, loggedHours: 10, progressPercent: 60, blockers: ['Cliente ha rivisto le dimensioni pallet'] },
+  { id: 't12', workItemId: 'w_cm027', title: 'Studio palettizzazione', assigneeId: 'p_camillo', status: 'In corso', startDate: d(-3), dueDate: d(10), estimatedHours: 20, loggedHours: 10, progressPercent: 60, blockers: ['Cliente ha rivisto le dimensioni pallet — da correggere'] },
 
   // CM-2025-098
-  { id: 't13', workItemId: 'w_cm031', title: 'Documentazione cliente finale', assigneeId: 'p_vincenzo', status: 'Pronto per rilascio', startDate: d(-14), dueDate: d(-1), estimatedHours: 12, loggedHours: 12, progressPercent: 100, blockers: [] },
-  { id: 't14', workItemId: 'w_cm031', title: 'Distinte produzione', assigneeId: 'p_vincenzo', status: 'Rilasciato produzione', startDate: d(-21), dueDate: d(-7), estimatedHours: 16, loggedHours: 16, progressPercent: 100, blockers: [] },
+  { id: 't13', workItemId: 'w_cm031', title: 'Documentazione cliente finale', assigneeId: 'p_vincenzo', status: 'In verifica', startDate: d(-14), dueDate: d(-1), estimatedHours: 12, loggedHours: 12, progressPercent: 100, blockers: [] },
+  { id: 't14', workItemId: 'w_cm031', title: 'Distinte produzione', assigneeId: 'p_vincenzo', status: 'Completato', startDate: d(-21), dueDate: d(-7), estimatedHours: 16, loggedHours: 16, progressPercent: 100, blockers: [] },
 
   // ST-2026-007
-  { id: 't15', workItemId: 'w_st007', title: 'Layout preliminare linea', assigneeId: 'p_camillo', status: 'In attesa input commerciale', startDate: d(-7), dueDate: d(7), estimatedHours: 16, loggedHours: 8, progressPercent: 50, blockers: ['In attesa volumi annui'] },
+  { id: 't15', workItemId: 'w_st007', title: 'Layout preliminare linea', assigneeId: 'p_camillo', status: 'In attesa', startDate: d(-7), dueDate: d(7), estimatedHours: 16, loggedHours: 8, progressPercent: 50, blockers: ['In attesa volumi annui dal commerciale'] },
   { id: 't16', workItemId: 'w_st007', title: 'Stima ore e materiali', assigneeId: 'p_camillo', status: 'Da pianificare', startDate: d(7), dueDate: d(14), estimatedHours: 12, loggedHours: 0, progressPercent: 0, blockers: [] },
 
   // ST-2026-011
@@ -294,18 +294,27 @@ const tasks: Task[] = [
   { id: 't18', workItemId: 'w_st011', title: 'Stima costi cantilever cavi', assigneeId: 'p_marco', status: 'Da pianificare', startDate: d(14), dueDate: d(21), estimatedHours: 8, loggedHours: 0, progressPercent: 0, blockers: [] },
 
   // ST-2026-015
-  { id: 't19', workItemId: 'w_st015', title: 'Layout reparto pesatura', assigneeId: 'p_nicola', status: 'In attesa input cliente', startDate: d(-7), dueDate: d(14), estimatedHours: 16, loggedHours: 4, progressPercent: 25, blockers: ['Cliente deve inviare planimetria reparto'] },
+  { id: 't19', workItemId: 'w_st015', title: 'Layout reparto pesatura', assigneeId: 'p_nicola', status: 'In attesa', startDate: d(-7), dueDate: d(14), estimatedHours: 16, loggedHours: 4, progressPercent: 25, blockers: ['Cliente deve inviare planimetria reparto'] },
 
   // IN-2026-002
   { id: 't20', workItemId: 'w_in002', title: 'Aggiornamento libreria attacchi', assigneeId: 'p_vincenzo', status: 'In corso', startDate: d(-21), dueDate: d(28), estimatedHours: 20, loggedHours: 8, progressPercent: 40, blockers: [] },
   { id: 't21', workItemId: 'w_in002', title: 'Standardizzazione bulloneria', assigneeId: 'p_vincenzo', status: 'Da pianificare', startDate: d(28), dueDate: d(56), estimatedHours: 16, loggedHours: 0, progressPercent: 0, blockers: [] },
 
   // IN-2026-005
-  { id: 't22', workItemId: 'w_in005', title: 'Bozza procedura rilascio', assigneeId: 'p_vincenzo', status: 'In attesa scelta tecnica', startDate: d(-3), dueDate: d(14), estimatedHours: 12, loggedHours: 4, progressPercent: 30, blockers: ['Decisione su separazione distinte'] },
+  { id: 't22', workItemId: 'w_in005', title: 'Bozza procedura rilascio', assigneeId: 'p_vincenzo', status: 'In attesa', startDate: d(-3), dueDate: d(14), estimatedHours: 12, loggedHours: 4, progressPercent: 30, blockers: ['Decisione su separazione distinte'] },
   { id: 't23', workItemId: 'w_in005', title: 'Revisione e approvazione', assigneeId: 'p_domenico', status: 'Da pianificare', startDate: d(14), dueDate: d(21), estimatedHours: 6, loggedHours: 0, progressPercent: 0, blockers: [] },
 ]
 
-export const demoData: AppData = { people, workItems, tasks }
+const absences: Absence[] = [
+  // Marco — 1 giorno di ferie venerdì della settimana corrente
+  { id: 'ab_marco_fri', personId: 'p_marco', type: 'ferie', startDate: d(4), endDate: d(4), hoursPerDay: 8, notes: 'Ponte programmato' },
+  // Camillo — permesso di 4h mercoledì della settimana corrente
+  { id: 'ab_camillo_wed', personId: 'p_camillo', type: 'permesso', startDate: d(2), endDate: d(2), hoursPerDay: 4, notes: 'Visita medica' },
+  // Vincenzo — trasferta lunedì della settimana successiva
+  { id: 'ab_vincenzo_mon', personId: 'p_vincenzo', type: 'trasferta', startDate: d(7), endDate: d(7), hoursPerDay: 8, notes: 'Sopralluogo cantiere Epsilon' },
+]
+
+export const demoData: AppData = { people, workItems, tasks, absences }
 
 export function freshDemoData(): AppData {
   return JSON.parse(JSON.stringify(demoData)) as AppData

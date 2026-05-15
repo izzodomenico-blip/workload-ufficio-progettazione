@@ -4,31 +4,21 @@ export type Priority = 'bassa' | 'media' | 'alta' | 'critica'
 
 export type Status =
   | 'Da pianificare'
-  | 'Assegnato'
+  | 'Pianificato'
   | 'In corso'
-  | 'In attesa input commerciale'
-  | 'In attesa input cliente'
-  | 'In attesa scelta tecnica'
-  | 'In verifica responsabile'
-  | 'Da correggere'
-  | 'Pronto per rilascio'
-  | 'Rilasciato produzione'
+  | 'In attesa'
+  | 'In verifica'
+  | 'Completato'
   | 'Sospeso'
-  | 'Annullato'
 
 export const ALL_STATUSES: Status[] = [
   'Da pianificare',
-  'Assegnato',
+  'Pianificato',
   'In corso',
-  'In attesa input commerciale',
-  'In attesa input cliente',
-  'In attesa scelta tecnica',
-  'In verifica responsabile',
-  'Da correggere',
-  'Pronto per rilascio',
-  'Rilasciato produzione',
+  'In attesa',
+  'In verifica',
+  'Completato',
   'Sospeso',
-  'Annullato',
 ]
 
 export const ALL_PRIORITIES: Priority[] = ['bassa', 'media', 'alta', 'critica']
@@ -81,10 +71,25 @@ export interface Task {
   notes?: string
 }
 
+export type AbsenceType = 'ferie' | 'permesso' | 'malattia' | 'trasferta' | 'altro'
+
+export const ALL_ABSENCE_TYPES: AbsenceType[] = ['ferie', 'permesso', 'malattia', 'trasferta', 'altro']
+
+export interface Absence {
+  id: string
+  personId: string
+  type: AbsenceType
+  startDate: string
+  endDate: string
+  hoursPerDay: number
+  notes?: string
+}
+
 export interface AppData {
   people: Person[]
   workItems: WorkItem[]
   tasks: Task[]
+  absences: Absence[]
 }
 
 export interface Filters {
@@ -105,7 +110,8 @@ export const EMPTY_FILTERS: Filters = {
   search: '',
 }
 
-export const CLOSED_STATUSES: Status[] = ['Rilasciato produzione', 'Annullato']
+/** Stati terminali: non contano come lavori/task “aperti” in dashboard e KPI. */
+export const CLOSED_STATUSES: Status[] = ['Completato', 'Sospeso']
 
 export function isOpen(status: Status): boolean {
   return !CLOSED_STATUSES.includes(status)

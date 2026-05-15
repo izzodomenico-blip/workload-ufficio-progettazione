@@ -15,16 +15,20 @@ export function HeroStats({ data }: Props) {
     const overdueTasks = data.tasks.filter((t) => isOpen(t.status) && isOverdue(t.dueDate)).length
     const blockedTasks = data.tasks.filter((t) => isOpen(t.status) && t.blockers.length > 0).length
 
-    const loads = data.people.filter((p) => p.active).map((p) => computeWorkload(p, data.tasks))
-    const avgLoad = loads.length === 0 ? 0 : Math.round(loads.reduce((s, l) => s + l.loadPercent, 0) / loads.length)
+    const loads = data.people.filter((p) => p.active).map((p) => computeWorkload(p, data.tasks, data.absences))
+    // Per il carico medio escludo persone "fully absent" (capacità reale 0)
+    const measurable = loads.filter((l) => !l.isFullyAbsent)
+    const avgLoad = measurable.length === 0 ? 0 : Math.round(measurable.reduce((s, l) => s + l.loadPercent, 0) / measurable.length)
     let mostLoaded: { person: Person; percent: number } | null = null
     for (const l of loads) {
+      if (l.isFullyAbsent) continue
       if (mostLoaded === null || l.loadPercent > mostLoaded.percent) {
         const person = data.people.find((p) => p.id === l.personId)
         if (person) mostLoaded = { person, percent: l.loadPercent }
       }
     }
-    return { openCommesse, openStudi, overdueTasks, blockedTasks, avgLoad, mostLoaded }
+    const peopleAbsent = loads.filter((l) => l.absenceHours > 0).length
+    return { openCommesse, openStudi, overdueTasks, blockedTasks, avgLoad, mostLoaded, peopleAbsent }
   }, [data])
 
   const now = new Date()
@@ -37,7 +41,12 @@ export function HeroStats({ data }: Props) {
     { label: 'Studi/preventivi aperti', value: String(stats.openStudi), tone: 'violet', hint: 'in valutazione' },
     { label: 'Task in ritardo', value: String(stats.overdueTasks), tone: stats.overdueTasks > 0 ? 'red' : 'emerald', hint: 'oltre scadenza' },
     { label: 'Task bloccati', value: String(stats.blockedTasks), tone: stats.blockedTasks > 0 ? 'amber' : 'emerald', hint: 'con bloccanti aperti' },
-    { label: 'Carico medio ufficio', value: `${stats.avgLoad}%`, tone: stats.avgLoad > 100 ? 'red' : stats.avgLoad > 85 ? 'orange' : 'sky', hint: 'settimana corrente' },
+    {
+      label: 'Carico medio ufficio',
+      value: `${stats.avgLoad}%`,
+      tone: stats.avgLoad > 100 ? 'red' : stats.avgLoad > 85 ? 'orange' : 'sky',
+      hint: stats.peopleAbsent > 0 ? `su capacità reale · ${stats.peopleAbsent} con assenze` : 'su capacità reale settimana corrente',
+    },
     {
       label: 'Più sovraccarico',
       value: stats.mostLoaded ? `${stats.mostLoaded.person.name}` : '—',

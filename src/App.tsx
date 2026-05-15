@@ -4,6 +4,7 @@ import { ToastProvider } from './state/ToastProvider'
 import { Dashboard } from './components/Dashboard'
 import { WorkItemFormModal } from './components/WorkItemFormModal'
 import { PeopleSettingsModal } from './components/PeopleSettingsModal'
+import { AbsencesCalendarModal } from './components/AbsencesCalendarModal'
 
 export function App() {
   return (
@@ -18,6 +19,7 @@ export function App() {
 function Shell() {
   const [createOpen, setCreateOpen] = useState(false)
   const [peopleOpen, setPeopleOpen] = useState(false)
+  const [absencesOpen, setAbsencesOpen] = useState(false)
 
   return (
     <div className="min-h-full">
@@ -29,6 +31,14 @@ function Shell() {
             <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Ufficio Progettazione Meccanica</div>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setAbsencesOpen(true)}
+              className="btn-ghost"
+              title="Calendario ferie, permessi, malattie e trasferte"
+            >
+              <Icon path="M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" />
+              Ferie e permessi
+            </button>
             <button
               onClick={() => setPeopleOpen(true)}
               className="btn-ghost"
@@ -54,7 +64,7 @@ function Shell() {
       </main>
 
       <footer className="mx-auto max-w-[1600px] px-5 py-6 text-center text-[11px] text-slate-600">
-        v0.2 · CRUD da interfaccia · dati persistiti in <code className="text-slate-400">localStorage</code>
+        v0.3 · ferie/permessi · dati persistiti in <code className="text-slate-400">localStorage</code>
       </footer>
 
       <WorkItemFormModal
@@ -65,6 +75,10 @@ function Shell() {
       <PeopleSettingsModal
         open={peopleOpen}
         onClose={() => setPeopleOpen(false)}
+      />
+      <AbsencesCalendarModal
+        open={absencesOpen}
+        onClose={() => setAbsencesOpen(false)}
       />
     </div>
   )

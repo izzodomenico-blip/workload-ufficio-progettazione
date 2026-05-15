@@ -1,4 +1,5 @@
-import type { AppData, Person, Status, Task, WorkItem } from '../types'
+import type { Absence, AppData, Person, Status, Task, WorkItem } from '../types'
+import { formatISODate } from '../utils/dates'
 import { uid } from '../utils/format'
 
 export type CreateWorkItemInput = Omit<WorkItem, 'id'>
@@ -6,6 +7,8 @@ export type UpdateWorkItemInput = Partial<Omit<WorkItem, 'id'>>
 export type CreateTaskInput = Omit<Task, 'id' | 'workItemId'>
 export type UpdateTaskInput = Partial<Omit<Task, 'id' | 'workItemId'>>
 export type UpdatePersonInput = Partial<Omit<Person, 'id'>>
+export type CreateAbsenceInput = Omit<Absence, 'id'>
+export type UpdateAbsenceInput = Partial<Omit<Absence, 'id'>>
 
 function normalizeWorkItem(w: WorkItem): WorkItem {
   if (w.type === 'studio') return w
@@ -81,4 +84,34 @@ export function updatePerson(data: AppData, id: string, patch: UpdatePersonInput
     ...data,
     people: data.people.map((p) => (p.id === id ? { ...p, ...patch } : p)),
   }
+}
+
+export function createAbsence(data: AppData, input: CreateAbsenceInput): { data: AppData; id: string } {
+  const id = uid('ab')
+  const absence: Absence = { ...input, id }
+  return {
+    data: { ...data, absences: [...data.absences, absence] },
+    id,
+  }
+}
+
+export function updateAbsence(data: AppData, id: string, patch: UpdateAbsenceInput): AppData {
+  return {
+    ...data,
+    absences: data.absences.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+  }
+}
+
+export function deleteAbsence(data: AppData, id: string): AppData {
+  return { ...data, absences: data.absences.filter((a) => a.id !== id) }
+}
+
+export function getAbsencesByPerson(data: AppData, personId: string): Absence[] {
+  return data.absences.filter((a) => a.personId === personId)
+}
+
+export function getAbsencesForWeek(data: AppData, weekStart: Date, weekEnd: Date): Absence[] {
+  const startISO = formatISODate(weekStart)
+  const endISO = formatISODate(weekEnd)
+  return data.absences.filter((a) => a.startDate <= endISO && a.endDate >= startISO)
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Task, WorkItem } from '../types'
+import type { Absence, Task, WorkItem } from '../types'
+import { isOpen } from '../types'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
 import { TypeBadge } from './TypeBadge'
@@ -10,6 +11,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { WorkItemFormModal } from './WorkItemFormModal'
 import { TaskFormModal } from './TaskFormModal'
 import { formatItalian, formatItalianShort, isOverdue, daysUntil } from '../utils/dates'
+import { getAssigneeAbsencesDuringTask } from '../utils/availability'
 
 interface Props {
   workItemId: string | null
@@ -193,6 +195,7 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
                   key={t.id}
                   task={t}
                   assigneeName={personById.get(t.assigneeId)?.name ?? '—'}
+                  absenceConflicts={getAssigneeAbsencesDuringTask(t.assigneeId, data.absences, t.startDate, t.dueDate)}
                   onEdit={() => setTaskFormState({ open: true, mode: 'edit', task: t })}
                   onDelete={() => setConfirmDeleteTaskId(t.id)}
                 />
@@ -259,14 +262,22 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
 }
 
 function TaskRow({
-  task, assigneeName, onEdit, onDelete,
-}: { task: Task; assigneeName: string; onEdit: () => void; onDelete: () => void }) {
+  task, assigneeName, absenceConflicts, onEdit, onDelete,
+}: { task: Task; assigneeName: string; absenceConflicts: Absence[]; onEdit: () => void; onDelete: () => void }) {
   const { setTaskStatus } = useData()
   const toast = useToast()
   const overdue = isOverdue(task.dueDate)
+  const hasAbsenceConflict = absenceConflicts.length > 0
+  const atRisk = hasAbsenceConflict && isOpen(task.status)
+
+  // La scadenza cade dentro un’assenza o nei due giorni successivi
+  const dueRiskAbsence = absenceConflicts.find((a) => task.dueDate >= a.startDate && task.dueDate <= addDaysISO(a.endDate, 2))
+  const dueDuringAbsence = absenceConflicts.find((a) => task.dueDate >= a.startDate && task.dueDate <= a.endDate)
 
   return (
-    <li className={`rounded-md border bg-slate-900/40 p-3 ${overdue ? 'border-red-500/30' : 'border-slate-800'}`}>
+    <li className={`rounded-md border bg-slate-900/40 p-3 ${
+      overdue ? 'border-red-500/30' : atRisk ? 'border-amber-500/30' : 'border-slate-800'
+    }`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium text-slate-100">{task.title}</div>
@@ -292,6 +303,25 @@ function TaskRow({
           <span className="tabular-nums">{task.progressPercent}%</span>
         </div>
       </div>
+      {hasAbsenceConflict && (
+        <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[11px] text-amber-200">
+          <div className="font-medium">⚠ L’assegnatario ha assenze nel periodo del task</div>
+          <ul className="mt-0.5 space-y-0.5 text-amber-200/80">
+            {absenceConflicts.map((a) => (
+              <li key={a.id}>
+                {capitalize(a.type)} · {formatItalianShort(a.startDate)}{a.startDate !== a.endDate ? ` → ${formatItalianShort(a.endDate)}` : ''} · {a.hoursPerDay}h/g
+                {a.notes ? ` — ${a.notes}` : ''}
+              </li>
+            ))}
+          </ul>
+          {dueDuringAbsence && (
+            <div className="mt-1 font-medium text-orange-300">⚠ Scadenza durante un’assenza</div>
+          )}
+          {!dueDuringAbsence && dueRiskAbsence && (
+            <div className="mt-1 text-orange-300">⚠ Scadenza subito dopo un’assenza</div>
+          )}
+        </div>
+      )}
       {task.blockers.length > 0 && (
         <ul className="mt-2 space-y-0.5 text-[11px] text-amber-300">
           {task.blockers.map((b, i) => <li key={i}>⛔ {b}</li>)}
@@ -300,6 +330,19 @@ function TaskRow({
       {task.notes && <div className="mt-1.5 whitespace-pre-wrap text-[11px] text-slate-400">{task.notes}</div>}
     </li>
   )
+}
+
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(y, (m ?? 1) - 1, (d ?? 1) + days)
+  const yy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
+}
+
+function capitalize(s: string): string {
+  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1)
 }
 
 function DeleteTaskDialog({ open, taskId, onClose }: { open: boolean; taskId: string | null; onClose: () => void }) {

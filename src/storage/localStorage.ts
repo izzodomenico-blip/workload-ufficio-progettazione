@@ -1,15 +1,32 @@
 import type { AppData } from '../types'
+import { mapLegacyStatus } from '../utils/progress'
 
 const STORAGE_KEY = 'workload-ufficio-progettazione:v1'
+
+export function migrateAppData(data: AppData): AppData {
+  const absences = Array.isArray(data.absences) ? data.absences : []
+  return {
+    ...data,
+    absences,
+    workItems: data.workItems.map((w) => ({
+      ...w,
+      status: mapLegacyStatus(w.status as string),
+    })),
+    tasks: data.tasks.map((t) => ({
+      ...t,
+      status: mapLegacyStatus(t.status as string),
+    })),
+  }
+}
 
 export function loadFromStorage(): AppData | null {
   if (typeof window === 'undefined') return null
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as AppData
+    const parsed = JSON.parse(raw) as Partial<AppData>
     if (!parsed.people || !parsed.workItems || !parsed.tasks) return null
-    return parsed
+    return migrateAppData(parsed as AppData)
   } catch {
     return null
   }
@@ -46,12 +63,12 @@ export function readJSONFile(file: File): Promise<AppData> {
     const reader = new FileReader()
     reader.onload = () => {
       try {
-        const data = JSON.parse(String(reader.result)) as AppData
+        const data = JSON.parse(String(reader.result)) as Partial<AppData>
         if (!data.people || !data.workItems || !data.tasks) {
           reject(new Error('Struttura JSON non valida: mancano people / workItems / tasks.'))
           return
         }
-        resolve(data)
+        resolve(migrateAppData(data as AppData))
       } catch (err) {
         reject(err instanceof Error ? err : new Error('Impossibile leggere il file.'))
       }
