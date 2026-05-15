@@ -1,0 +1,62 @@
+import type { AppData } from '../types'
+
+const STORAGE_KEY = 'workload-ufficio-progettazione:v1'
+
+export function loadFromStorage(): AppData | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as AppData
+    if (!parsed.people || !parsed.workItems || !parsed.tasks) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function saveToStorage(data: AppData): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch {
+    // storage full / disabled — silently ignore
+  }
+}
+
+export function clearStorage(): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(STORAGE_KEY)
+}
+
+export function downloadJSON(data: AppData, filename?: string): void {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename ?? `workload-${new Date().toISOString().slice(0, 10)}.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+export function readJSONFile(file: File): Promise<AppData> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result)) as AppData
+        if (!data.people || !data.workItems || !data.tasks) {
+          reject(new Error('Struttura JSON non valida: mancano people / workItems / tasks.'))
+          return
+        }
+        resolve(data)
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error('Impossibile leggere il file.'))
+      }
+    }
+    reader.onerror = () => reject(new Error('Errore di lettura file.'))
+    reader.readAsText(file)
+  })
+}

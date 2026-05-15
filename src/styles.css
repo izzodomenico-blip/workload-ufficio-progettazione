@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b1020;
+  --color-bg-soft: #0f172a;
+  --color-panel: #111a30;
+  --color-panel-hi: #172139;
+  --color-edge: #1f2a44;
+  --color-edge-soft: #182238;
+  --color-ink: #e2e8f0;
+  --color-ink-dim: #94a3b8;
+  --color-ink-faint: #64748b;
+  --color-accent: #38bdf8;
+  --color-accent-2: #818cf8;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 800px at 0% 0%, #122044 0%, transparent 60%),
+    radial-gradient(1000px 700px at 100% 0%, #0e1a3d 0%, transparent 55%),
+    var(--color-bg);
+  color: var(--color-ink);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+* { border-color: var(--color-edge); }
+
+@utility panel {
+  @apply rounded-xl border bg-[color:var(--color-panel)] shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)];
+  border-color: var(--color-edge);
+}
+
+@utility input-base {
+  @apply block w-full rounded-md border bg-[color:var(--color-bg-soft)] px-3 py-1.5 text-sm text-[color:var(--color-ink)] outline-none transition placeholder:text-[color:var(--color-ink-faint)] focus:border-[color:var(--color-accent)] focus:ring-2 focus:ring-sky-500/20;
+  border-color: var(--color-edge);
+}
+
+@utility btn-primary {
+  @apply inline-flex items-center gap-1.5 rounded-md bg-sky-500 px-3 py-1.5 text-sm font-medium text-slate-950 transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-300/50;
+}
+
+@utility btn-ghost {
+  @apply inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-[color:var(--color-ink)] transition hover:bg-[color:var(--color-panel-hi)];
+  border-color: var(--color-edge);
+}
+
+@utility chip {
+  @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset;
+}
+
+@utility scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-edge) transparent;
+}
+
+::selection {
+  background: rgba(56, 189, 248, 0.3);
+  color: white;
+}

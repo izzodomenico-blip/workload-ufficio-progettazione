@@ -1,0 +1,124 @@
+import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
+import type { AppData, Filters, WorkItem } from '../types'
+import { isOpen } from '../types'
+import { HeroStats } from './HeroStats'
+import { WorkloadPersonCard } from './WorkloadPersonCard'
+import { FiltersBar } from './FiltersBar'
+import { WorkItemsTable } from './WorkItemsTable'
+import { WorkloadKanban } from './WorkloadKanban'
+import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
+import { ImportExportPanel } from './ImportExportPanel'
+
+interface Props {
+  data: AppData
+  filters: Filters
+  onFiltersChange: (next: Filters) => void
+  onImport: (next: AppData) => void
+  onReset: () => void
+  onConvertStudio: (id: string, code?: string) => void
+}
+
+type ViewMode = 'table' | 'kanban'
+
+export function Dashboard({ data, filters, onFiltersChange, onImport, onReset, onConvertStudio }: Props) {
+  const [view, setView] = useState<ViewMode>('table')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const filteredItems = useMemo<WorkItem[]>(() => {
+    const q = filters.search.trim().toLowerCase()
+    return data.workItems
+      .filter((w) => {
+        if (filters.type && w.type !== filters.type) return false
+        if (filters.priority && w.priority !== filters.priority) return false
+        if (filters.status && w.status !== filters.status) return false
+        if (filters.customer && w.customer !== filters.customer) return false
+        if (filters.personId) {
+          if (w.ownerId !== filters.personId && !w.assigneeIds.includes(filters.personId)) return false
+        }
+        if (q) {
+          const hay = `${w.code} ${w.title} ${w.customer} ${w.description}`.toLowerCase()
+          if (!hay.includes(q)) return false
+        }
+        return true
+      })
+      .sort((a, b) => {
+        // open first, then earliest due
+        const ao = isOpen(a.status) ? 0 : 1
+        const bo = isOpen(b.status) ? 0 : 1
+        if (ao !== bo) return ao - bo
+        return a.dueDate.localeCompare(b.dueDate)
+      })
+  }, [data.workItems, filters])
+
+  const tasksForLoad = data.tasks
+
+  return (
+    <div className="space-y-5">
+      <HeroStats data={data} />
+
+      <section>
+        <SectionHeader
+          title="Workload per persona"
+          subtitle="Carico settimana corrente, capacità e principali task"
+        />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {data.people.filter((p) => p.active).map((p) => (
+            <WorkloadPersonCard
+              key={p.id}
+              person={p}
+              tasks={tasksForLoad}
+              onTaskClick={(workItemId) => setSelectedId(workItemId)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <SectionHeader
+          title="Lavori"
+          subtitle="Tabella e Kanban filtrabili"
+          right={
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-md border border-slate-700 bg-slate-900 p-0.5 text-xs">
+                <button
+                  onClick={() => setView('table')}
+                  className={`rounded px-2.5 py-1 transition ${view === 'table' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+                >Tabella</button>
+                <button
+                  onClick={() => setView('kanban')}
+                  className={`rounded px-2.5 py-1 transition ${view === 'kanban' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+                >Kanban</button>
+              </div>
+              <ImportExportPanel data={data} onImport={onImport} onReset={onReset} />
+            </div>
+          }
+        />
+        <FiltersBar data={data} filters={filters} onChange={onFiltersChange} />
+        {view === 'table'
+          ? <WorkItemsTable data={data} items={filteredItems} onSelect={setSelectedId} />
+          : <WorkloadKanban data={data} items={filteredItems} onSelect={setSelectedId} />
+        }
+      </section>
+
+      <WorkItemDetailDrawer
+        data={data}
+        workItemId={selectedId}
+        onClose={() => setSelectedId(null)}
+        onConvertStudio={onConvertStudio}
+      />
+    </div>
+  )
+}
+
+function SectionHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
+  return (
+    <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h2 className="text-base font-semibold text-slate-100">{title}</h2>
+        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+      </div>
+      {right}
+    </div>
+  )
+}
