@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { Absence, Person, Task } from '../types'
 import { computeWorkload, LOAD_BAR_CLASS, LOAD_LABELS, LOAD_RING_CLASS, LOAD_TEXT_CLASS, topTasksForPerson } from '../utils/workload'
+import { countActiveTaskHealth } from '../utils/progress'
 import { formatItalianShort, isOverdue } from '../utils/dates'
 
 interface Props {
@@ -13,6 +14,10 @@ interface Props {
 export function WorkloadPersonCard({ person, tasks, absences, onTaskClick }: Props) {
   const load = useMemo(() => computeWorkload(person, tasks, absences), [person, tasks, absences])
   const top = useMemo(() => topTasksForPerson(tasks, person.id, 3), [tasks, person.id])
+  const healthCounts = useMemo(
+    () => countActiveTaskHealth(tasks, person.id, () => false),
+    [tasks, person.id],
+  )
 
   const ringClass = load.hasTasksDuringAbsence
     ? 'ring-amber-500/40'
@@ -108,6 +113,17 @@ export function WorkloadPersonCard({ person, tasks, absences, onTaskClick }: Pro
         </div>
       )}
 
+      <div className="mt-3 border-t border-slate-800 pt-2">
+        <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-500">Salute task</div>
+        <div className="flex flex-wrap gap-1">
+          <HealthCount label="OK" value={healthCounts.ok} tone="emerald" />
+          <HealthCount label="A rischio" value={healthCounts['a rischio']} tone="amber" />
+          <HealthCount label="In ritardo" value={healthCounts['in ritardo']} tone="red" />
+          <HealthCount label="In attesa" value={healthCounts['in attesa']} tone="sky" />
+          <HealthCount label="Sospesi" value={healthCounts.sospeso} tone="zinc" />
+        </div>
+      </div>
+
       <div className="mt-3 space-y-1.5">
         {top.length === 0 && (
           <div className="rounded-md border border-dashed border-slate-700 px-3 py-2 text-[11px] text-slate-500">
@@ -131,5 +147,22 @@ export function WorkloadPersonCard({ person, tasks, absences, onTaskClick }: Pro
         })}
       </div>
     </div>
+  )
+}
+
+const COUNT_TONES = {
+  emerald: { on: 'bg-emerald-500/15 text-emerald-200 ring-emerald-500/40', off: 'bg-slate-800/40 text-slate-500 ring-slate-700/60' },
+  amber: { on: 'bg-amber-500/15 text-amber-200 ring-amber-500/40', off: 'bg-slate-800/40 text-slate-500 ring-slate-700/60' },
+  red: { on: 'bg-red-500/15 text-red-200 ring-red-500/40', off: 'bg-slate-800/40 text-slate-500 ring-slate-700/60' },
+  sky: { on: 'bg-sky-500/15 text-sky-200 ring-sky-500/40', off: 'bg-slate-800/40 text-slate-500 ring-slate-700/60' },
+  zinc: { on: 'bg-zinc-500/15 text-zinc-200 ring-zinc-500/40', off: 'bg-slate-800/40 text-slate-500 ring-slate-700/60' },
+} as const
+
+function HealthCount({ label, value, tone }: { label: string; value: number; tone: keyof typeof COUNT_TONES }) {
+  const cls = value > 0 ? COUNT_TONES[tone].on : COUNT_TONES[tone].off
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${cls}`}>
+      {label} <span className="tabular-nums">{value}</span>
+    </span>
   )
 }

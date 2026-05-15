@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { AppData, WorkItem } from '../types'
 import { isOpen } from '../types'
 import { useData } from '../state/DataProvider'
@@ -5,7 +6,9 @@ import { useToast } from '../state/ToastProvider'
 import { TypeBadge } from './TypeBadge'
 import { PriorityBadge } from './PriorityBadge'
 import { StatusSelect } from './StatusSelect'
+import { HealthBadge } from './HealthBadge'
 import { formatItalianShort, isOverdue, daysUntil } from '../utils/dates'
+import { calculateExpectedProgress, getWorkItemHealth } from '../utils/progress'
 
 interface Props {
   data: AppData
@@ -17,6 +20,15 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
   const { setWorkItemStatus } = useData()
   const toast = useToast()
   const personById = new Map(data.people.map((p) => [p.id, p]))
+  const tasksByItem = useMemo(() => {
+    const m = new Map<string, typeof data.tasks>()
+    for (const t of data.tasks) {
+      const arr = m.get(t.workItemId) ?? []
+      arr.push(t)
+      m.set(t.workItemId, arr)
+    }
+    return m
+  }, [data.tasks])
 
   return (
     <div className="panel overflow-hidden">
@@ -40,6 +52,7 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
               <th className="px-3 py-2 font-semibold">Assegnati</th>
               <th className="px-3 py-2 font-semibold">Scadenza</th>
               <th className="px-3 py-2 font-semibold">Avanz.</th>
+              <th className="px-3 py-2 font-semibold">Salute</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/70">
@@ -47,6 +60,10 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
               const overdue = isOpen(w.status) && isOverdue(w.dueDate)
               const days = daysUntil(w.dueDate)
               const owner = personById.get(w.ownerId)
+              const itemTasks = tasksByItem.get(w.id) ?? []
+              const expected = calculateExpectedProgress(w.startDate, w.dueDate)
+              const health = getWorkItemHealth(w, itemTasks)
+              const diff = w.progressPercent - expected
               return (
                 <tr
                   key={w.id}
@@ -99,19 +116,27 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
                       {overdue ? `${Math.abs(days)} gg di ritardo` : days >= 0 ? `tra ${days} gg` : ''}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 w-[140px]">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-800">
-                        <div className="h-full bg-sky-500" style={{ width: `${w.progressPercent}%` }} />
-                      </div>
-                      <span className="w-9 text-right text-[11px] tabular-nums text-slate-400">{w.progressPercent}%</span>
+                  <td className="px-3 py-2.5 w-[170px]">
+                    <div className="relative h-1.5 overflow-hidden rounded-full bg-slate-800">
+                      <div className="h-full bg-sky-500" style={{ width: `${w.progressPercent}%` }} />
+                      <div
+                        className="absolute top-0 h-full w-px bg-amber-300"
+                        style={{ left: `${expected}%` }}
+                        title={`Atteso ${expected}%`}
+                        aria-hidden
+                      />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-[10px] tabular-nums">
+                      <span className="text-slate-400">Reale {w.progressPercent}%</span>
+                      <span className={`${diff < -20 ? 'text-amber-300' : 'text-slate-500'}`}>Atteso {expected}%</span>
                     </div>
                   </td>
+                  <td className="px-3 py-2.5"><HealthBadge health={health} /></td>
                 </tr>
               )
             })}
             {items.length === 0 && (
-              <tr><td colSpan={10} className="px-4 py-12 text-center text-sm text-slate-500">Nessun lavoro corrisponde ai filtri.</td></tr>
+              <tr><td colSpan={11} className="px-4 py-12 text-center text-sm text-slate-500">Nessun lavoro corrisponde ai filtri.</td></tr>
             )}
           </tbody>
         </table>

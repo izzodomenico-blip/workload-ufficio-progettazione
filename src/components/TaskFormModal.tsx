@@ -184,7 +184,12 @@ export function TaskFormModal({ open, onClose, mode, workItemId, task }: Props) 
           <input type="number" min={0} step={1} className="input-base" value={values.loggedHours} onChange={(e) => set('loggedHours', Number(e.target.value))} />
         </FormField>
 
-        <FormField label="Avanzamento %" error={errors.progressPercent} className="md:col-span-2">
+        <FormField
+          label="Avanzamento reale %"
+          error={errors.progressPercent}
+          className="md:col-span-2"
+          hint="L’avanzamento atteso viene calcolato automaticamente in base a date e giorni lavorativi."
+        >
           <div className="flex items-center gap-3">
             <input
               type="range" min={0} max={100} value={values.progressPercent}

@@ -12,6 +12,8 @@ import { WorkItemFormModal } from './WorkItemFormModal'
 import { TaskFormModal } from './TaskFormModal'
 import { formatItalian, formatItalianShort, isOverdue, daysUntil } from '../utils/dates'
 import { getAssigneeAbsencesDuringTask } from '../utils/availability'
+import { calculateExpectedProgress, getTaskHealth } from '../utils/progress'
+import { HealthBadge } from './HealthBadge'
 
 interface Props {
   workItemId: string | null
@@ -269,6 +271,9 @@ function TaskRow({
   const overdue = isOverdue(task.dueDate)
   const hasAbsenceConflict = absenceConflicts.length > 0
   const atRisk = hasAbsenceConflict && isOpen(task.status)
+  const expected = calculateExpectedProgress(task.startDate, task.dueDate)
+  const health = getTaskHealth(task)
+  const diff = task.progressPercent - expected
 
   // La scadenza cade dentro un’assenza o nei due giorni successivi
   const dueRiskAbsence = absenceConflicts.find((a) => task.dueDate >= a.startDate && task.dueDate <= addDaysISO(a.endDate, 2))
@@ -284,6 +289,7 @@ function TaskRow({
           <div className="mt-0.5 text-[11px] text-slate-500">{assigneeName}</div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          <HealthBadge health={health} />
           <StatusSelect
             value={task.status}
             onChange={(s) => { setTaskStatus(task.id, s); toast.info(`Task: ${s}`) }}
@@ -292,16 +298,25 @@ function TaskRow({
           <button onClick={onDelete} className="rounded p-1 text-slate-400 hover:bg-red-500/10 hover:text-red-300" title="Elimina task" aria-label="Elimina">🗑</button>
         </div>
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-slate-400">
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-400 md:grid-cols-3">
         <div>
           <span className="text-slate-500">Periodo:</span> {formatItalianShort(task.startDate)} → <span className={overdue ? 'text-red-300' : ''}>{formatItalianShort(task.dueDate)}</span>
         </div>
         <div><span className="text-slate-500">Ore:</span> {task.loggedHours}/{task.estimatedHours}h</div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-slate-500">Avanz.:</span>
-          <span className="inline-block h-1 w-12 overflow-hidden rounded-full bg-slate-800"><span className="block h-full bg-sky-500" style={{ width: `${task.progressPercent}%` }} /></span>
-          <span className="tabular-nums">{task.progressPercent}%</span>
+        <div>
+          <span className="text-slate-500">Avanz.:</span>{' '}
+          <span className="tabular-nums text-slate-200">Reale {task.progressPercent}%</span>
+          {' · '}
+          <span className="tabular-nums text-amber-300">Atteso {expected}%</span>
+          {' '}
+          <span className={`tabular-nums ${diff < -20 ? 'text-red-300' : diff < 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
+            ({diff > 0 ? '+' : ''}{diff}%)
+          </span>
         </div>
+      </div>
+      <div className="mt-1.5 relative h-1 overflow-hidden rounded-full bg-slate-800">
+        <div className="h-full bg-sky-500" style={{ width: `${task.progressPercent}%` }} />
+        <div className="absolute top-0 h-full w-px bg-amber-300" style={{ left: `${expected}%` }} aria-hidden />
       </div>
       {hasAbsenceConflict && (
         <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[11px] text-amber-200">

@@ -19,15 +19,6 @@ const LEGACY_STATUS_MAP: Record<string, Status> = {
   'Annullato': 'Sospeso',
 }
 
-const HEALTH_PRIORITY: HealthStatus[] = [
-  'in ritardo',
-  'a rischio',
-  'in attesa',
-  'sospeso',
-  'completato',
-  'ok',
-]
-
 export function mapLegacyStatus(status: string): Status {
   if (VALID_STATUSES.has(status)) return status as Status
   return LEGACY_STATUS_MAP[status] ?? 'Da pianificare'
@@ -86,11 +77,18 @@ function healthFromEntity(
   )
 }
 
+/**
+ * Salute aggregata di un work-item dai suoi task.
+ * Priorità: in ritardo > a rischio > in attesa > sospeso > (tutti completati) > ok.
+ * "completato" richiede che TUTTI i task lo siano (1 task non chiude il work-item).
+ */
 function aggregateHealth(healths: HealthStatus[]): HealthStatus {
   if (healths.length === 0) return 'ok'
-  for (const h of HEALTH_PRIORITY) {
-    if (healths.includes(h)) return h
-  }
+  if (healths.includes('in ritardo')) return 'in ritardo'
+  if (healths.includes('a rischio')) return 'a rischio'
+  if (healths.includes('in attesa')) return 'in attesa'
+  if (healths.includes('sospeso')) return 'sospeso'
+  if (healths.every((h) => h === 'completato')) return 'completato'
   return 'ok'
 }
 
