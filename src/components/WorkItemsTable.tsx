@@ -1,8 +1,10 @@
 import type { AppData, WorkItem } from '../types'
 import { isOpen } from '../types'
+import { useData } from '../state/DataProvider'
+import { useToast } from '../state/ToastProvider'
 import { TypeBadge } from './TypeBadge'
 import { PriorityBadge } from './PriorityBadge'
-import { StatusBadge } from './StatusBadge'
+import { StatusSelect } from './StatusSelect'
 import { formatItalianShort, isOverdue, daysUntil } from '../utils/dates'
 
 interface Props {
@@ -12,6 +14,8 @@ interface Props {
 }
 
 export function WorkItemsTable({ data, items, onSelect }: Props) {
+  const { setWorkItemStatus } = useData()
+  const toast = useToast()
   const personById = new Map(data.people.map((p) => [p.id, p]))
 
   return (
@@ -66,7 +70,12 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
                     )}
                   </td>
                   <td className="px-3 py-2.5"><PriorityBadge priority={w.priority} /></td>
-                  <td className="px-3 py-2.5"><StatusBadge status={w.status} /></td>
+                  <td className="px-3 py-2.5">
+                    <StatusSelect
+                      value={w.status}
+                      onChange={(s) => { setWorkItemStatus(w.id, s); toast.info(`${w.code || w.title}: ${s}`) }}
+                    />
+                  </td>
                   <td className="px-3 py-2.5 text-slate-300">{owner?.name ?? '—'}</td>
                   <td className="px-3 py-2.5">
                     <div className="flex flex-wrap gap-1">

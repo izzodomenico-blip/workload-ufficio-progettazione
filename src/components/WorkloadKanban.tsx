@@ -1,7 +1,10 @@
 import { useMemo } from 'react'
 import type { AppData, Status, WorkItem } from '../types'
+import { useData } from '../state/DataProvider'
+import { useToast } from '../state/ToastProvider'
 import { TypeBadge } from './TypeBadge'
 import { PriorityBadge } from './PriorityBadge'
+import { StatusSelect } from './StatusSelect'
 import { formatItalianShort, isOverdue } from '../utils/dates'
 
 interface KanbanColumn {
@@ -27,6 +30,8 @@ interface Props {
 }
 
 export function WorkloadKanban({ data, items, onSelect }: Props) {
+  const { setWorkItemStatus } = useData()
+  const toast = useToast()
   const personById = useMemo(() => new Map(data.people.map((p) => [p.id, p])), [data.people])
 
   const grouped = useMemo(() => {
@@ -62,10 +67,10 @@ export function WorkloadKanban({ data, items, onSelect }: Props) {
                 {colItems.map((w) => {
                   const overdue = isOverdue(w.dueDate)
                   return (
-                    <button
+                    <div
                       key={w.id}
                       onClick={() => onSelect(w.id)}
-                      className={`block w-full rounded-md border bg-slate-900 p-2.5 text-left transition hover:border-slate-600 hover:bg-slate-800 ${
+                      className={`block w-full cursor-pointer rounded-md border bg-slate-900 p-2.5 text-left transition hover:border-slate-600 hover:bg-slate-800 ${
                         overdue ? 'border-red-500/40' : 'border-slate-800'
                       }`}
                     >
@@ -76,6 +81,12 @@ export function WorkloadKanban({ data, items, onSelect }: Props) {
                       <div className="mt-1.5 font-mono text-[11px] text-slate-400">{w.code}</div>
                       <div className="text-sm font-medium text-slate-100 leading-snug">{w.title}</div>
                       <div className="mt-1 truncate text-[11px] text-slate-500">{w.customer}</div>
+                      <div className="mt-2">
+                        <StatusSelect
+                          value={w.status}
+                          onChange={(s) => { setWorkItemStatus(w.id, s); toast.info(`${w.code || w.title}: ${s}`) }}
+                        />
+                      </div>
                       <div className="mt-2 flex items-center justify-between text-[11px]">
                         <div className="flex flex-wrap gap-1">
                           {w.assigneeIds.slice(0, 3).map((id) => {
@@ -98,7 +109,7 @@ export function WorkloadKanban({ data, items, onSelect }: Props) {
                       <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-800">
                         <div className="h-full bg-sky-500" style={{ width: `${w.progressPercent}%` }} />
                       </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>

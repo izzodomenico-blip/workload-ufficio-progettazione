@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { AppData, Filters, WorkItem } from '../types'
-import { isOpen } from '../types'
+import type { Filters, WorkItem } from '../types'
+import { EMPTY_FILTERS, isOpen } from '../types'
+import { useData } from '../state/DataProvider'
 import { HeroStats } from './HeroStats'
 import { WorkloadPersonCard } from './WorkloadPersonCard'
 import { FiltersBar } from './FiltersBar'
@@ -10,18 +11,11 @@ import { WorkloadKanban } from './WorkloadKanban'
 import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
 import { ImportExportPanel } from './ImportExportPanel'
 
-interface Props {
-  data: AppData
-  filters: Filters
-  onFiltersChange: (next: Filters) => void
-  onImport: (next: AppData) => void
-  onReset: () => void
-  onConvertStudio: (id: string, code?: string) => void
-}
-
 type ViewMode = 'table' | 'kanban'
 
-export function Dashboard({ data, filters, onFiltersChange, onImport, onReset, onConvertStudio }: Props) {
+export function Dashboard() {
+  const { data } = useData()
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [view, setView] = useState<ViewMode>('table')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -43,15 +37,12 @@ export function Dashboard({ data, filters, onFiltersChange, onImport, onReset, o
         return true
       })
       .sort((a, b) => {
-        // open first, then earliest due
         const ao = isOpen(a.status) ? 0 : 1
         const bo = isOpen(b.status) ? 0 : 1
         if (ao !== bo) return ao - bo
         return a.dueDate.localeCompare(b.dueDate)
       })
   }, [data.workItems, filters])
-
-  const tasksForLoad = data.tasks
 
   return (
     <div className="space-y-5">
@@ -67,7 +58,7 @@ export function Dashboard({ data, filters, onFiltersChange, onImport, onReset, o
             <WorkloadPersonCard
               key={p.id}
               person={p}
-              tasks={tasksForLoad}
+              tasks={data.tasks}
               onTaskClick={(workItemId) => setSelectedId(workItemId)}
             />
           ))}
@@ -90,11 +81,11 @@ export function Dashboard({ data, filters, onFiltersChange, onImport, onReset, o
                   className={`rounded px-2.5 py-1 transition ${view === 'kanban' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
                 >Kanban</button>
               </div>
-              <ImportExportPanel data={data} onImport={onImport} onReset={onReset} />
+              <ImportExportPanel />
             </div>
           }
         />
-        <FiltersBar data={data} filters={filters} onChange={onFiltersChange} />
+        <FiltersBar data={data} filters={filters} onChange={setFilters} />
         {view === 'table'
           ? <WorkItemsTable data={data} items={filteredItems} onSelect={setSelectedId} />
           : <WorkloadKanban data={data} items={filteredItems} onSelect={setSelectedId} />
@@ -102,10 +93,8 @@ export function Dashboard({ data, filters, onFiltersChange, onImport, onReset, o
       </section>
 
       <WorkItemDetailDrawer
-        data={data}
         workItemId={selectedId}
         onClose={() => setSelectedId(null)}
-        onConvertStudio={onConvertStudio}
       />
     </div>
   )

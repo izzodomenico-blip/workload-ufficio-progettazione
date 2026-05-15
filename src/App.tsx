@@ -1,85 +1,71 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { AppData, Filters, WorkItem } from './types'
-import { EMPTY_FILTERS } from './types'
-import { freshDemoData } from './data/demoData'
-import { loadFromStorage, saveToStorage } from './storage/localStorage'
+import { useState } from 'react'
+import { DataProvider } from './state/DataProvider'
+import { ToastProvider } from './state/ToastProvider'
 import { Dashboard } from './components/Dashboard'
+import { WorkItemFormModal } from './components/WorkItemFormModal'
+import { PeopleSettingsModal } from './components/PeopleSettingsModal'
 
 export function App() {
-  const [data, setData] = useState<AppData>(() => loadFromStorage() ?? freshDemoData())
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
+  return (
+    <ToastProvider>
+      <DataProvider>
+        <Shell />
+      </DataProvider>
+    </ToastProvider>
+  )
+}
 
-  useEffect(() => {
-    saveToStorage(data)
-  }, [data])
-
-  const handleImport = useCallback((next: AppData) => {
-    setData(next)
-  }, [])
-
-  const handleReset = useCallback(() => {
-    setData(freshDemoData())
-  }, [])
-
-  const handleConvertStudio = useCallback((id: string, newCode?: string) => {
-    setData((prev) => ({
-      ...prev,
-      workItems: prev.workItems.map<WorkItem>((w) => {
-        if (w.id !== id || w.type !== 'studio') return w
-        const converted: WorkItem = {
-          id: w.id,
-          type: 'commessa',
-          code: newCode && newCode.length > 0 ? newCode : w.code,
-          customer: w.customer,
-          title: w.title,
-          description: w.description,
-          priority: w.priority,
-          status: w.status,
-          ownerId: w.ownerId,
-          assigneeIds: w.assigneeIds,
-          startDate: w.startDate,
-          dueDate: w.dueDate,
-          estimatedHours: w.estimatedHours,
-          loggedHours: w.loggedHours,
-          progressPercent: w.progressPercent,
-          blockers: w.blockers,
-          notes: w.notes,
-        }
-        return converted
-      }),
-    }))
-  }, [])
+function Shell() {
+  const [createOpen, setCreateOpen] = useState(false)
+  const [peopleOpen, setPeopleOpen] = useState(false)
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[color:var(--color-bg)]/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-[1600px] items-center gap-3 px-5 py-3">
+      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[color:var(--color-bg)]/85 backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-5 py-3">
           <Logo />
           <div className="leading-tight">
             <div className="text-sm font-semibold text-slate-100">Workload</div>
             <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Ufficio Progettazione Meccanica</div>
           </div>
-          <div className="ml-auto flex items-center gap-3 text-[11px] text-slate-500">
-            <span className="hidden sm:inline">dati locali (browser) · v0.1</span>
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300 ring-1 ring-emerald-500/30">live</span>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setPeopleOpen(true)}
+              className="btn-ghost"
+              title="Modifica persone, capacità e skill"
+            >
+              <Icon path="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 0a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-2.67 0-8 1.34-8 4v3h10v-3a4.7 4.7 0 0 1 2-3.74A12.7 12.7 0 0 0 8 13Zm8 0c-.29 0-.62 0-1 .05A5.65 5.65 0 0 1 18 17v3h6v-3c0-2.66-5.33-4-8-4Z" />
+              Persone
+            </button>
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="btn-primary"
+              title="Crea un nuovo lavoro (commessa, studio o interno)"
+            >
+              <Icon path="M12 5v14M5 12h14" />
+              Nuovo lavoro
+            </button>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-[1600px] px-5 py-5">
-        <Dashboard
-          data={data}
-          filters={filters}
-          onFiltersChange={setFilters}
-          onImport={handleImport}
-          onReset={handleReset}
-          onConvertStudio={handleConvertStudio}
-        />
+        <Dashboard />
       </main>
 
       <footer className="mx-auto max-w-[1600px] px-5 py-6 text-center text-[11px] text-slate-600">
-        Prima versione frontend-only · dati persistiti in localStorage
+        v0.2 · CRUD da interfaccia · dati persistiti in <code className="text-slate-400">localStorage</code>
       </footer>
+
+      <WorkItemFormModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        mode="create"
+      />
+      <PeopleSettingsModal
+        open={peopleOpen}
+        onClose={() => setPeopleOpen(false)}
+      />
     </div>
   )
 }
@@ -91,5 +77,13 @@ function Logo() {
         <path d="M14 44 L24 24 L32 36 L40 20 L50 44" stroke="#38bdf8" strokeWidth="6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </div>
+  )
+}
+
+function Icon({ path }: { path: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={path} />
+    </svg>
   )
 }
