@@ -14,10 +14,12 @@ import {
   setTaskStatus as svcSetTaskStatus,
   setWorkItemStatus as svcSetWorkItemStatus,
   updateAbsence as svcUpdateAbsence,
+  updatePeople as svcUpdatePeople,
   updatePerson as svcUpdatePerson,
   updateTask as svcUpdateTask,
   updateWorkItem as svcUpdateWorkItem,
 } from '../services/dataService'
+import { appendActivityLog, createActivityLogEntry } from '../utils/activityLog'
 import type {
   CreateAbsenceInput,
   CreateTaskInput,
@@ -117,7 +119,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updatePeople = useCallback((nextPeople: Person[]) => {
-    setData((prev) => ({ ...prev, people: nextPeople }))
+    setData((prev) => svcUpdatePeople(prev, nextPeople))
   }, [])
 
   const createAbsence = useCallback((input: CreateAbsenceInput): string => {
@@ -139,7 +141,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const importData = useCallback((next: AppData) => {
-    setData(next)
+    setData(
+      appendActivityLog(
+        next,
+        createActivityLogEntry({
+          entityType: 'system',
+          entityId: 'import',
+          action: 'imported',
+          title: 'Import JSON',
+          description: `${next.workItems.length} lavori · ${next.tasks.length} task · ${next.absences.length} assenze · ${(next.activityLog ?? []).length} eventi storico`,
+        }),
+      ),
+    )
   }, [])
 
   const exportData = useCallback(() => {
@@ -147,7 +160,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [data])
 
   const resetData = useCallback(() => {
-    setData(freshDemoData())
+    setData(
+      appendActivityLog(
+        freshDemoData(),
+        createActivityLogEntry({
+          entityType: 'system',
+          entityId: 'reset',
+          action: 'reset',
+          title: 'Reset dati demo',
+          description: 'Tutti i dati sono stati ripristinati ai valori demo iniziali',
+        }),
+      ),
+    )
   }, [])
 
   const value = useMemo<DataContextValue>(() => ({

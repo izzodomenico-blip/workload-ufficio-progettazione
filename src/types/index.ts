@@ -85,11 +85,55 @@ export interface Absence {
   notes?: string
 }
 
+export type ActivityLogAction =
+  | 'created'
+  | 'updated'
+  | 'deleted'
+  | 'status_changed'
+  | 'progress_changed'
+  | 'converted'
+  | 'imported'
+  | 'reset'
+
+export type ActivityLogEntityType = 'workItem' | 'task' | 'person' | 'absence' | 'system'
+
+export interface ActivityLogEntry {
+  id: string
+  timestamp: string
+  entityType: ActivityLogEntityType
+  entityId: string
+  action: ActivityLogAction
+  title: string
+  description?: string
+  before?: Record<string, unknown> | string | number | boolean | null
+  after?: Record<string, unknown> | string | number | boolean | null
+}
+
+export const ALL_ACTIVITY_ACTIONS: ActivityLogAction[] = [
+  'created',
+  'updated',
+  'deleted',
+  'status_changed',
+  'progress_changed',
+  'converted',
+  'imported',
+  'reset',
+]
+
+export const ALL_ACTIVITY_ENTITY_TYPES: ActivityLogEntityType[] = [
+  'workItem',
+  'task',
+  'person',
+  'absence',
+  'system',
+]
+
 export interface AppData {
   people: Person[]
   workItems: WorkItem[]
   tasks: Task[]
   absences: Absence[]
+  activityLog: ActivityLogEntry[]
 }
 
 export interface Filters {

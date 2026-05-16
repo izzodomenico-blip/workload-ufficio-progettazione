@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Absence, Task, WorkItem } from '../types'
+import type { Absence, ActivityLogEntry, Task, WorkItem } from '../types'
 import { isOpen } from '../types'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
@@ -13,6 +13,7 @@ import { TaskFormModal } from './TaskFormModal'
 import { formatItalian, formatItalianShort, isOverdue, daysUntil } from '../utils/dates'
 import { getAssigneeAbsencesDuringTask } from '../utils/availability'
 import { calculateExpectedProgress, getTaskHealth } from '../utils/progress'
+import { getRecentForWorkItem } from '../utils/activityLog'
 import { HealthBadge } from './HealthBadge'
 
 interface Props {
@@ -58,6 +59,8 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
     const avgProgress = tasks.length === 0 ? 0 : Math.round(tasks.reduce((s, t) => s + t.progressPercent, 0) / tasks.length)
     return { est, log, avgProgress }
   }, [tasks])
+
+  const recentLog = useMemo(() => getRecentForWorkItem(data, item.id, 5), [data, item.id])
 
   const [showConvert, setShowConvert] = useState(false)
   const [newCode, setNewCode] = useState(() => item.code.replace(/^ST-/, 'CM-'))
@@ -227,6 +230,20 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
             <p className="whitespace-pre-wrap text-sm text-slate-300">{item.notes}</p>
           </Section>
         )}
+
+        <Section title={`Storico recente${recentLog.length > 0 ? ` (${recentLog.length})` : ''}`}>
+          {recentLog.length === 0 ? (
+            <p className="text-[12px] italic text-slate-500">
+              Nessuna modifica tracciata su questo lavoro o sui suoi task.
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {recentLog.map((e) => (
+                <RecentLogRow key={e.id} entry={e} />
+              ))}
+            </ul>
+          )}
+        </Section>
       </div>
 
       <WorkItemFormModal
@@ -412,5 +429,55 @@ function Stat({ label, value }: { label: string; value: ReactNode }) {
       <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 text-lg font-semibold text-slate-100 tabular-nums">{value}</div>
     </div>
+  )
+}
+
+const RECENT_ACTION_LABEL: Record<string, string> = {
+  created: 'creato',
+  updated: 'modificato',
+  deleted: 'eliminato',
+  status_changed: 'stato',
+  progress_changed: 'avanzamento',
+  converted: 'convertito',
+  imported: 'import',
+  reset: 'reset',
+}
+
+const RECENT_ACTION_TONE: Record<string, string> = {
+  created: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30',
+  updated: 'bg-sky-500/10 text-sky-300 ring-sky-500/30',
+  deleted: 'bg-red-500/15 text-red-300 ring-red-500/40',
+  status_changed: 'bg-indigo-500/10 text-indigo-300 ring-indigo-500/30',
+  progress_changed: 'bg-amber-500/10 text-amber-300 ring-amber-500/30',
+  converted: 'bg-violet-500/10 text-violet-300 ring-violet-500/30',
+  imported: 'bg-cyan-500/10 text-cyan-300 ring-cyan-500/30',
+  reset: 'bg-slate-500/15 text-slate-300 ring-slate-500/30',
+}
+
+function fmtRecentTimestamp(iso: string): string {
+  const d = new Date(iso)
+  return `${formatItalianShort(d.toISOString().slice(0, 10))} · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function RecentLogRow({ entry }: { entry: ActivityLogEntry }) {
+  const tone = RECENT_ACTION_TONE[entry.action] ?? RECENT_ACTION_TONE.updated
+  return (
+    <li className="flex items-start gap-2 rounded-md border border-slate-800 bg-slate-900/30 px-2.5 py-1.5 text-[12px]">
+      <span className="shrink-0 text-[10px] tabular-nums text-slate-500 pt-0.5 min-w-[90px]">
+        {fmtRecentTimestamp(entry.timestamp)}
+      </span>
+      <span className={`shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${tone}`}>
+        {RECENT_ACTION_LABEL[entry.action] ?? entry.action}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="text-slate-200">
+          {entry.entityType === 'task' ? 'Task' : entry.entityType === 'workItem' ? 'Lavoro' : entry.entityType}
+        </span>{' '}
+        <span className="text-slate-300">{entry.title}</span>
+        {entry.description && (
+          <div className="mt-0.5 text-[11px] text-slate-500">{entry.description}</div>
+        )}
+      </span>
+    </li>
   )
 }

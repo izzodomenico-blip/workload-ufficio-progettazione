@@ -9,9 +9,10 @@ interface Props {
   tasks: Task[]
   absences: Absence[]
   onTaskClick?: (workItemId: string) => void
+  onPersonClick?: (personId: string) => void
 }
 
-export function WorkloadPersonCard({ person, tasks, absences, onTaskClick }: Props) {
+export function WorkloadPersonCard({ person, tasks, absences, onTaskClick, onPersonClick }: Props) {
   const load = useMemo(() => computeWorkload(person, tasks, absences), [person, tasks, absences])
   const top = useMemo(() => topTasksForPerson(tasks, person.id, 3), [tasks, person.id])
   const healthCounts = useMemo(
@@ -35,15 +36,32 @@ export function WorkloadPersonCard({ person, tasks, absences, onTaskClick }: Pro
   return (
     <div className={`panel relative p-4 ring-1 ring-inset ${ringClass}`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-slate-200">
-            {initials}
+        {onPersonClick ? (
+          <button
+            type="button"
+            onClick={() => onPersonClick(person.id)}
+            className="group flex min-w-0 items-center gap-3 rounded-md text-left transition hover:opacity-90"
+            title={`Apri agenda di ${person.name}`}
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-slate-200 ring-0 ring-sky-500/0 transition group-hover:ring-2 group-hover:ring-sky-500/40">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-slate-100 group-hover:text-sky-300">{person.name}</div>
+              <div className="truncate text-[11px] text-slate-400">{person.role}</div>
+            </div>
+          </button>
+        ) : (
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-slate-200">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-slate-100">{person.name}</div>
+              <div className="truncate text-[11px] text-slate-400">{person.role}</div>
+            </div>
           </div>
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-slate-100">{person.name}</div>
-            <div className="truncate text-[11px] text-slate-400">{person.role}</div>
-          </div>
-        </div>
+        )}
         <div className="text-right">
           {load.isFullyAbsent ? (
             <>

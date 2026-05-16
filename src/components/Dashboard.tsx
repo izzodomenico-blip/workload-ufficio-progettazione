@@ -11,9 +11,11 @@ import { WorkloadKanban } from './WorkloadKanban'
 import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
 import { ImportExportPanel } from './ImportExportPanel'
 import { PlanningMatrix } from './PlanningMatrix'
+import { PersonAgendaView } from './PersonAgendaView'
+import { ActivityLogView } from './ActivityLogView'
 
 type ViewMode = 'table' | 'kanban'
-type MainTab = 'dashboard' | 'planning'
+type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log'
 
 export function Dashboard() {
   const { data } = useData()
@@ -21,6 +23,12 @@ export function Dashboard() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [view, setView] = useState<ViewMode>('table')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [agendaPersonId, setAgendaPersonId] = useState<string | null>(null)
+
+  function jumpToAgenda(personId: string) {
+    setAgendaPersonId(personId)
+    setTab('agenda')
+  }
 
   const filteredItems = useMemo<WorkItem[]>(() => {
     const q = filters.search.trim().toLowerCase()
@@ -71,6 +79,22 @@ export function Dashboard() {
           >
             Pianificazione
           </button>
+          <button
+            role="tab"
+            aria-selected={tab === 'agenda'}
+            onClick={() => setTab('agenda')}
+            className={`rounded-md px-3 py-1.5 font-medium transition ${tab === 'agenda' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            Agenda persone
+          </button>
+          <button
+            role="tab"
+            aria-selected={tab === 'log'}
+            onClick={() => setTab('log')}
+            className={`rounded-md px-3 py-1.5 font-medium transition ${tab === 'log' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            Storico
+          </button>
         </div>
         <ImportExportPanel />
       </div>
@@ -92,6 +116,7 @@ export function Dashboard() {
                   tasks={data.tasks}
                   absences={data.absences}
                   onTaskClick={(workItemId) => setSelectedId(workItemId)}
+                  onPersonClick={jumpToAgenda}
                 />
               ))}
             </div>
@@ -126,8 +151,12 @@ export function Dashboard() {
             onClose={() => setSelectedId(null)}
           />
         </>
-      ) : (
+      ) : tab === 'planning' ? (
         <PlanningMatrix />
+      ) : tab === 'agenda' ? (
+        <PersonAgendaView initialPersonId={agendaPersonId} />
+      ) : (
+        <ActivityLogView />
       )}
     </div>
   )
