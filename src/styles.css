@@ -63,3 +63,43 @@ body {
   background: rgba(56, 189, 248, 0.3);
   color: white;
 }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+
+  html, body {
+    background: white !important;
+    color: #0f172a !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .report-print-area, .report-print-area * {
+    visibility: visible !important;
+  }
+
+  .report-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .print-keep {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}

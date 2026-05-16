@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Utente\\\\Documents\\\\workload-ufficio-progettazione\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)"
+    ]
+  }
+}

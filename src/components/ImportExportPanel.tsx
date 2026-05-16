@@ -5,6 +5,7 @@ import { useToast } from '../state/ToastProvider'
 import { downloadTextFile, readJSONFile } from '../storage/localStorage'
 import { generateWeeklyAdminReport } from '../utils/weeklyReport'
 import { ConfirmDialog } from './ConfirmDialog'
+import { WeeklyReportModal } from './WeeklyReportModal'
 
 export function ImportExportPanel() {
   const { data, exportData, importData, resetData } = useData()
@@ -13,6 +14,7 @@ export function ImportExportPanel() {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -72,6 +74,11 @@ export function ImportExportPanel() {
     setOpen(false)
   }
 
+  function handlePreview() {
+    setPreviewOpen(true)
+    setOpen(false)
+  }
+
   return (
     <div ref={wrapperRef} className="relative">
       <button
@@ -109,13 +116,19 @@ export function ImportExportPanel() {
 
           <SectionLabel>Report</SectionLabel>
           <p className="px-3 pb-1 text-[11px] leading-snug text-slate-400">
-            Genera un riepilogo leggibile per amministratore/direzione con stato lavori, carichi, criticità e attività previste.
+            Anteprima visuale pronta per stampa/PDF, oppure export Markdown del riepilogo.
           </p>
+          <MenuItem
+            onClick={handlePreview}
+            icon={<Icon path="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />}
+          >
+            Anteprima report (stampa · PDF)
+          </MenuItem>
           <MenuItem
             onClick={handleReport}
             icon={<Icon path="M9 17v-6m3 6V8m3 9v-3M5 21h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2Z" />}
           >
-            Esporta report settimanale
+            Esporta report Markdown
           </MenuItem>
         </div>
       )}
@@ -131,6 +144,8 @@ export function ImportExportPanel() {
         onConfirm={handleReset}
         onCancel={() => setConfirmReset(false)}
       />
+
+      <WeeklyReportModal open={previewOpen} onClose={() => setPreviewOpen(false)} />
     </div>
   )
 }
