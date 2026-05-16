@@ -10,11 +10,14 @@ import { WorkItemsTable } from './WorkItemsTable'
 import { WorkloadKanban } from './WorkloadKanban'
 import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
 import { ImportExportPanel } from './ImportExportPanel'
+import { PlanningMatrix } from './PlanningMatrix'
 
 type ViewMode = 'table' | 'kanban'
+type MainTab = 'dashboard' | 'planning'
 
 export function Dashboard() {
   const { data } = useData()
+  const [tab, setTab] = useState<MainTab>('dashboard')
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [view, setView] = useState<ViewMode>('table')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -46,57 +49,86 @@ export function Dashboard() {
 
   return (
     <div className="space-y-5">
-      <HeroStats data={data} />
-
-      <section>
-        <SectionHeader
-          title="Workload per persona"
-          subtitle="Carico settimana corrente, capacità e principali task"
-        />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {data.people.filter((p) => p.active).map((p) => (
-            <WorkloadPersonCard
-              key={p.id}
-              person={p}
-              tasks={data.tasks}
-              absences={data.absences}
-              onTaskClick={(workItemId) => setSelectedId(workItemId)}
-            />
-          ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div
+          role="tablist"
+          aria-label="Sezione principale"
+          className="inline-flex rounded-lg border border-slate-700 bg-slate-900 p-0.5 text-sm"
+        >
+          <button
+            role="tab"
+            aria-selected={tab === 'dashboard'}
+            onClick={() => setTab('dashboard')}
+            className={`rounded-md px-3 py-1.5 font-medium transition ${tab === 'dashboard' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            Dashboard
+          </button>
+          <button
+            role="tab"
+            aria-selected={tab === 'planning'}
+            onClick={() => setTab('planning')}
+            className={`rounded-md px-3 py-1.5 font-medium transition ${tab === 'planning' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            Pianificazione
+          </button>
         </div>
-      </section>
+        <ImportExportPanel />
+      </div>
 
-      <section className="space-y-3">
-        <SectionHeader
-          title="Lavori"
-          subtitle="Tabella e Kanban filtrabili"
-          right={
-            <div className="flex items-center gap-2">
-              <div className="inline-flex rounded-md border border-slate-700 bg-slate-900 p-0.5 text-xs">
-                <button
-                  onClick={() => setView('table')}
-                  className={`rounded px-2.5 py-1 transition ${view === 'table' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
-                >Tabella</button>
-                <button
-                  onClick={() => setView('kanban')}
-                  className={`rounded px-2.5 py-1 transition ${view === 'kanban' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
-                >Kanban</button>
-              </div>
-              <ImportExportPanel />
+      {tab === 'dashboard' ? (
+        <>
+          <HeroStats data={data} />
+
+          <section>
+            <SectionHeader
+              title="Workload per persona"
+              subtitle="Carico settimana corrente, capacità e principali task"
+            />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              {data.people.filter((p) => p.active).map((p) => (
+                <WorkloadPersonCard
+                  key={p.id}
+                  person={p}
+                  tasks={data.tasks}
+                  absences={data.absences}
+                  onTaskClick={(workItemId) => setSelectedId(workItemId)}
+                />
+              ))}
             </div>
-          }
-        />
-        <FiltersBar data={data} filters={filters} onChange={setFilters} />
-        {view === 'table'
-          ? <WorkItemsTable data={data} items={filteredItems} onSelect={setSelectedId} />
-          : <WorkloadKanban data={data} items={filteredItems} onSelect={setSelectedId} />
-        }
-      </section>
+          </section>
 
-      <WorkItemDetailDrawer
-        workItemId={selectedId}
-        onClose={() => setSelectedId(null)}
-      />
+          <section className="space-y-3">
+            <SectionHeader
+              title="Lavori"
+              subtitle="Tabella e Kanban filtrabili"
+              right={
+                <div className="inline-flex rounded-md border border-slate-700 bg-slate-900 p-0.5 text-xs">
+                  <button
+                    onClick={() => setView('table')}
+                    className={`rounded px-2.5 py-1 transition ${view === 'table' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+                  >Tabella</button>
+                  <button
+                    onClick={() => setView('kanban')}
+                    className={`rounded px-2.5 py-1 transition ${view === 'kanban' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+                  >Kanban</button>
+                </div>
+              }
+            />
+            <FiltersBar data={data} filters={filters} onChange={setFilters} />
+            {view === 'table'
+              ? <WorkItemsTable data={data} items={filteredItems} onSelect={setSelectedId} />
+              : <WorkloadKanban data={data} items={filteredItems} onSelect={setSelectedId} />
+            }
+          </section>
+
+          <WorkItemDetailDrawer
+            workItemId={selectedId}
+            onClose={() => setSelectedId(null)}
+          />
+        </>
+      ) : (
+        <PlanningMatrix />
+      )}
     </div>
   )
 }

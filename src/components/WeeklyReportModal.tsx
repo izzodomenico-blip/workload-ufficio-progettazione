@@ -9,6 +9,7 @@ import {
   type PersonWorkloadReport,
   type WorkloadLevel,
 } from '../utils/weeklyReport'
+import { computePlanningMatrix, type PlanningMatrix } from '../utils/planning'
 import type { Absence, AbsenceType, Person, Task, WorkItem } from '../types'
 import { formatItalianShort, workingDaysOverlap } from '../utils/dates'
 import { topTasksForPerson } from '../utils/workload'
@@ -54,13 +55,14 @@ export function WeeklyReportModal({ open, onClose }: Props) {
     return {
       current: getCurrentWeekReportData(data, generatedAt),
       next: getNextWeekReportData(data, generatedAt),
+      planning: computePlanningMatrix(data, generatedAt, 4),
       generatedAt,
     }
   }, [open, data])
 
   if (!open || !computed) return null
 
-  const { current, next, generatedAt } = computed
+  const { current, next, planning, generatedAt } = computed
   const personById = new Map<string, Person>(data.people.map((p) => [p.id, p]))
   const workItemById = new Map<string, WorkItem>(data.workItems.map((w) => [w.id, w]))
 
@@ -117,7 +119,12 @@ export function WeeklyReportModal({ open, onClose }: Props) {
             <CriticalSection issues={current.criticalIssues} />
           </div>
           <div className="mt-6">
-            <NextWeekSection next={next} personById={personById} workItemById={workItemById} />
+            <NextWeekSection
+              next={next}
+              planning={planning}
+              personById={personById}
+              workItemById={workItemById}
+            />
           </div>
           <ReportFooter generatedAt={generatedAt} />
         </div>
@@ -523,14 +530,17 @@ function CriticalSection({ issues }: { issues: string[] }) {
 
 function NextWeekSection({
   next,
+  planning,
   personById,
   workItemById,
 }: {
   next: NextWeekReport
+  planning: PlanningMatrix
   personById: Map<string, Person>
   workItemById: Map<string, WorkItem>
 }) {
   const reducedCount = next.reducedCapacityPeople.length
+  const outlook = planning.summary
   return (
     <section className="print-keep">
       <SectionTitle
@@ -539,6 +549,23 @@ function NextWeekSection({
       >
         Focus prossima settimana
       </SectionTitle>
+
+      <p className="mt-1.5 text-[11px] text-slate-500">
+        Outlook prossime 4 settimane:{' '}
+        <span className={`font-semibold ${outlook.criticalWeeks > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+          {outlook.criticalWeeks}/4 critiche
+        </span>
+        {outlook.overloadedPeople > 0 && (
+          <>
+            {' · '}
+            <span className="font-semibold text-red-700">{outlook.overloadedPeople}</span>{' '}
+            {outlook.overloadedPeople === 1 ? 'persona sovraccarica' : 'persone sovraccariche'}
+          </>
+        )}
+        {' · '}
+        <span className="tabular-nums text-slate-600">{Math.round(outlook.totalPlannedHours)}h</span>{' '}
+        pianificate
+      </p>
 
       <div className="mt-2.5 grid grid-cols-4 gap-2.5 print:gap-2">
         <NextTile value={next.startingTasks.length} label="Task in partenza" tone="sky" />
