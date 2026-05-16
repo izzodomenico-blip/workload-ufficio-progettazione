@@ -217,6 +217,8 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
           </div>
         </Section>
 
+        <TechnicalDetailsSection item={item} />
+
         {item.blockers.length > 0 && (
           <Section title="Bloccanti">
             <ul className="space-y-1 text-sm text-amber-300">
@@ -429,6 +431,117 @@ function Stat({ label, value }: { label: string; value: ReactNode }) {
       <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 text-lg font-semibold text-slate-100 tabular-nums">{value}</div>
     </div>
+  )
+}
+
+const COMMERCIAL_TONE: Record<string, string> = {
+  bassa: 'bg-slate-500/15 text-slate-300 ring-slate-500/30',
+  media: 'bg-sky-500/15 text-sky-200 ring-sky-500/30',
+  alta: 'bg-orange-500/15 text-orange-200 ring-orange-500/30',
+  critica: 'bg-red-500/15 text-red-200 ring-red-500/40',
+}
+
+function TechnicalDetailsSection({ item }: { item: WorkItem }) {
+  const hasAny =
+    !!item.technicalPhase ||
+    !!item.customerRequestDate ||
+    !!item.plannedProductionReleaseDate ||
+    !!item.actualProductionReleaseDate ||
+    !!item.offerReference ||
+    !!item.commercialPriority ||
+    !!item.workFolderLink ||
+    !!item.managerNotes
+
+  if (!hasAny) {
+    return (
+      <Section title="Dettagli tecnici">
+        <p className="text-[12px] italic text-slate-500">
+          Nessun dettaglio tecnico/operativo. Aprilo in modifica per aggiungere fase, rilascio produzione, offerta, ecc.
+        </p>
+      </Section>
+    )
+  }
+
+  return (
+    <Section title="Dettagli tecnici">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        {item.technicalPhase && (
+          <Row
+            label="Fase tecnica"
+            value={
+              <span className="inline-flex items-center rounded bg-indigo-500/15 px-2 py-0.5 text-[11px] font-medium text-indigo-200 ring-1 ring-inset ring-indigo-500/30">
+                {item.technicalPhase}
+              </span>
+            }
+          />
+        )}
+        {item.commercialPriority && (
+          <Row
+            label="Priorità commerciale"
+            value={
+              <span
+                className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium capitalize ring-1 ring-inset ${COMMERCIAL_TONE[item.commercialPriority] ?? COMMERCIAL_TONE.media}`}
+              >
+                {item.commercialPriority}
+              </span>
+            }
+          />
+        )}
+        {item.plannedProductionReleaseDate && (
+          <Row
+            label="Rilascio produzione previsto"
+            value={
+              <span className={item.actualProductionReleaseDate ? 'text-slate-400 line-through' : ''}>
+                {formatItalian(item.plannedProductionReleaseDate)}
+              </span>
+            }
+          />
+        )}
+        {item.actualProductionReleaseDate && (
+          <Row
+            label="Rilascio produzione effettivo"
+            value={
+              <span className="font-medium text-emerald-300">
+                {formatItalian(item.actualProductionReleaseDate)}
+              </span>
+            }
+          />
+        )}
+        {item.customerRequestDate && (
+          <Row label="Data richiesta cliente" value={formatItalian(item.customerRequestDate)} />
+        )}
+        {item.offerReference && (
+          <Row
+            label="Riferimento offerta"
+            value={<span className="font-mono text-[12px] text-slate-200">{item.offerReference}</span>}
+          />
+        )}
+      </dl>
+
+      {item.workFolderLink && (
+        <div className="mt-3">
+          <a
+            href={item.workFolderLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-sm font-medium text-sky-200 transition hover:bg-sky-500/20"
+            title={item.workFolderLink}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+            </svg>
+            Apri cartella
+          </a>
+        </div>
+      )}
+
+      {item.managerNotes && (
+        <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/40 p-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Note responsabile</div>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">{item.managerNotes}</p>
+        </div>
+      )}
+    </Section>
   )
 }
 

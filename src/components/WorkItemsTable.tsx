@@ -82,9 +82,28 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
                   <td className="px-3 py-2.5 text-slate-300">{w.customer}</td>
                   <td className="px-3 py-2.5">
                     <div className="font-medium text-slate-100">{w.title}</div>
-                    {w.type === 'studio' && typeof w.acquisitionProbability === 'number' && (
-                      <div className="text-[10px] text-violet-300/80">prob. acquisizione {w.acquisitionProbability}%</div>
-                    )}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                      {w.technicalPhase && (
+                        <span className="inline-flex items-center rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-medium text-indigo-200 ring-1 ring-inset ring-indigo-500/30">
+                          {w.technicalPhase}
+                        </span>
+                      )}
+                      {w.commercialPriority && (w.commercialPriority === 'alta' || w.commercialPriority === 'critica') && (
+                        <span
+                          className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium capitalize ring-1 ring-inset ${
+                            w.commercialPriority === 'critica'
+                              ? 'bg-red-500/15 text-red-200 ring-red-500/40'
+                              : 'bg-orange-500/15 text-orange-200 ring-orange-500/30'
+                          }`}
+                          title="Priorità commerciale"
+                        >
+                          comm. {w.commercialPriority}
+                        </span>
+                      )}
+                      {w.type === 'studio' && typeof w.acquisitionProbability === 'number' && (
+                        <span className="text-[10px] text-violet-300/80">prob. acquisizione {w.acquisitionProbability}%</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-2.5"><PriorityBadge priority={w.priority} /></td>
                   <td className="px-3 py-2.5">
@@ -115,6 +134,15 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
                     <div className="text-[10px] text-slate-500">
                       {overdue ? `${Math.abs(days)} gg di ritardo` : days >= 0 ? `tra ${days} gg` : ''}
                     </div>
+                    {w.plannedProductionReleaseDate && (
+                      <div
+                        className={`mt-0.5 text-[10px] ${w.actualProductionReleaseDate ? 'text-emerald-300/80' : 'text-sky-300/80'}`}
+                        title="Rilascio produzione"
+                      >
+                        {w.actualProductionReleaseDate ? '✓ ' : '→ '}
+                        rilascio {formatItalianShort(w.actualProductionReleaseDate ?? w.plannedProductionReleaseDate)}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 w-[170px]">
                     <div className="relative h-1.5 overflow-hidden rounded-full bg-slate-800">

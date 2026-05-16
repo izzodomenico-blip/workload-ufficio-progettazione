@@ -38,11 +38,13 @@ export function Dashboard() {
         if (filters.priority && w.priority !== filters.priority) return false
         if (filters.status && w.status !== filters.status) return false
         if (filters.customer && w.customer !== filters.customer) return false
+        if (filters.technicalPhase && w.technicalPhase !== filters.technicalPhase) return false
+        if (filters.commercialPriority && w.commercialPriority !== filters.commercialPriority) return false
         if (filters.personId) {
           if (w.ownerId !== filters.personId && !w.assigneeIds.includes(filters.personId)) return false
         }
         if (q) {
-          const hay = `${w.code} ${w.title} ${w.customer} ${w.description}`.toLowerCase()
+          const hay = `${w.code} ${w.title} ${w.customer} ${w.description} ${w.offerReference ?? ''}`.toLowerCase()
           if (!hay.includes(q)) return false
         }
         return true

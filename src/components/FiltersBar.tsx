@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import type { AppData, Filters, Priority, Status, WorkItemType } from '../types'
-import { ALL_PRIORITIES, ALL_STATUSES, ALL_TYPES, EMPTY_FILTERS } from '../types'
+import type { AppData, Filters, Priority, Status, TechnicalPhase, WorkItemType } from '../types'
+import { ALL_PRIORITIES, ALL_STATUSES, ALL_TYPES, EMPTY_FILTERS, TECHNICAL_PHASES } from '../types'
 
 interface Props {
   data: AppData
@@ -18,7 +18,9 @@ export function FiltersBar({ data, filters, onChange }: Props) {
     filters.type !== '' ||
     filters.priority !== '' ||
     filters.status !== '' ||
-    filters.search !== ''
+    filters.search !== '' ||
+    filters.technicalPhase !== '' ||
+    filters.commercialPriority !== ''
 
   return (
     <div className="panel flex flex-wrap items-end gap-2 p-3">
@@ -58,6 +60,26 @@ export function FiltersBar({ data, filters, onChange }: Props) {
         <select className="input-base w-56" value={filters.status} onChange={(e) => set('status', e.target.value as Status | '')}>
           <option value="">Tutti</option>
           {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </Field>
+      <Field label="Fase tecnica">
+        <select
+          className="input-base w-48"
+          value={filters.technicalPhase}
+          onChange={(e) => set('technicalPhase', e.target.value as TechnicalPhase | '')}
+        >
+          <option value="">Tutte</option>
+          {TECHNICAL_PHASES.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+      </Field>
+      <Field label="Priorità comm.">
+        <select
+          className="input-base w-36"
+          value={filters.commercialPriority}
+          onChange={(e) => set('commercialPriority', e.target.value as Priority | '')}
+        >
+          <option value="">Tutte</option>
+          {ALL_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </Field>
       {dirty && (

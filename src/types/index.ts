@@ -25,6 +25,20 @@ export const ALL_PRIORITIES: Priority[] = ['bassa', 'media', 'alta', 'critica']
 
 export const ALL_TYPES: WorkItemType[] = ['commessa', 'studio', 'interno']
 
+export const TECHNICAL_PHASES = [
+  'Studio fattibilità',
+  'Layout',
+  'Progettazione 3D',
+  'Dettagli costruttivi',
+  'Distinte / commerciali',
+  'Verifica responsabile',
+  'Rilascio produzione',
+  'Documentazione cliente',
+  'Completato',
+] as const
+
+export type TechnicalPhase = (typeof TECHNICAL_PHASES)[number]
+
 export interface Person {
   id: string
   name: string
@@ -54,6 +68,15 @@ export interface WorkItem {
   acquisitionProbability?: number
   blockers: string[]
   notes?: string
+  // Dettagli tecnici e operativi (v0.9, tutti opzionali per compat dati legacy)
+  technicalPhase?: TechnicalPhase
+  customerRequestDate?: string
+  plannedProductionReleaseDate?: string
+  actualProductionReleaseDate?: string
+  workFolderLink?: string
+  offerReference?: string
+  commercialPriority?: Priority
+  managerNotes?: string
 }
 
 export interface Task {
@@ -143,6 +166,8 @@ export interface Filters {
   priority: Priority | ''
   status: Status | ''
   search: string
+  technicalPhase: TechnicalPhase | ''
+  commercialPriority: Priority | ''
 }
 
 export const EMPTY_FILTERS: Filters = {
@@ -152,6 +177,8 @@ export const EMPTY_FILTERS: Filters = {
   priority: '',
   status: '',
   search: '',
+  technicalPhase: '',
+  commercialPriority: '',
 }
 
 /** Stati terminali: non contano come lavori/task “aperti” in dashboard e KPI. */

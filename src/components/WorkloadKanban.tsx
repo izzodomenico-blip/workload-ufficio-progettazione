@@ -81,6 +81,36 @@ export function WorkloadKanban({ data, items, onSelect }: Props) {
                       <div className="mt-1.5 font-mono text-[11px] text-slate-400">{w.code}</div>
                       <div className="text-sm font-medium text-slate-100 leading-snug">{w.title}</div>
                       <div className="mt-1 truncate text-[11px] text-slate-500">{w.customer}</div>
+                      {(w.technicalPhase || (w.commercialPriority && (w.commercialPriority === 'alta' || w.commercialPriority === 'critica'))) && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                          {w.technicalPhase && (
+                            <span className="inline-flex items-center rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-medium text-indigo-200 ring-1 ring-inset ring-indigo-500/30">
+                              {w.technicalPhase}
+                            </span>
+                          )}
+                          {w.commercialPriority && (w.commercialPriority === 'alta' || w.commercialPriority === 'critica') && (
+                            <span
+                              className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium capitalize ring-1 ring-inset ${
+                                w.commercialPriority === 'critica'
+                                  ? 'bg-red-500/15 text-red-200 ring-red-500/40'
+                                  : 'bg-orange-500/15 text-orange-200 ring-orange-500/30'
+                              }`}
+                              title="Priorità commerciale"
+                            >
+                              comm. {w.commercialPriority}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {w.plannedProductionReleaseDate && (
+                        <div
+                          className={`mt-1 text-[10px] ${w.actualProductionReleaseDate ? 'text-emerald-300/80' : 'text-sky-300/80'}`}
+                          title="Rilascio produzione"
+                        >
+                          {w.actualProductionReleaseDate ? '✓ ' : '→ '}
+                          rilascio {formatItalianShort(w.actualProductionReleaseDate ?? w.plannedProductionReleaseDate)}
+                        </div>
+                      )}
                       <div className="mt-2">
                         <StatusSelect
                           value={w.status}

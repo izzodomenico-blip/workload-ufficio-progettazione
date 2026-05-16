@@ -567,6 +567,19 @@ function pushItemsGroup(
     out.push(`  - Stato: ${w.status} · Priorità: ${w.priority} · Salute: **${health}**`)
     out.push(`  - Avanzamento reale **${w.progressPercent}%** / atteso **${expected}%**`)
     out.push(`  - Scadenza: ${fmtIso(w.dueDate)}`)
+    const technicalParts: string[] = []
+    if (w.technicalPhase) technicalParts.push(`Fase tecnica: **${w.technicalPhase}**`)
+    if (w.plannedProductionReleaseDate) {
+      const releaseLabel = w.actualProductionReleaseDate
+        ? `Rilascio produzione effettivo: **${fmtIso(w.actualProductionReleaseDate)}** (previsto ${fmtIso(w.plannedProductionReleaseDate)})`
+        : `Rilascio produzione previsto: **${fmtIso(w.plannedProductionReleaseDate)}**`
+      technicalParts.push(releaseLabel)
+    } else if (w.actualProductionReleaseDate) {
+      technicalParts.push(`Rilascio produzione effettivo: **${fmtIso(w.actualProductionReleaseDate)}**`)
+    }
+    if (w.offerReference) technicalParts.push(`Offerta: ${w.offerReference}`)
+    if (w.commercialPriority) technicalParts.push(`Priorità commerciale: ${w.commercialPriority}`)
+    if (technicalParts.length > 0) out.push(`  - ${technicalParts.join(' · ')}`)
   }
   out.push('')
 }

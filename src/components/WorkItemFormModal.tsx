@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Priority, Status, WorkItem, WorkItemType } from '../types'
-import { ALL_PRIORITIES, ALL_STATUSES, ALL_TYPES } from '../types'
+import type { Priority, Status, TechnicalPhase, WorkItem, WorkItemType } from '../types'
+import { ALL_PRIORITIES, ALL_STATUSES, ALL_TYPES, TECHNICAL_PHASES } from '../types'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
 import { todayISO } from '../utils/dates'
@@ -29,6 +29,15 @@ interface FormValues {
   acquisitionProbability: number
   blockers: string[]
   notes: string
+  // Dettagli tecnici e operativi
+  technicalPhase: TechnicalPhase | ''
+  customerRequestDate: string
+  plannedProductionReleaseDate: string
+  actualProductionReleaseDate: string
+  workFolderLink: string
+  offerReference: string
+  commercialPriority: Priority | ''
+  managerNotes: string
 }
 
 function emptyValues(defaultOwnerId: string): FormValues {
@@ -51,6 +60,14 @@ function emptyValues(defaultOwnerId: string): FormValues {
     acquisitionProbability: 50,
     blockers: [],
     notes: '',
+    technicalPhase: '',
+    customerRequestDate: '',
+    plannedProductionReleaseDate: '',
+    actualProductionReleaseDate: '',
+    workFolderLink: '',
+    offerReference: '',
+    commercialPriority: '',
+    managerNotes: '',
   }
 }
 
@@ -73,6 +90,14 @@ function fromWorkItem(w: WorkItem): FormValues {
     acquisitionProbability: w.acquisitionProbability ?? 50,
     blockers: [...w.blockers],
     notes: w.notes ?? '',
+    technicalPhase: w.technicalPhase ?? '',
+    customerRequestDate: w.customerRequestDate ?? '',
+    plannedProductionReleaseDate: w.plannedProductionReleaseDate ?? '',
+    actualProductionReleaseDate: w.actualProductionReleaseDate ?? '',
+    workFolderLink: w.workFolderLink ?? '',
+    offerReference: w.offerReference ?? '',
+    commercialPriority: w.commercialPriority ?? '',
+    managerNotes: w.managerNotes ?? '',
   }
 }
 
@@ -104,25 +129,36 @@ export function WorkItemFormModal({ open, onClose, mode, workItem, onCreated }: 
 
   const isStudio = values.type === 'studio'
 
-  const payload = useMemo<Omit<WorkItem, 'id'>>(() => ({
-    type: values.type,
-    code: values.code.trim(),
-    customer: values.customer.trim(),
-    title: values.title.trim(),
-    description: values.description.trim(),
-    priority: values.priority,
-    status: values.status,
-    ownerId: values.ownerId,
-    assigneeIds: values.assigneeIds,
-    startDate: values.startDate,
-    dueDate: values.dueDate,
-    estimatedHours: Number(values.estimatedHours) || 0,
-    loggedHours: Number(values.loggedHours) || 0,
-    progressPercent: Number(values.progressPercent) || 0,
-    blockers: values.blockers,
-    notes: values.notes.trim() === '' ? undefined : values.notes.trim(),
-    ...(isStudio ? { acquisitionProbability: Number(values.acquisitionProbability) || 0 } : {}),
-  }), [values, isStudio])
+  const payload = useMemo<Omit<WorkItem, 'id'>>(() => {
+    const linkRaw = values.workFolderLink.trim()
+    return {
+      type: values.type,
+      code: values.code.trim(),
+      customer: values.customer.trim(),
+      title: values.title.trim(),
+      description: values.description.trim(),
+      priority: values.priority,
+      status: values.status,
+      ownerId: values.ownerId,
+      assigneeIds: values.assigneeIds,
+      startDate: values.startDate,
+      dueDate: values.dueDate,
+      estimatedHours: Number(values.estimatedHours) || 0,
+      loggedHours: Number(values.loggedHours) || 0,
+      progressPercent: Number(values.progressPercent) || 0,
+      blockers: values.blockers,
+      notes: values.notes.trim() === '' ? undefined : values.notes.trim(),
+      ...(isStudio ? { acquisitionProbability: Number(values.acquisitionProbability) || 0 } : {}),
+      ...(values.technicalPhase ? { technicalPhase: values.technicalPhase } : {}),
+      ...(values.customerRequestDate ? { customerRequestDate: values.customerRequestDate } : {}),
+      ...(values.plannedProductionReleaseDate ? { plannedProductionReleaseDate: values.plannedProductionReleaseDate } : {}),
+      ...(values.actualProductionReleaseDate ? { actualProductionReleaseDate: values.actualProductionReleaseDate } : {}),
+      ...(linkRaw ? { workFolderLink: linkRaw } : {}),
+      ...(values.offerReference.trim() ? { offerReference: values.offerReference.trim() } : {}),
+      ...(values.commercialPriority ? { commercialPriority: values.commercialPriority } : {}),
+      ...(values.managerNotes.trim() ? { managerNotes: values.managerNotes.trim() } : {}),
+    }
+  }, [values, isStudio])
 
   function handleSubmit() {
     setSubmitted(true)
@@ -310,6 +346,103 @@ export function WorkItemFormModal({ open, onClose, mode, workItem, onCreated }: 
             value={values.notes}
             onChange={(e) => set('notes', e.target.value)}
             placeholder="Annotazioni libere"
+          />
+        </FormField>
+
+        <div className="md:col-span-2 mt-1 border-t border-slate-800 pt-3">
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Dettagli tecnici e operativi
+            </h3>
+            <span className="text-[10px] text-slate-500">tutti i campi sono opzionali</span>
+          </div>
+        </div>
+
+        <FormField label="Fase tecnica">
+          <select
+            className="input-base"
+            value={values.technicalPhase}
+            onChange={(e) => set('technicalPhase', e.target.value as TechnicalPhase | '')}
+          >
+            <option value="">— non specificata —</option>
+            {TECHNICAL_PHASES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
+        <FormField label="Priorità commerciale" hint="Indicatore separato dalla priorità tecnica">
+          <select
+            className="input-base capitalize"
+            value={values.commercialPriority}
+            onChange={(e) => set('commercialPriority', e.target.value as Priority | '')}
+          >
+            <option value="">— non specificata —</option>
+            {ALL_PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
+        <FormField label="Data richiesta cliente">
+          <input
+            type="date"
+            className="input-base"
+            value={values.customerRequestDate}
+            onChange={(e) => set('customerRequestDate', e.target.value)}
+          />
+        </FormField>
+
+        <FormField label="Riferimento offerta">
+          <input
+            className="input-base"
+            value={values.offerReference}
+            onChange={(e) => set('offerReference', e.target.value)}
+            placeholder="Es. OFF-2026-070"
+          />
+        </FormField>
+
+        <FormField label="Rilascio produzione previsto">
+          <input
+            type="date"
+            className="input-base"
+            value={values.plannedProductionReleaseDate}
+            onChange={(e) => set('plannedProductionReleaseDate', e.target.value)}
+          />
+        </FormField>
+
+        <FormField
+          label="Rilascio produzione effettivo"
+          hint={values.actualProductionReleaseDate ? 'Lavoro rilasciato in produzione' : 'Vuoto finché non rilasciato'}
+        >
+          <input
+            type="date"
+            className="input-base"
+            value={values.actualProductionReleaseDate}
+            onChange={(e) => set('actualProductionReleaseDate', e.target.value)}
+          />
+        </FormField>
+
+        <FormField label="Link cartella commessa" className="md:col-span-2" hint="URL o percorso file (es. file:///… oppure https://…)">
+          <input
+            className="input-base"
+            value={values.workFolderLink}
+            onChange={(e) => set('workFolderLink', e.target.value)}
+            placeholder="https://… oppure file:///…"
+          />
+        </FormField>
+
+        <FormField label="Note responsabile" className="md:col-span-2" hint="Visibili nel dettaglio lavoro">
+          <textarea
+            rows={2}
+            className="input-base resize-y"
+            value={values.managerNotes}
+            onChange={(e) => set('managerNotes', e.target.value)}
+            placeholder="Indicazioni interne, priorità, contesto…"
           />
         </FormField>
       </div>

@@ -66,6 +66,31 @@ export function describeWorkItemChange(before: WorkItem, after: WorkItem): strin
   if (before.blockers.length !== after.blockers.length) {
     parts.push(`bloccanti ${before.blockers.length} → ${after.blockers.length}`)
   }
+  // v0.9 — dettagli tecnici e operativi
+  if ((before.technicalPhase ?? '') !== (after.technicalPhase ?? '')) {
+    parts.push(`fase tecnica ${before.technicalPhase ?? '—'} → ${after.technicalPhase ?? '—'}`)
+  }
+  if ((before.plannedProductionReleaseDate ?? '') !== (after.plannedProductionReleaseDate ?? '')) {
+    parts.push(`rilascio previsto ${before.plannedProductionReleaseDate ?? '—'} → ${after.plannedProductionReleaseDate ?? '—'}`)
+  }
+  if ((before.actualProductionReleaseDate ?? '') !== (after.actualProductionReleaseDate ?? '')) {
+    parts.push(`rilascio effettivo ${before.actualProductionReleaseDate ?? '—'} → ${after.actualProductionReleaseDate ?? '—'}`)
+  }
+  if ((before.customerRequestDate ?? '') !== (after.customerRequestDate ?? '')) {
+    parts.push(`data richiesta cliente ${before.customerRequestDate ?? '—'} → ${after.customerRequestDate ?? '—'}`)
+  }
+  if ((before.commercialPriority ?? '') !== (after.commercialPriority ?? '')) {
+    parts.push(`priorità commerciale ${before.commercialPriority ?? '—'} → ${after.commercialPriority ?? '—'}`)
+  }
+  if ((before.offerReference ?? '') !== (after.offerReference ?? '')) {
+    parts.push('riferimento offerta aggiornato')
+  }
+  if ((before.workFolderLink ?? '') !== (after.workFolderLink ?? '')) {
+    parts.push('link cartella aggiornato')
+  }
+  if ((before.managerNotes ?? '') !== (after.managerNotes ?? '')) {
+    parts.push('note responsabile aggiornate')
+  }
   return parts.length === 0 ? 'modifica minore' : parts.join(' · ')
 }
 

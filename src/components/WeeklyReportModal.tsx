@@ -33,6 +33,16 @@ function getInitials(name: string): string {
   return name.split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase()
 }
 
+function isWithinDays(iso: string, days: number): boolean {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return false
+  const target = new Date(y, m - 1, d).getTime()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diff = (target - today.getTime()) / 86_400_000
+  return diff <= days
+}
+
 export function WeeklyReportModal({ open, onClose }: Props) {
   const { data } = useData()
 
@@ -399,6 +409,12 @@ function PersonRow({
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-600">
             {top.map((t) => {
               const wi = workItemById.get(t.workItemId)
+              const phase = wi?.technicalPhase
+              const commPrio = wi?.commercialPriority
+              const releaseSoon =
+                wi?.plannedProductionReleaseDate &&
+                !wi.actualProductionReleaseDate &&
+                isWithinDays(wi.plannedProductionReleaseDate, 21)
               return (
                 <span key={t.id} className="inline-flex min-w-0 items-center gap-1">
                   <span className="text-slate-300">▸</span>
@@ -406,6 +422,26 @@ function PersonRow({
                   {wi?.code && <span className="text-slate-300">·</span>}
                   <span className="truncate text-slate-600">{t.title}</span>
                   <span className="text-slate-400">({formatItalianShort(t.dueDate)})</span>
+                  {phase && (
+                    <span className="rounded bg-indigo-100 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-indigo-700">
+                      {phase}
+                    </span>
+                  )}
+                  {commPrio && (commPrio === 'alta' || commPrio === 'critica') && (
+                    <span
+                      className={`rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide ${
+                        commPrio === 'critica' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                      }`}
+                      title="Priorità commerciale"
+                    >
+                      comm.{commPrio === 'critica' ? '!' : ''}
+                    </span>
+                  )}
+                  {releaseSoon && wi?.plannedProductionReleaseDate && (
+                    <span className="rounded bg-sky-100 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-sky-700" title="Rilascio produzione previsto vicino">
+                      rel. {formatItalianShort(wi.plannedProductionReleaseDate)}
+                    </span>
+                  )}
                 </span>
               )
             })}
