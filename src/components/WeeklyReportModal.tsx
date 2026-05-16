@@ -224,7 +224,12 @@ function KpiBar({ current }: { current: CurrentWeekReport }) {
       sub: `${s.openCommesse} commesse · ${s.openStudi} studi`,
       tone: 'sky',
     },
-    { value: s.openTasks, label: 'Task aperti', sub: `${s.completedTasks} completati`, tone: 'slate' },
+    {
+      value: s.openTasks,
+      label: 'Task aperti',
+      sub: `${s.completedThisWeekCount} completati in settimana${s.completedTasks > 0 ? ` · ${s.completedTasks} totali` : ''}`,
+      tone: 'slate',
+    },
     {
       value: operational,
       label: 'Persone operative',

@@ -15,6 +15,7 @@ import {
   parseISODate,
   startOfWeek,
 } from './dates'
+import { getCompletionsInRange } from './activityLog'
 
 const MS_PER_DAY = 86_400_000
 
@@ -70,6 +71,7 @@ export interface CurrentWeekReport {
     openInterni: number
     openTasks: number
     completedTasks: number
+    completedThisWeekCount: number
     lateTasks: number
     atRiskTasks: number
     avgLoadPercent: number
@@ -160,11 +162,19 @@ export function getCurrentWeekReportData(data: AppData, today: Date = new Date()
     interni: sortByDue(data.workItems.filter((w) => w.type === 'interno' && isOpen(w.status))),
   }
 
-  // === completed this week (filter by dueDate falling in week)
+  // === completed this week — union di:
+  //   1) eventi activityLog con status_changed → Completato in questa settimana
+  //   2) fallback legacy: items attualmente Completato con dueDate in questa settimana
+  const { workItemIds: logWiIds, taskIds: logTaskIds } = getCompletionsInRange(data, weekStartISO, weekEndISO)
+  const logBasedWi = data.workItems.filter((w) => logWiIds.has(w.id))
+  const logBasedTasks = data.tasks.filter((t) => logTaskIds.has(t.id))
+  const legacyWi = data.workItems.filter((w) => w.status === 'Completato' && w.dueDate >= weekStartISO && w.dueDate <= weekEndISO)
+  const legacyTasks = data.tasks.filter((t) => t.status === 'Completato' && t.dueDate >= weekStartISO && t.dueDate <= weekEndISO)
   const completedThisWeek = {
-    workItems: data.workItems.filter((w) => w.status === 'Completato' && w.dueDate >= weekStartISO && w.dueDate <= weekEndISO),
-    tasks: data.tasks.filter((t) => t.status === 'Completato' && t.dueDate >= weekStartISO && t.dueDate <= weekEndISO),
+    workItems: Array.from(new Map([...logBasedWi, ...legacyWi].map((w) => [w.id, w])).values()),
+    tasks: Array.from(new Map([...logBasedTasks, ...legacyTasks].map((t) => [t.id, t])).values()),
   }
+  const completedThisWeekCount = completedThisWeek.workItems.length + completedThisWeek.tasks.length
 
   // === at risk or late
   const itemTasksMap = new Map<string, Task[]>()
@@ -275,7 +285,7 @@ export function getCurrentWeekReportData(data: AppData, today: Date = new Date()
     weekEnd,
     weekStartISO,
     weekEndISO,
-    summary: { openCommesse, openStudi, openInterni, openTasks, completedTasks, lateTasks, atRiskTasks, avgLoadPercent },
+    summary: { openCommesse, openStudi, openInterni, openTasks, completedTasks, completedThisWeekCount, lateTasks, atRiskTasks, avgLoadPercent },
     workload,
     workItemsByType,
     completedThisWeek,
@@ -400,7 +410,7 @@ export function formatReportMarkdown(
   // === Completate questa settimana
   push('## Attività completate questa settimana')
   push()
-  push('> Lo storico completamenti non è ancora disponibile; vengono mostrate le attività con scadenza in questa settimana attualmente in stato Completato.')
+  push('> Sono incluse: attività marcate Completato durante la settimana (rilevate dallo storico modifiche) e attività con scadenza in settimana attualmente in stato Completato.')
   push()
   if (current.completedThisWeek.workItems.length === 0 && current.completedThisWeek.tasks.length === 0) {
     push('_Nessuna attività in stato Completato con scadenza in questa settimana._')
