@@ -12,6 +12,10 @@ import {
   taskLabel,
   workItemLabel,
 } from '../utils/activityLog'
+import {
+  appendNotification,
+  createNotification,
+} from '../utils/notifications'
 
 export type CreateWorkItemInput = Omit<WorkItem, 'id'>
 export type UpdateWorkItemInput = Partial<Omit<WorkItem, 'id'>>
@@ -50,7 +54,7 @@ export function updateWorkItem(data: AppData, id: string, patch: UpdateWorkItemI
   const before = data.workItems.find((w) => w.id === id)
   if (!before) return data
   const after = normalizeWorkItem({ ...before, ...patch })
-  const next: AppData = {
+  let next: AppData = {
     ...data,
     workItems: data.workItems.map((w) => (w.id === id ? after : w)),
   }
@@ -61,7 +65,7 @@ export function updateWorkItem(data: AppData, id: string, patch: UpdateWorkItemI
     : progressChanged
       ? 'progress_changed'
       : 'updated'
-  return logEntry(next, {
+  next = logEntry(next, {
     entityType: 'workItem',
     entityId: id,
     action,
@@ -70,6 +74,21 @@ export function updateWorkItem(data: AppData, id: string, patch: UpdateWorkItemI
     before: { status: before.status, progressPercent: before.progressPercent },
     after: { status: after.status, progressPercent: after.progressPercent },
   })
+  if (statusChanged) {
+    next = appendNotification(
+      next,
+      createNotification({
+        kind: 'workitem_status',
+        entityId: id,
+        workItemId: id,
+        title: `Lavoro ${workItemLabel(after)}`,
+        message: `${after.customer ? `Cliente: ${after.customer}. ` : ''}Cambio stato registrato dall'app.`,
+        beforeStatus: before.status,
+        afterStatus: after.status,
+      }),
+    )
+  }
+  return next
 }
 
 export function deleteWorkItem(data: AppData, id: string): AppData {
@@ -138,7 +157,7 @@ export function updateTask(data: AppData, id: string, patch: UpdateTaskInput): A
   const before = data.tasks.find((t) => t.id === id)
   if (!before) return data
   const after: Task = { ...before, ...patch }
-  const next: AppData = {
+  let next: AppData = {
     ...data,
     tasks: data.tasks.map((t) => (t.id === id ? after : t)),
   }
@@ -150,7 +169,7 @@ export function updateTask(data: AppData, id: string, patch: UpdateTaskInput): A
     : progressChanged
       ? 'progress_changed'
       : 'updated'
-  return logEntry(next, {
+  next = logEntry(next, {
     entityType: 'task',
     entityId: id,
     action,
@@ -167,6 +186,21 @@ export function updateTask(data: AppData, id: string, patch: UpdateTaskInput): A
       workItemId: after.workItemId,
     },
   })
+  if (statusChanged) {
+    next = appendNotification(
+      next,
+      createNotification({
+        kind: 'task_status',
+        entityId: id,
+        workItemId: after.workItemId,
+        title: `Task: ${after.title}`,
+        message: wi ? `Sul lavoro ${workItemLabel(wi)}. Cambio stato registrato.` : 'Cambio stato registrato.',
+        beforeStatus: before.status,
+        afterStatus: after.status,
+      }),
+    )
+  }
+  return next
 }
 
 export function deleteTask(data: AppData, id: string): AppData {

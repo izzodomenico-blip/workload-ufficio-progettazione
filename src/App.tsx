@@ -5,6 +5,7 @@ import { Dashboard } from './components/Dashboard'
 import { WorkItemFormModal } from './components/WorkItemFormModal'
 import { PeopleSettingsModal } from './components/PeopleSettingsModal'
 import { AbsencesCalendarModal } from './components/AbsencesCalendarModal'
+import { NotificationsBell } from './components/NotificationsBell'
 
 export function App() {
   return (
@@ -31,6 +32,7 @@ function Shell() {
             <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Ufficio Progettazione Meccanica</div>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <NotificationsBell />
             <button
               onClick={() => setAbsencesOpen(true)}
               className="btn-ghost"

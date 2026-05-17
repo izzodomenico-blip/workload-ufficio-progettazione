@@ -342,7 +342,14 @@ const absences: Absence[] = [
   { id: 'ab_vincenzo_mon', personId: 'p_vincenzo', type: 'trasferta', startDate: d(7), endDate: d(7), hoursPerDay: 8, notes: 'Sopralluogo cantiere Epsilon' },
 ]
 
-export const demoData: AppData = { people, workItems, tasks, absences, activityLog: [] }
+export const demoData: AppData = {
+  people,
+  workItems,
+  tasks,
+  absences,
+  activityLog: [],
+  notifications: [],
+}
 
 export function freshDemoData(): AppData {
   return JSON.parse(JSON.stringify(demoData)) as AppData

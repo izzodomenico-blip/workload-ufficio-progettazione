@@ -20,6 +20,11 @@ import {
   updateWorkItem as svcUpdateWorkItem,
 } from '../services/dataService'
 import { appendActivityLog, createActivityLogEntry } from '../utils/activityLog'
+import {
+  clearAllNotifications as svcClearAllNotifications,
+  markAllNotificationsRead as svcMarkAllNotificationsRead,
+  markNotificationRead as svcMarkNotificationRead,
+} from '../utils/notifications'
 import type {
   CreateAbsenceInput,
   CreateTaskInput,
@@ -55,6 +60,10 @@ interface DataContextValue {
   importData: (next: AppData) => void
   exportData: () => void
   resetData: () => void
+  // notifications
+  markNotificationRead: (id: string) => void
+  markAllNotificationsRead: () => void
+  clearAllNotifications: () => void
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -174,6 +183,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
+  const markNotificationRead = useCallback((id: string) => {
+    setData((prev) => svcMarkNotificationRead(prev, id))
+  }, [])
+
+  const markAllNotificationsRead = useCallback(() => {
+    setData((prev) => svcMarkAllNotificationsRead(prev))
+  }, [])
+
+  const clearAllNotifications = useCallback(() => {
+    setData((prev) => svcClearAllNotifications(prev))
+  }, [])
+
   const value = useMemo<DataContextValue>(() => ({
     data,
     absences: data.absences,
@@ -194,6 +215,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     importData,
     exportData,
     resetData,
+    markNotificationRead,
+    markAllNotificationsRead,
+    clearAllNotifications,
   }), [
     data,
     createWorkItem, updateWorkItem, deleteWorkItem, setWorkItemStatus, convertStudioToCommessa,
@@ -201,6 +225,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updatePerson, updatePeople,
     createAbsence, updateAbsence, deleteAbsence,
     importData, exportData, resetData,
+    markNotificationRead, markAllNotificationsRead, clearAllNotifications,
   ])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

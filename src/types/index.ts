@@ -151,12 +151,32 @@ export const ALL_ACTIVITY_ENTITY_TYPES: ActivityLogEntityType[] = [
   'system',
 ]
 
+// === Notifiche interne (v0.10) ===
+// Generate quando cambia stato a un WorkItem o Task.
+// Pensate per essere mostrate nel centro notifiche e per generare un mailto.
+// L'invio email automatico richiederà un backend dedicato — qui sono solo interne.
+export type NotificationKind = 'workitem_status' | 'task_status'
+
+export interface NotificationEntry {
+  id: string
+  timestamp: string
+  kind: NotificationKind
+  entityId: string
+  workItemId?: string
+  title: string
+  message?: string
+  beforeStatus?: Status
+  afterStatus?: Status
+  read: boolean
+}
+
 export interface AppData {
   people: Person[]
   workItems: WorkItem[]
   tasks: Task[]
   absences: Absence[]
   activityLog: ActivityLogEntry[]
+  notifications: NotificationEntry[]
 }
 
 export interface Filters {
