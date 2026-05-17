@@ -17,7 +17,6 @@ interface FormValues {
   startDate: string
   dueDate: string
   estimatedHours: number
-  loggedHours: number
   progressPercent: number
   blockers: string[]
   notes: string
@@ -32,7 +31,6 @@ function emptyValues(defaultAssigneeId: string): FormValues {
     startDate: today,
     dueDate: today,
     estimatedHours: 8,
-    loggedHours: 0,
     progressPercent: 0,
     blockers: [],
     notes: '',
@@ -47,7 +45,6 @@ function fromTask(t: Task): FormValues {
     startDate: t.startDate,
     dueDate: t.dueDate,
     estimatedHours: t.estimatedHours,
-    loggedHours: t.loggedHours,
     progressPercent: t.progressPercent,
     blockers: [...t.blockers],
     notes: t.notes ?? '',
@@ -87,7 +84,8 @@ export function TaskFormModal({ open, onClose, mode, workItemId, task }: Props) 
     startDate: values.startDate,
     dueDate: values.dueDate,
     estimatedHours: Number(values.estimatedHours) || 0,
-    loggedHours: Number(values.loggedHours) || 0,
+    // loggedHours non più gestito in UI — preserva valore esistente per compat dati legacy
+    loggedHours: task?.loggedHours ?? 0,
     progressPercent: Number(values.progressPercent) || 0,
     blockers: values.blockers,
     notes: values.notes.trim() === '' ? undefined : values.notes.trim(),
@@ -176,12 +174,19 @@ export function TaskFormModal({ open, onClose, mode, workItemId, task }: Props) 
           />
         </FormField>
 
-        <FormField label="Ore stimate" error={errors.estimatedHours}>
-          <input type="number" min={0} step={1} className="input-base" value={values.estimatedHours} onChange={(e) => set('estimatedHours', Number(e.target.value))} />
-        </FormField>
-
-        <FormField label="Ore consuntivate" error={errors.loggedHours}>
-          <input type="number" min={0} step={1} className="input-base" value={values.loggedHours} onChange={(e) => set('loggedHours', Number(e.target.value))} />
+        <FormField
+          label="Ore stimate"
+          error={errors.estimatedHours}
+          hint="Le ore residue vengono calcolate da stima e avanzamento."
+        >
+          <input
+            type="number"
+            min={0}
+            step={1}
+            className="input-base"
+            value={values.estimatedHours}
+            onChange={(e) => set('estimatedHours', Number(e.target.value))}
+          />
         </FormField>
 
         <FormField

@@ -1,20 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
-import type { NotificationEntry, Status } from '../types'
+import type { Notification, Status } from '../types'
 import {
-  prepareEmailNotification,
+  buildMailtoFromNotification,
+  DEFAULT_RECIPIENT,
+  getUnreadNotificationsCount,
   RESPONSIBLE_EMAIL,
-  unreadCount,
 } from '../utils/notifications'
 
 export function NotificationsBell() {
-  const { data, markAllNotificationsRead, clearAllNotifications } = useData()
+  const { data, markAllNotificationsAsRead, clearReadNotifications, clearAllNotifications } = useData()
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
 
-  const notifications = data.notifications ?? []
-  const unread = unreadCount(data)
+  // Mostra solo notifiche per Domenico (in attesa di multi-recipient).
+  const myNotifications = useMemo(
+    () => (data.notifications ?? []).filter((n) => n.recipient === DEFAULT_RECIPIENT),
+    [data.notifications],
+  )
+  const unread = getUnreadNotificationsCount({ ...data, notifications: myNotifications })
 
   useEffect(() => {
     if (!open) return
@@ -38,7 +43,11 @@ export function NotificationsBell() {
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="relative inline-flex items-center justify-center rounded-md border border-slate-700 px-2.5 py-1.5 text-slate-200 transition hover:bg-slate-800"
-        title={unread > 0 ? `${unread} notifich${unread === 1 ? 'a' : 'e'} non lett${unread === 1 ? 'a' : 'e'}` : 'Notifiche'}
+        title={
+          unread > 0
+            ? `${unread} notifich${unread === 1 ? 'a' : 'e'} non lett${unread === 1 ? 'a' : 'e'}`
+            : 'Notifiche'
+        }
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`Notifiche${unread > 0 ? `, ${unread} non lette` : ''}`}
@@ -61,26 +70,35 @@ export function NotificationsBell() {
             <div>
               <div className="text-sm font-semibold text-slate-100">Notifiche</div>
               <div className="text-[11px] text-slate-500">
-                {notifications.length === 0
-                  ? 'Nessuna notifica'
-                  : `${notifications.length} total${notifications.length === 1 ? 'e' : 'i'} · ${unread} non lett${unread === 1 ? 'a' : 'e'}`}
+                {myNotifications.length === 0
+                  ? 'Nessuna notifica.'
+                  : `${myNotifications.length} total${myNotifications.length === 1 ? 'e' : 'i'} · ${unread} non lett${unread === 1 ? 'a' : 'e'}`}
               </div>
             </div>
             <div className="flex items-center gap-1">
               {unread > 0 && (
                 <button
-                  onClick={markAllNotificationsRead}
+                  onClick={markAllNotificationsAsRead}
                   className="rounded px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-800"
                   title="Segna tutte come lette"
                 >
                   ✓ tutte
                 </button>
               )}
-              {notifications.length > 0 && (
+              {myNotifications.some((n) => n.read) && (
+                <button
+                  onClick={clearReadNotifications}
+                  className="rounded px-2 py-1 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                  title="Rimuovi quelle già lette"
+                >
+                  rimuovi lette
+                </button>
+              )}
+              {myNotifications.length > 0 && (
                 <button
                   onClick={clearAllNotifications}
                   className="rounded px-2 py-1 text-[11px] text-slate-400 hover:bg-red-500/10 hover:text-red-300"
-                  title="Svuota notifiche"
+                  title="Svuota tutte le notifiche"
                 >
                   svuota
                 </button>
@@ -89,13 +107,16 @@ export function NotificationsBell() {
           </header>
 
           <div className="flex-1 overflow-y-auto scroll-thin">
-            {notifications.length === 0 ? (
+            {myNotifications.length === 0 ? (
               <div className="px-4 py-8 text-center text-[12px] text-slate-500">
-                Le notifiche compariranno qui quando cambierà lo stato di un lavoro o di un task.
+                Nessuna notifica.
+                <div className="mt-1 text-[11px] text-slate-600">
+                  Compariranno qui quando cambierà lo stato di un lavoro o di un task.
+                </div>
               </div>
             ) : (
               <ul className="divide-y divide-slate-800/60">
-                {notifications.map((n) => (
+                {myNotifications.map((n) => (
                   <NotificationRow key={n.id} notification={n} onAfterAction={() => setOpen(false)} />
                 ))}
               </ul>
@@ -109,7 +130,7 @@ export function NotificationsBell() {
               <span className="text-amber-300/80">Non inserire credenziali email nel frontend.</span>
             </p>
             <p className="mt-1 text-[10px] text-slate-500">
-              Destinatario predefinito: <span className="font-mono text-slate-300">{RESPONSIBLE_EMAIL}</span>
+              Destinatario: <span className="font-mono text-slate-300">{RESPONSIBLE_EMAIL}</span>
             </p>
           </footer>
         </div>
@@ -124,35 +145,27 @@ function NotificationRow({
   notification,
   onAfterAction,
 }: {
-  notification: NotificationEntry
+  notification: Notification
   onAfterAction: () => void
 }) {
-  const { data, markNotificationRead } = useData()
+  const { markNotificationAsRead } = useData()
   const toast = useToast()
-
-  const workItem = notification.workItemId
-    ? data.workItems.find((w) => w.id === notification.workItemId)
-    : undefined
-  const task = notification.kind === 'task_status'
-    ? data.tasks.find((t) => t.id === notification.entityId)
-    : undefined
-  const person = task ? data.people.find((p) => p.id === task.assigneeId) : undefined
 
   const time = useMemo(() => fmtTime(notification.timestamp), [notification.timestamp])
 
   function handlePrepareEmail() {
-    const draft = prepareEmailNotification(notification, { workItem, task, person })
+    const mailto = buildMailtoFromNotification(notification)
     try {
-      window.location.href = draft.mailto
-      toast.success('Bozza email aperta nel client di posta.')
+      window.location.href = mailto
+      toast.success('Bozza email aperta nel client di posta (invio manuale).')
     } catch {
       toast.error('Impossibile aprire il client email. Copia oggetto/corpo manualmente.')
     }
-    if (!notification.read) markNotificationRead(notification.id)
+    if (!notification.read) markNotificationAsRead(notification.id)
   }
 
   function handleMarkRead() {
-    if (!notification.read) markNotificationRead(notification.id)
+    if (!notification.read) markNotificationAsRead(notification.id)
   }
 
   return (
@@ -166,6 +179,7 @@ function NotificationRow({
             notification.read ? 'bg-slate-700' : 'bg-sky-400'
           }`}
           aria-hidden
+          title={notification.read ? 'Letta' : 'Non letta'}
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
@@ -200,7 +214,7 @@ function NotificationRow({
                 }}
                 className="rounded px-2 py-1 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-slate-200"
               >
-                Segna come letta
+                Segna come letto
               </button>
             )}
           </div>

@@ -144,10 +144,32 @@ sulla stessa rete:
 - Drag-and-drop nel Kanban
 - Vista carico multi-settimana / capacity planning
 - Autenticazione semplice e ruoli (responsabile vs progettista)
-- Time tracking con `loggedHours` cumulativi per giorno
-- Notifiche email/Teams su cambi di stato chiave
-- Audit log e storico stati
+- Invio email automatico reale tramite backend (vedi sezione "Notifiche ed email")
 - Allegati (link a Drive/SharePoint)
+
+## Notifiche ed email
+
+L'app genera **notifiche interne** automatiche al cambio di stato di un lavoro o
+di un task. Le notifiche compaiono nel centro notifiche (campanella in header)
+e sono persistite localmente in `localStorage`.
+
+Il pulsante **"Prepara email"** in ogni notifica apre un link `mailto:` verso il
+responsabile dell'ufficio tecnico (`utm@innotecsrl.eu`) con oggetto e corpo già
+compilati. L'invio è **manuale**: spetta all'utente confermarlo dal proprio
+client di posta.
+
+**L'invio email automatico reale non è implementato** in questa versione
+frontend-only e richiederà un **backend locale o un servizio dedicato**:
+le credenziali SMTP (es. Aruba) devono vivere lato server, mai nel browser.
+
+Per attivarlo in futuro:
+1. Implementare `sendEmailNotificationViaBackend(...)` in `src/utils/notifications.ts`
+   con un `fetch` verso un endpoint backend (es. `POST /api/notifications/email`).
+2. Registrare il dispatcher via `registerNotificationDispatcher(...)` perché
+   ogni nuova notifica tenti l'invio reale, mantenendo `mailto` come fallback.
+3. Il backend custodisce le credenziali SMTP e gestisce la consegna.
+
+**Non inserire mai password, token o credenziali email nel frontend.**
 
 ## Note tecniche
 

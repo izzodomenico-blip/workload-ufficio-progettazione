@@ -55,9 +55,12 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
 
   const totals = useMemo(() => {
     const est = tasks.reduce((s, t) => s + t.estimatedHours, 0)
-    const log = tasks.reduce((s, t) => s + t.loggedHours, 0)
+    const residual = tasks.reduce(
+      (s, t) => s + Math.max(0, t.estimatedHours * (1 - t.progressPercent / 100)),
+      0,
+    )
     const avgProgress = tasks.length === 0 ? 0 : Math.round(tasks.reduce((s, t) => s + t.progressPercent, 0) / tasks.length)
-    return { est, log, avgProgress }
+    return { est, residual: Math.round(residual * 10) / 10, avgProgress }
   }, [tasks])
 
   const recentLog = useMemo(() => getRecentForWorkItem(data, item.id, 5), [data, item.id])
@@ -165,7 +168,10 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
               </span>
             } />
             <Row label="Ore stimate" value={`${item.estimatedHours}h`} />
-            <Row label="Ore consuntivate" value={`${item.loggedHours}h`} />
+            <Row
+              label="Ore residue calcolate"
+              value={`${Math.round(Math.max(0, item.estimatedHours * (1 - item.progressPercent / 100)) * 10) / 10}h`}
+            />
             <Row label="Avanzamento" value={
               <span className="inline-flex items-center gap-2">
                 <span className="inline-block h-1.5 w-24 overflow-hidden rounded-full bg-slate-800">
@@ -212,7 +218,7 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
         <Section title="Totali (da task)">
           <div className="grid grid-cols-3 gap-3">
             <Stat label="Ore stimate" value={`${totals.est}h`} />
-            <Stat label="Ore consuntivate" value={`${totals.log}h`} />
+            <Stat label="Ore residue" value={`${totals.residual}h`} />
             <Stat label="Avanzamento medio" value={`${totals.avgProgress}%`} />
           </div>
         </Section>
@@ -321,7 +327,10 @@ function TaskRow({
         <div>
           <span className="text-slate-500">Periodo:</span> {formatItalianShort(task.startDate)} → <span className={overdue ? 'text-red-300' : ''}>{formatItalianShort(task.dueDate)}</span>
         </div>
-        <div><span className="text-slate-500">Ore:</span> {task.loggedHours}/{task.estimatedHours}h</div>
+        <div>
+          <span className="text-slate-500">Ore:</span> stim. {task.estimatedHours}h ·{' '}
+          residue {Math.round(Math.max(0, task.estimatedHours * (1 - task.progressPercent / 100)) * 10) / 10}h
+        </div>
         <div>
           <span className="text-slate-500">Avanz.:</span>{' '}
           <span className="tabular-nums text-slate-200">Reale {task.progressPercent}%</span>

@@ -8,7 +8,7 @@ export type ValidationResult<T extends string> =
 export type WorkItemField =
   | 'title' | 'type' | 'status' | 'dueDate'
   | 'code' | 'customer' | 'startDate'
-  | 'estimatedHours' | 'loggedHours' | 'progressPercent'
+  | 'estimatedHours' | 'progressPercent'
   | 'acquisitionProbability'
 
 export function validateWorkItem(
@@ -27,9 +27,6 @@ export function validateWorkItem(
   if (typeof input.estimatedHours === 'number' && input.estimatedHours < 0) {
     errors.estimatedHours = 'Le ore stimate non possono essere negative'
   }
-  if (typeof input.loggedHours === 'number' && input.loggedHours < 0) {
-    errors.loggedHours = 'Le ore consuntivate non possono essere negative'
-  }
   if (typeof input.progressPercent === 'number' && (input.progressPercent < 0 || input.progressPercent > 100)) {
     errors.progressPercent = 'L’avanzamento deve essere tra 0 e 100'
   }
@@ -44,7 +41,7 @@ export function validateWorkItem(
 
 export type TaskField =
   | 'title' | 'assigneeId' | 'dueDate'
-  | 'startDate' | 'estimatedHours' | 'loggedHours' | 'progressPercent' | 'status'
+  | 'startDate' | 'estimatedHours' | 'progressPercent' | 'status'
 
 export function validateTask(
   input: Partial<Omit<Task, 'id' | 'workItemId'>>,
@@ -61,9 +58,6 @@ export function validateTask(
   }
   if (typeof input.estimatedHours === 'number' && input.estimatedHours < 0) {
     errors.estimatedHours = 'Le ore stimate non possono essere negative'
-  }
-  if (typeof input.loggedHours === 'number' && input.loggedHours < 0) {
-    errors.loggedHours = 'Le ore consuntivate non possono essere negative'
   }
   if (typeof input.progressPercent === 'number' && (input.progressPercent < 0 || input.progressPercent > 100)) {
     errors.progressPercent = 'L’avanzamento deve essere tra 0 e 100'

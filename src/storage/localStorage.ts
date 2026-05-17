@@ -1,4 +1,4 @@
-import type { ActivityLogEntry, AppData, NotificationEntry } from '../types'
+import type { ActivityLogEntry, AppData, Notification } from '../types'
 import { mapLegacyStatus } from '../utils/progress'
 
 const STORAGE_KEY = 'workload-ufficio-progettazione:v1'
@@ -16,16 +16,19 @@ function isPlainEntry(e: unknown): e is ActivityLogEntry {
   )
 }
 
-function isPlainNotification(n: unknown): n is NotificationEntry {
+function isPlainNotification(n: unknown): n is Notification {
   if (!n || typeof n !== 'object') return false
   const o = n as Record<string, unknown>
   return (
     typeof o.id === 'string' &&
     typeof o.timestamp === 'string' &&
-    typeof o.kind === 'string' &&
+    typeof o.type === 'string' &&
+    typeof o.entityType === 'string' &&
     typeof o.entityId === 'string' &&
     typeof o.title === 'string' &&
-    typeof o.read === 'boolean'
+    typeof o.read === 'boolean' &&
+    typeof o.emailSubject === 'string' &&
+    typeof o.emailBody === 'string'
   )
 }
 
@@ -36,7 +39,7 @@ export function migrateAppData(data: AppData): AppData {
     ? (rawLog as unknown[]).filter(isPlainEntry)
     : []
   const rawNotif = (data as AppData & { notifications?: unknown }).notifications
-  const notifications: NotificationEntry[] = Array.isArray(rawNotif)
+  const notifications: Notification[] = Array.isArray(rawNotif)
     ? (rawNotif as unknown[]).filter(isPlainNotification)
     : []
   return {

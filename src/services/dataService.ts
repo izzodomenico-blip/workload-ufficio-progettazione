@@ -14,7 +14,7 @@ import {
 } from '../utils/activityLog'
 import {
   appendNotification,
-  createNotification,
+  createStatusChangeNotification,
 } from '../utils/notifications'
 
 export type CreateWorkItemInput = Omit<WorkItem, 'id'>
@@ -77,12 +77,11 @@ export function updateWorkItem(data: AppData, id: string, patch: UpdateWorkItemI
   if (statusChanged) {
     next = appendNotification(
       next,
-      createNotification({
-        kind: 'workitem_status',
+      createStatusChangeNotification({
+        entityType: 'workItem',
         entityId: id,
         workItemId: id,
-        title: `Lavoro ${workItemLabel(after)}`,
-        message: `${after.customer ? `Cliente: ${after.customer}. ` : ''}Cambio stato registrato dall'app.`,
+        itemTitle: after.code ? `${after.code} · ${after.title}` : after.title,
         beforeStatus: before.status,
         afterStatus: after.status,
       }),
@@ -189,12 +188,11 @@ export function updateTask(data: AppData, id: string, patch: UpdateTaskInput): A
   if (statusChanged) {
     next = appendNotification(
       next,
-      createNotification({
-        kind: 'task_status',
+      createStatusChangeNotification({
+        entityType: 'task',
         entityId: id,
         workItemId: after.workItemId,
-        title: `Task: ${after.title}`,
-        message: wi ? `Sul lavoro ${workItemLabel(wi)}. Cambio stato registrato.` : 'Cambio stato registrato.',
+        itemTitle: after.title,
         beforeStatus: before.status,
         afterStatus: after.status,
       }),

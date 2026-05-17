@@ -22,8 +22,9 @@ import {
 import { appendActivityLog, createActivityLogEntry } from '../utils/activityLog'
 import {
   clearAllNotifications as svcClearAllNotifications,
-  markAllNotificationsRead as svcMarkAllNotificationsRead,
-  markNotificationRead as svcMarkNotificationRead,
+  clearReadNotifications as svcClearReadNotifications,
+  markAllNotificationsAsRead as svcMarkAllNotificationsAsRead,
+  markNotificationAsRead as svcMarkNotificationAsRead,
 } from '../utils/notifications'
 import type {
   CreateAbsenceInput,
@@ -61,8 +62,9 @@ interface DataContextValue {
   exportData: () => void
   resetData: () => void
   // notifications
-  markNotificationRead: (id: string) => void
-  markAllNotificationsRead: () => void
+  markNotificationAsRead: (id: string) => void
+  markAllNotificationsAsRead: () => void
+  clearReadNotifications: () => void
   clearAllNotifications: () => void
 }
 
@@ -183,12 +185,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
-  const markNotificationRead = useCallback((id: string) => {
-    setData((prev) => svcMarkNotificationRead(prev, id))
+  const markNotificationAsRead = useCallback((id: string) => {
+    setData((prev) => svcMarkNotificationAsRead(prev, id))
   }, [])
 
-  const markAllNotificationsRead = useCallback(() => {
-    setData((prev) => svcMarkAllNotificationsRead(prev))
+  const markAllNotificationsAsRead = useCallback(() => {
+    setData((prev) => svcMarkAllNotificationsAsRead(prev))
+  }, [])
+
+  const clearReadNotifications = useCallback(() => {
+    setData((prev) => svcClearReadNotifications(prev))
   }, [])
 
   const clearAllNotifications = useCallback(() => {
@@ -215,8 +221,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     importData,
     exportData,
     resetData,
-    markNotificationRead,
-    markAllNotificationsRead,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearReadNotifications,
     clearAllNotifications,
   }), [
     data,
@@ -225,7 +232,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updatePerson, updatePeople,
     createAbsence, updateAbsence, deleteAbsence,
     importData, exportData, resetData,
-    markNotificationRead, markAllNotificationsRead, clearAllNotifications,
+    markNotificationAsRead, markAllNotificationsAsRead,
+    clearReadNotifications, clearAllNotifications,
   ])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
