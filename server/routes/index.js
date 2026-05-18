@@ -7,6 +7,12 @@ import {
   upsertEntity,
 } from '../db.js'
 import { extractAppData } from '../services/appData.js'
+import {
+  createPreMutationBackup,
+  getBackupStatus,
+  recordAutomaticBackupActivity,
+  scheduleAutoBackup,
+} from '../backupService.js'
 
 export function createApiRouter() {
   const router = Router()
@@ -22,10 +28,25 @@ export function createApiRouter() {
   router.put('/app-data', (req, res, next) => {
     try {
       const data = extractAppData(req.body)
-      res.json(saveAppData(data))
+      const reason = mutationReason(req, 'put-app-data')
+      const isNormalCommit = req.get('x-workload-mutation-kind') === 'normal'
+      if (isNormalCommit) {
+        const saved = saveAppData(data)
+        scheduleAutoBackup(reason)
+        res.json(saved)
+        return
+      }
+      const backup = createPreMutationBackup(reason)
+      const saved = saveAppData(data)
+      if (backup) recordAutomaticBackupActivity(backup.reason, new Date(backup.createdAt))
+      res.json(saved)
     } catch (error) {
       next(badRequest(error))
     }
+  })
+
+  router.get('/backup/status', (_req, res) => {
+    res.json(getBackupStatus())
   })
 
   registerCollectionRoutes(router, {
@@ -67,6 +88,7 @@ export function createApiRouter() {
         return
       }
       saveAppData({ ...appData, notifications })
+      scheduleAutoBackup('notification-read')
       res.json(updated)
     } catch (error) {
       next(error)
@@ -78,6 +100,7 @@ export function createApiRouter() {
       const appData = getAppData()
       const notifications = appData.notifications.map((notification) => ({ ...notification, read: true }))
       saveAppData({ ...appData, notifications })
+      scheduleAutoBackup('notifications-read-all')
       res.json({ ok: true, count: notifications.length })
     } catch (error) {
       next(error)
@@ -103,6 +126,7 @@ function registerCollectionRoutes(router, { apiName, collection }) {
   router.post(`/${apiName}`, (req, res, next) => {
     try {
       const saved = upsertEntity(collection, req.body)
+      scheduleAutoBackup(`${collection}-created`)
       res.status(201).json(saved)
     } catch (error) {
       next(badRequest(error))
@@ -117,6 +141,7 @@ function registerCollectionRoutes(router, { apiName, collection }) {
         return
       }
       const saved = upsertEntity(collection, { ...current, ...req.body, id: req.params.id })
+      scheduleAutoBackup(`${collection}-updated`)
       res.json(saved)
     } catch (error) {
       next(badRequest(error))
@@ -125,12 +150,19 @@ function registerCollectionRoutes(router, { apiName, collection }) {
 
   router.delete(`/${apiName}/:id`, (req, res, next) => {
     try {
+      if (collection === 'workItems') createPreMutationBackup('delete-work-item')
       deleteEntity(collection, req.params.id)
+      if (collection !== 'workItems') scheduleAutoBackup(`${collection}-deleted`)
       res.status(204).end()
     } catch (error) {
       next(error)
     }
   })
+}
+
+function mutationReason(req, fallback) {
+  const headerReason = req.get('x-workload-mutation-reason')
+  return headerReason && headerReason.trim().length > 0 ? headerReason.trim() : fallback
 }
 
 function badRequest(error) {

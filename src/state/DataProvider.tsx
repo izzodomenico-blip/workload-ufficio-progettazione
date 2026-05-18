@@ -86,6 +86,11 @@ interface BackupExportResult {
   filename: string
 }
 
+interface CommitOptions {
+  risky?: boolean
+  reason?: string
+}
+
 const DataContext = createContext<DataContextValue | null>(null)
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -117,11 +122,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [toast])
 
-  const commitData = useCallback((next: AppData) => {
+  const commitData = useCallback((next: AppData, options: CommitOptions = {}) => {
     dataRef.current = next
     setData(next)
     saveToStorage(next)
-    void saveAppDataToApi(next).catch((err) => {
+    void saveAppDataToApi(next, options).catch((err) => {
       console.error('Salvataggio su database fallito', err)
       toast.error(`Salvataggio database fallito: ${err instanceof Error ? err.message : 'errore sconosciuto'}`)
     })
@@ -138,7 +143,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [commitData])
 
   const deleteWorkItem = useCallback((id: string) => {
-    commitData(svcDeleteWorkItem(dataRef.current, id))
+    commitData(svcDeleteWorkItem(dataRef.current, id), { risky: true, reason: 'delete-work-item' })
   }, [commitData])
 
   const setWorkItemStatus = useCallback((id: string, status: Status) => {
@@ -212,6 +217,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           description,
         }),
       ),
+      { risky: true, reason: 'import-json' },
     )
   }, [commitData])
 
@@ -230,7 +236,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     )
     const exportedAt = setLastBackupAt(exportedAtDate)
     downloadJSON(createBackupPayload(nextData, exportedAtDate), filename)
-    commitData(nextData)
+    commitData(nextData, { reason: 'export-json-activity-log' })
     return { exportedAt, filename }
   }, [commitData])
 
@@ -246,6 +252,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           description: 'Tutti i dati sono stati ripristinati ai valori demo iniziali',
         }),
       ),
+      { risky: true, reason: 'reset-demo' },
     )
   }, [commitData])
 

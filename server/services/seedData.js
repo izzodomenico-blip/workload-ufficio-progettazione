@@ -1,3 +1,5 @@
+import { REQUIRED_OFFICE_PEOPLE } from './officePeople.js'
+
 function iso(date) {
   return date.toISOString().slice(0, 10)
 }
@@ -21,32 +23,10 @@ export function freshSeedData() {
   const monday = startOfWeek(new Date())
   const d = (offset) => iso(addDays(monday, offset))
 
-  const people = [
-    {
-      id: 'p_domenico',
-      name: 'Domenico',
-      role: 'Responsabile ufficio tecnico',
-      weeklyCapacityHours: 40,
-      skills: ['coordinamento', 'verifica tecnica', 'priorità'],
-      active: true,
-    },
-    {
-      id: 'p_marco',
-      name: 'Marco',
-      role: 'Progettazione tendostrutture e cantilever',
-      weeklyCapacityHours: 40,
-      skills: ['tendostrutture', 'cantilever', 'layout'],
-      active: true,
-    },
-    {
-      id: 'p_camillo',
-      name: 'Camillo',
-      role: 'Progettazione linee e layout',
-      weeklyCapacityHours: 40,
-      skills: ['linee', 'layout', 'assiemi'],
-      active: true,
-    },
-  ]
+  const people = REQUIRED_OFFICE_PEOPLE.map((person) => ({
+    ...person,
+    skills: [...person.skills],
+  }))
 
   const workItems = [
     {
@@ -59,7 +39,7 @@ export function freshSeedData() {
       priority: 'alta',
       status: 'In corso',
       ownerId: 'p_domenico',
-      assigneeIds: ['p_camillo', 'p_marco'],
+      assigneeIds: ['p_camillo', 'p_marco', 'p_nicola', 'p_vincenzo'],
       startDate: d(-7),
       dueDate: d(21),
       estimatedHours: 120,
@@ -74,7 +54,7 @@ export function freshSeedData() {
       type: 'studio',
       code: 'ST-2026-001',
       customer: 'Prospect Demo',
-      title: 'Studio fattibilità demo',
+      title: 'Studio fattibilita demo',
       description: 'Studio demo per verificare import, report e pianificazione.',
       priority: 'media',
       status: 'Da pianificare',
@@ -126,6 +106,32 @@ export function freshSeedData() {
       startDate: d(0),
       dueDate: d(7),
       estimatedHours: 12,
+      loggedHours: 0,
+      progressPercent: 0,
+      blockers: [],
+    },
+    {
+      id: 't_seed_004',
+      workItemId: 'w_seed_cm001',
+      title: 'Supporto progettazione',
+      assigneeId: 'p_nicola',
+      status: 'Da pianificare',
+      startDate: d(7),
+      dueDate: d(14),
+      estimatedHours: 12,
+      loggedHours: 0,
+      progressPercent: 0,
+      blockers: [],
+    },
+    {
+      id: 't_seed_005',
+      workItemId: 'w_seed_cm001',
+      title: 'Documentazione cliente',
+      assigneeId: 'p_vincenzo',
+      status: 'Da pianificare',
+      startDate: d(14),
+      dueDate: d(21),
+      estimatedHours: 10,
       loggedHours: 0,
       progressPercent: 0,
       blockers: [],

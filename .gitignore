@@ -12,3 +12,6 @@ data/*.db-*
 !data/.gitkeep
 backups/*
 !backups/.gitkeep
+!backups/auto/
+backups/auto/*
+!backups/auto/.gitkeep

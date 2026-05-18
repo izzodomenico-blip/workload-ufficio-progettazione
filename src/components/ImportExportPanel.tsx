@@ -3,6 +3,8 @@ import type { ChangeEvent, ReactNode } from 'react'
 import type { AppData } from '../types'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
+import type { BackupStatus } from '../services/apiClient'
+import { fetchBackupStatus } from '../services/apiClient'
 import { downloadTextFile, readJSONFile } from '../storage/localStorage'
 import type { BackupSummary } from '../utils/backup'
 import { getLastBackupAt, validateBackupPayload } from '../utils/backup'
@@ -27,11 +29,15 @@ export function ImportExportPanel() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null)
   const [lastBackupAt, setLastBackupAtState] = useState<string | null>(() => getLastBackupAt())
+  const [serverBackupStatus, setServerBackupStatus] = useState<BackupStatus | null>(null)
   const reminder = getBackupReminder(lastBackupAt)
 
   useEffect(() => {
     if (!open) return
     setLastBackupAtState(getLastBackupAt())
+    fetchBackupStatus()
+      .then(setServerBackupStatus)
+      .catch(() => setServerBackupStatus(null))
     function onClick(e: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false)
     }
@@ -147,6 +153,7 @@ export function ImportExportPanel() {
           <div className="px-3 py-1 text-xs text-slate-400">
             {formatLastBackupLabel(lastBackupAt)}
           </div>
+          <ServerBackupStatusBox status={serverBackupStatus} />
           <MenuItem onClick={handlePickFile} icon={<Icon path="M12 21V9m0 0-4 4m4-4 4 4M5 3h14" />}>
             Importa backup JSON
           </MenuItem>
@@ -232,6 +239,27 @@ function BackupReminderBox({ reminder }: { reminder: BackupReminder }) {
   )
 }
 
+function ServerBackupStatusBox({ status }: { status: BackupStatus | null }) {
+  return (
+    <div className="mx-3 my-1 rounded-md border border-slate-800 bg-slate-900/35 px-2.5 py-2 text-[11px] leading-snug text-slate-400">
+      <div className="flex items-center justify-between gap-2">
+        <span>Backup automatico</span>
+        <span className={status?.autoBackupEnabled ? 'font-medium text-emerald-300' : 'font-medium text-slate-500'}>
+          {status?.autoBackupEnabled ? 'attivo' : 'non disponibile'}
+        </span>
+      </div>
+      <div className="mt-1">Ultimo backup automatico: {formatServerBackupDate(status?.lastAutoBackupAt)}</div>
+      <div>Backup automatici conservati: {status?.autoBackupCount ?? '—'}</div>
+      {status?.lastAutoBackupError && (
+        <div className="mt-1 text-amber-200">Warning: ultimo backup automatico fallito.</div>
+      )}
+      <div className="mt-1 text-slate-500">
+        I backup automatici sono salvati sul PC server nella cartella backups/auto.
+      </div>
+    </div>
+  )
+}
+
 function getBackupReminder(lastBackupAt: string | null): BackupReminder | null {
   if (!lastBackupAt) {
     return {
@@ -259,6 +287,13 @@ function getBackupReminder(lastBackupAt: string | null): BackupReminder | null {
     }
   }
   return null
+}
+
+function formatServerBackupDate(iso?: string | null): string {
+  if (!iso) return 'mai'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return `${date.toLocaleDateString('it-IT')} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 }
 
 function formatLastBackupLabel(lastBackupAt: string | null): string {

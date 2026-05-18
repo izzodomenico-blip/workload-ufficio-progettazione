@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "start": "node server/index.js",
     "db:seed": "node server/seed.js",
+    "db:repair-people": "node server/repairPeople.js",
     "backup": "node server/backup.js",
     "typecheck": "tsc -b --noEmit"
   },

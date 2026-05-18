@@ -141,6 +141,60 @@ Lo script crea in `backups/`:
 Il file `.db` è una copia consistente del database SQLite. Il JSON è utile per
 import o controllo umano.
 
+### Backup automatici server
+
+Il backend crea backup automatici lato server nella cartella:
+
+```text
+backups/auto/
+```
+
+I file automatici hanno nomi del tipo:
+
+```text
+auto_backup_workload_YYYY-MM-DD_HH-mm-ss.db
+auto_backup_workload_YYYY-MM-DD_HH-mm-ss.json
+```
+
+I backup automatici sono separati dai backup manuali: `npm run backup` continua
+a scrivere direttamente in `backups/`, mentre l'automatico scrive solo in
+`backups/auto/`.
+
+Strategia anti-spreco:
+
+- per le modifiche normali viene creato al massimo un backup automatico ogni 30 minuti;
+- se arrivano altre modifiche entro 30 minuti, il server tiene un backup pendente per il prossimo intervallo;
+- prima di operazioni rischiose viene creato subito un backup automatico pre-mutazione.
+
+Operazioni rischiose:
+
+- import JSON;
+- reset demo;
+- eliminazione di un work item;
+- chiamate esterne a `PUT /api/app-data` non marcate come salvataggio normale dal frontend.
+
+Rotazione:
+
+- vengono conservati solo gli ultimi 30 backup automatici `.db`;
+- i backup automatici più vecchi e il relativo `.json` vengono eliminati;
+- i backup manuali in `backups/` non vengono cancellati dalla rotazione automatica.
+
+Stato backup:
+
+```text
+GET /api/backup/status
+```
+
+Lo stato è mostrato anche nel menu **Strumenti > Backup dati**.
+
+Per ripristinare manualmente un backup `.db`:
+
+1. Spegni il server chiudendo la finestra `npm run start`.
+2. Fai una copia di sicurezza dell'attuale `data/workload.db`.
+3. Copia il file `.db` scelto da `backups/auto/` o `backups/` in `data/`.
+4. Rinominalo in `workload.db`.
+5. Riavvia con `npm run start`.
+
 ## Importare vecchi dati
 
 Flusso consigliato dalla vecchia versione localStorage:
@@ -219,6 +273,8 @@ GET /api/activity-log
 GET /api/notifications
 PUT /api/notifications/:id/read
 PUT /api/notifications/read-all
+
+GET /api/backup/status
 ```
 
 Il frontend usa soprattutto `GET /api/app-data` e `PUT /api/app-data`, così le
@@ -231,6 +287,7 @@ npm run dev        # backend + frontend in sviluppo
 npm run build      # typecheck + build frontend
 npm run start      # server produzione locale su porta 3000
 npm run db:seed    # crea dati demo se il DB è vuoto
+npm run db:repair-people  # ripristina/riattiva i 5 membri base senza toccare lavori e task
 npm run backup     # backup JSON + copia DB in backups/
 npm run typecheck  # controllo TypeScript frontend
 ```

@@ -83,6 +83,20 @@ export function saveAppData(data, db = getDb()) {
   return normalized
 }
 
+export function savePeople(people, db = getDb()) {
+  const normalized = normalizeAppData({ ...getAppData(db), people })
+  const now = new Date().toISOString()
+  db.exec('BEGIN IMMEDIATE TRANSACTION;')
+  try {
+    replaceTable(db, TABLES.people, normalized.people, now)
+    db.exec('COMMIT;')
+  } catch (error) {
+    db.exec('ROLLBACK;')
+    throw error
+  }
+  return normalized.people
+}
+
 export function getCollection(name, db = getDb()) {
   const appData = getAppData(db)
   if (!(name in appData)) throw new Error(`Collezione non supportata: ${name}`)
