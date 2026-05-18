@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Absence, AppData, Person, Status } from '../types'
+import type { Absence, AppData, BusinessPartner, Person, Status } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
 import { fetchAppData, saveAppData as saveAppDataToApi } from '../services/apiClient'
@@ -42,10 +42,26 @@ import type {
   UpdateTaskInput,
   UpdateWorkItemInput,
 } from '../services/dataService'
+import {
+  applyImport as svcApplyPartnerImport,
+  createBusinessPartner as svcCreatePartner,
+  deleteBusinessPartner as svcDeletePartner,
+  planImport as svcPlanPartnerImport,
+  setBusinessPartnerActive as svcSetPartnerActive,
+  updateBusinessPartner as svcUpdatePartner,
+} from '../services/businessPartnersService'
+import type {
+  CreateBusinessPartnerInput,
+  ImportPlan,
+  ImportPlanRecord,
+  ImportResult,
+  UpdateBusinessPartnerInput,
+} from '../services/businessPartnersService'
 
 interface DataContextValue {
   data: AppData
   absences: Absence[]
+  businessPartners: BusinessPartner[]
   // workItems
   createWorkItem: (input: CreateWorkItemInput) => string
   updateWorkItem: (id: string, patch: UpdateWorkItemInput) => void
@@ -64,6 +80,13 @@ interface DataContextValue {
   createAbsence: (input: CreateAbsenceInput) => string
   updateAbsence: (id: string, patch: UpdateAbsenceInput) => void
   deleteAbsence: (id: string) => void
+  // business partners
+  createBusinessPartner: (input: CreateBusinessPartnerInput) => string
+  updateBusinessPartner: (id: string, patch: UpdateBusinessPartnerInput) => void
+  setBusinessPartnerActive: (id: string, active: boolean) => void
+  deleteBusinessPartner: (id: string) => void
+  planBusinessPartnerImport: (records: ImportPlanRecord[], filename?: string) => ImportPlan
+  applyBusinessPartnerImport: (plan: ImportPlan) => ImportResult
   // import/export/reset
   importData: (next: AppData, options?: ImportDataOptions) => void
   exportData: () => BackupExportResult
@@ -194,6 +217,119 @@ export function DataProvider({ children }: { children: ReactNode }) {
     commitData(svcDeleteAbsence(dataRef.current, id))
   }, [commitData])
 
+  const createBusinessPartner = useCallback((input: CreateBusinessPartnerInput): string => {
+    const result = svcCreatePartner(dataRef.current, input)
+    commitData(
+      appendActivityLog(
+        result.data,
+        createActivityLogEntry({
+          entityType: 'system',
+          entityId: result.id,
+          action: 'created',
+          title: `Anagrafica creata: ${result.partner.name}`,
+          description: `${result.partner.type}${result.partner.accountCode ? ` · ${result.partner.accountCode}` : ''}`,
+          after: { name: result.partner.name, type: result.partner.type, active: result.partner.active },
+        }),
+      ),
+    )
+    return result.id
+  }, [commitData])
+
+  const updateBusinessPartner = useCallback((id: string, patch: UpdateBusinessPartnerInput) => {
+    const before = dataRef.current.businessPartners.find((p) => p.id === id)
+    const nextData = svcUpdatePartner(dataRef.current, id, patch)
+    const after = nextData.businessPartners.find((p) => p.id === id)
+    if (!before || !after) {
+      commitData(nextData)
+      return
+    }
+    const changes: string[] = []
+    if (before.active !== after.active) changes.push(after.active ? 'attivata' : 'disattivata')
+    if (before.name !== after.name) changes.push('ragione sociale aggiornata')
+    if ((before.email ?? '') !== (after.email ?? '')) changes.push('email aggiornata')
+    if ((before.pec ?? '') !== (after.pec ?? '')) changes.push('PEC aggiornata')
+    if ((before.vatNumber ?? '') !== (after.vatNumber ?? '')) changes.push('P.IVA aggiornata')
+    if ((before.address ?? '') !== (after.address ?? '')) changes.push('indirizzo aggiornato')
+    const description = changes.length === 0 ? 'modifica minore' : changes.join(' · ')
+    commitData(
+      appendActivityLog(
+        nextData,
+        createActivityLogEntry({
+          entityType: 'system',
+          entityId: id,
+          action: before.active !== after.active
+            ? (after.active ? 'updated' : 'deleted')
+            : 'updated',
+          title: `Anagrafica aggiornata: ${after.name}`,
+          description,
+          before: { active: before.active, name: before.name },
+          after: { active: after.active, name: after.name },
+        }),
+      ),
+    )
+  }, [commitData])
+
+  const setBusinessPartnerActive = useCallback((id: string, active: boolean) => {
+    const before = dataRef.current.businessPartners.find((p) => p.id === id)
+    if (!before) return
+    const nextData = svcSetPartnerActive(dataRef.current, id, active)
+    commitData(
+      appendActivityLog(
+        nextData,
+        createActivityLogEntry({
+          entityType: 'system',
+          entityId: id,
+          action: active ? 'updated' : 'deleted',
+          title: `Anagrafica ${active ? 'riattivata' : 'disattivata'}: ${before.name}`,
+        }),
+      ),
+    )
+  }, [commitData])
+
+  const deleteBusinessPartner = useCallback((id: string) => {
+    const before = dataRef.current.businessPartners.find((p) => p.id === id)
+    if (!before) return
+    // soft delete = active=false
+    const nextData = svcDeletePartner(dataRef.current, id)
+    commitData(
+      appendActivityLog(
+        nextData,
+        createActivityLogEntry({
+          entityType: 'system',
+          entityId: id,
+          action: 'deleted',
+          title: `Anagrafica disattivata: ${before.name}`,
+          description: 'Soft delete (active=false): nessuna cancellazione fisica.',
+        }),
+      ),
+    )
+  }, [commitData])
+
+  const planBusinessPartnerImport = useCallback(
+    (records: ImportPlanRecord[], filename?: string): ImportPlan => {
+      return svcPlanPartnerImport(dataRef.current, records, filename)
+    },
+    [],
+  )
+
+  const applyBusinessPartnerImport = useCallback((plan: ImportPlan): ImportResult => {
+    const { data: nextData, result } = svcApplyPartnerImport(dataRef.current, plan)
+    commitData(
+      appendActivityLog(
+        nextData,
+        createActivityLogEntry({
+          entityType: 'system',
+          entityId: 'import-anagrafica',
+          action: 'imported',
+          title: 'Import anagrafica completato',
+          description: `${result.created} nuove · ${result.updated} aggiornate · ${result.skipped} scartate${plan.filename ? ` · file: ${plan.filename}` : ''}`,
+        }),
+      ),
+      { risky: true, reason: 'import-business-partners' },
+    )
+    return result
+  }, [commitData])
+
   const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
     const description = [
       `${next.workItems.length} lavori`,
@@ -275,6 +411,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const value = useMemo<DataContextValue>(() => ({
     data,
     absences: data.absences,
+    businessPartners: data.businessPartners,
     createWorkItem,
     updateWorkItem,
     deleteWorkItem,
@@ -289,6 +426,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createAbsence,
     updateAbsence,
     deleteAbsence,
+    createBusinessPartner,
+    updateBusinessPartner,
+    setBusinessPartnerActive,
+    deleteBusinessPartner,
+    planBusinessPartnerImport,
+    applyBusinessPartnerImport,
     importData,
     exportData,
     resetData,
@@ -302,6 +445,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createTask, updateTask, deleteTask, setTaskStatus,
     updatePerson, updatePeople,
     createAbsence, updateAbsence, deleteAbsence,
+    createBusinessPartner, updateBusinessPartner, setBusinessPartnerActive, deleteBusinessPartner,
+    planBusinessPartnerImport, applyBusinessPartnerImport,
     importData, exportData, resetData,
     markNotificationAsRead, markAllNotificationsAsRead,
     clearReadNotifications, clearAllNotifications,

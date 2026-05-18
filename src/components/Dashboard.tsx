@@ -13,9 +13,10 @@ import { ImportExportPanel } from './ImportExportPanel'
 import { PlanningMatrix } from './PlanningMatrix'
 import { PersonAgendaView } from './PersonAgendaView'
 import { ActivityLogView } from './ActivityLogView'
+import { BusinessPartnersView } from './BusinessPartnersView'
 
 type ViewMode = 'table' | 'kanban'
-type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log'
+type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche'
 
 export function Dashboard() {
   const { data } = useData()
@@ -97,6 +98,14 @@ export function Dashboard() {
           >
             Storico
           </button>
+          <button
+            role="tab"
+            aria-selected={tab === 'anagrafiche'}
+            onClick={() => setTab('anagrafiche')}
+            className={`rounded-md px-3 py-1.5 font-medium transition ${tab === 'anagrafiche' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            Anagrafiche
+          </button>
         </div>
         <ImportExportPanel />
       </div>
@@ -157,6 +166,10 @@ export function Dashboard() {
         <PlanningMatrix />
       ) : tab === 'agenda' ? (
         <PersonAgendaView initialPersonId={agendaPersonId} />
+      ) : tab === 'anagrafiche' ? (
+        <BusinessPartnersView
+          onWorkItemClick={(id) => { setSelectedId(id); setTab('dashboard') }}
+        />
       ) : (
         <ActivityLogView />
       )}

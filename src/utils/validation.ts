@@ -1,4 +1,5 @@
-import type { Absence, Person, Task, WorkItem } from '../types'
+import type { Absence, BusinessPartner, Person, Task, WorkItem } from '../types'
+import { ALL_BUSINESS_PARTNER_TYPES } from '../types'
 
 export type ValidationErrors<T extends string> = Partial<Record<T, string>>
 export type ValidationResult<T extends string> =
@@ -94,6 +95,41 @@ export function validateAbsence(input: Partial<Omit<Absence, 'id'>>): Validation
   }
   if (typeof input.hoursPerDay !== 'number' || input.hoursPerDay <= 0 || input.hoursPerDay > 8) {
     errors.hoursPerDay = 'Le ore al giorno devono essere tra 1 e 8'
+  }
+
+  return Object.keys(errors).length === 0 ? { ok: true } : { ok: false, errors }
+}
+
+export type BusinessPartnerField =
+  | 'accountCode' | 'name' | 'type'
+  | 'vatNumber' | 'fiscalCode' | 'email' | 'pec'
+  | 'balance' | 'exposure' | 'creditLimit' | 'overCreditLimit' | 'risk'
+
+export function validateBusinessPartner(
+  input: Partial<Omit<BusinessPartner, 'id' | 'createdAt' | 'updatedAt'>>,
+): ValidationResult<BusinessPartnerField> {
+  const errors: ValidationErrors<BusinessPartnerField> = {}
+
+  if (!input.name || !input.name.trim()) {
+    errors.name = 'La ragione sociale è obbligatoria'
+  }
+  if (!input.type || !ALL_BUSINESS_PARTNER_TYPES.includes(input.type)) {
+    errors.type = 'Seleziona un tipo valido'
+  }
+  if (input.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email.trim())) {
+    errors.email = 'Email non valida'
+  }
+  if (input.pec && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.pec.trim())) {
+    errors.pec = 'PEC non valida'
+  }
+  if (input.vatNumber && !/^[A-Za-z0-9]{4,20}$/.test(input.vatNumber.trim())) {
+    errors.vatNumber = 'P.IVA non valida (4–20 caratteri alfanumerici)'
+  }
+  for (const field of ['balance', 'exposure', 'creditLimit', 'overCreditLimit', 'risk'] as const) {
+    const v = input[field]
+    if (v !== undefined && v !== null && (typeof v !== 'number' || !Number.isFinite(v))) {
+      errors[field] = 'Valore numerico richiesto'
+    }
   }
 
   return Object.keys(errors).length === 0 ? { ok: true } : { ok: false, errors }

@@ -13,6 +13,7 @@ import {
   recordAutomaticBackupActivity,
   scheduleAutoBackup,
 } from '../backupService.js'
+import { parseAnagraficheXml } from '../services/anagraficheImport.js'
 
 export function createApiRouter() {
   const router = Router()
@@ -64,6 +65,64 @@ export function createApiRouter() {
   registerCollectionRoutes(router, {
     apiName: 'absences',
     collection: 'absences',
+  })
+  registerCollectionRoutes(router, {
+    apiName: 'business-partners',
+    collection: 'businessPartners',
+  })
+
+  router.put('/business-partners/:id/activate', (req, res, next) => {
+    try {
+      const current = getCollection('businessPartners').find((p) => p.id === req.params.id)
+      if (!current) {
+        res.status(404).json({ error: 'Anagrafica non trovata.' })
+        return
+      }
+      const saved = upsertEntity('businessPartners', { ...current, active: true, updatedAt: new Date().toISOString() })
+      scheduleAutoBackup('business-partner-activated')
+      res.json(saved)
+    } catch (error) {
+      next(badRequest(error))
+    }
+  })
+
+  router.put('/business-partners/:id/deactivate', (req, res, next) => {
+    try {
+      const current = getCollection('businessPartners').find((p) => p.id === req.params.id)
+      if (!current) {
+        res.status(404).json({ error: 'Anagrafica non trovata.' })
+        return
+      }
+      const saved = upsertEntity('businessPartners', { ...current, active: false, updatedAt: new Date().toISOString() })
+      scheduleAutoBackup('business-partner-deactivated')
+      res.json(saved)
+    } catch (error) {
+      next(badRequest(error))
+    }
+  })
+
+  router.post('/business-partners/parse-xml', (req, res, next) => {
+    try {
+      const body = req.body ?? {}
+      const xml = typeof body.xml === 'string' ? body.xml : null
+      if (!xml || xml.trim().length === 0) {
+        const err = new Error('Body deve contenere il campo "xml" con il contenuto del file.')
+        err.statusCode = 400
+        throw err
+      }
+      const result = parseAnagraficheXml(xml)
+      res.json({
+        filename: typeof body.filename === 'string' ? body.filename : undefined,
+        totalRows: result.totalRows,
+        headerFound: result.headerFound,
+        skipped: result.skipped,
+        recordsRead: result.records.length,
+        errors: result.errors,
+        records: result.records,
+      })
+    } catch (error) {
+      next(badRequest(error))
+    }
   })
 
   router.get('/activity-log', (_req, res) => {

@@ -15,3 +15,9 @@ backups/*
 !backups/auto/
 backups/auto/*
 !backups/auto/.gitkeep
+
+# Anagrafiche e altri file aziendali contengono dati sensibili
+# (P.IVA, codici fiscali, email, PEC, esposizione, fido, rischio).
+# Vanno custoditi in cartella aziendale protetta, mai committati.
+imports/
+*.xml

@@ -23,6 +23,7 @@ const LEGACY_STATUS_MAP = {
 const VALID_TYPES = new Set(['commessa', 'studio', 'interno'])
 const VALID_PRIORITIES = new Set(['bassa', 'media', 'alta', 'critica'])
 const VALID_ABSENCE_TYPES = new Set(['ferie', 'permesso', 'malattia', 'trasferta', 'altro'])
+const VALID_BUSINESS_PARTNER_TYPES = new Set(['cliente', 'fornitore', 'personale', 'altro'])
 const VALID_ACTIVITY_ACTIONS = new Set([
   'created',
   'updated',
@@ -43,6 +44,7 @@ export const EMPTY_APP_DATA = {
   absences: [],
   activityLog: [],
   notifications: [],
+  businessPartners: [],
 }
 
 export function extractAppData(payload) {
@@ -67,6 +69,9 @@ export function normalizeAppData(input) {
   if (root.notifications !== undefined && !Array.isArray(root.notifications)) {
     throw new Error('notifications deve essere un array oppure assente.')
   }
+  if (root.businessPartners !== undefined && !Array.isArray(root.businessPartners)) {
+    throw new Error('businessPartners deve essere un array oppure assente.')
+  }
 
   return {
     people: root.people.map((item, index) => normalizePerson(item, index)),
@@ -75,6 +80,7 @@ export function normalizeAppData(input) {
     absences: (root.absences ?? []).map((item, index) => normalizeAbsence(item, index)),
     activityLog: (root.activityLog ?? []).map(normalizeActivityLogEntry).filter(Boolean),
     notifications: (root.notifications ?? []).map(normalizeNotification).filter(Boolean),
+    businessPartners: (root.businessPartners ?? []).map(normalizeBusinessPartner).filter(Boolean),
   }
 }
 
@@ -86,6 +92,7 @@ export function countAppData(data) {
     absences: data.absences.length,
     activityLog: data.activityLog.length,
     notifications: data.notifications.length,
+    businessPartners: data.businessPartners.length,
   }
 }
 
@@ -210,6 +217,23 @@ function normalizeActivityLogEntry(item) {
   if (!VALID_ACTIVITY_ENTITY_TYPES.has(o.entityType) || !VALID_ACTIVITY_ACTIONS.has(o.action)) return null
   if (!isNonEmptyString(o.entityId) || !isNonEmptyString(o.title)) return null
   return o
+}
+
+function normalizeBusinessPartner(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id) || !isNonEmptyString(o.name)) return null
+  const type = VALID_BUSINESS_PARTNER_TYPES.has(o.type) ? o.type : 'cliente'
+  const now = new Date().toISOString()
+  return {
+    ...o,
+    id: o.id,
+    accountCode: isString(o.accountCode) ? o.accountCode : '',
+    name: o.name,
+    type,
+    active: typeof o.active === 'boolean' ? o.active : true,
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
 }
 
 function normalizeNotification(item) {

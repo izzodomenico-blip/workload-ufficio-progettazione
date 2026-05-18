@@ -77,6 +77,11 @@ export interface WorkItem {
   offerReference?: string
   commercialPriority?: Priority
   managerNotes?: string
+  // Collegamento opzionale all'anagrafica clienti (v1.2). `customer` resta come
+  // stringa libera per WorkItem creati prima dell'introduzione delle anagrafiche
+  // o per clienti non ancora censiti.
+  customerPartnerId?: string
+  customerPartnerName?: string
 }
 
 export interface Task {
@@ -180,6 +185,45 @@ export interface Notification {
   afterStatus?: Status
 }
 
+// === Anagrafiche clienti / fornitori / personale (v1.2) ===
+
+export type BusinessPartnerType = 'cliente' | 'fornitore' | 'personale' | 'altro'
+
+export const ALL_BUSINESS_PARTNER_TYPES: BusinessPartnerType[] = ['cliente', 'fornitore', 'personale', 'altro']
+
+export interface BusinessPartner {
+  id: string
+  accountCode: string
+  name: string
+  type: BusinessPartnerType
+  vatNumber?: string
+  fiscalCode?: string
+  sdiCode?: string
+  address?: string
+  city?: string
+  province?: string
+  postalCode?: string
+  country?: string
+  email?: string
+  pec?: string
+  phone?: string
+  paymentCode?: string
+  paymentDescription?: string
+  bankName?: string
+  abi?: string
+  cab?: string
+  vatExemptionCode?: string
+  balance?: number
+  exposure?: number
+  creditLimit?: number
+  overCreditLimit?: number
+  risk?: number
+  notes?: string
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AppData {
   people: Person[]
   workItems: WorkItem[]
@@ -187,6 +231,7 @@ export interface AppData {
   absences: Absence[]
   activityLog: ActivityLogEntry[]
   notifications: Notification[]
+  businessPartners: BusinessPartner[]
 }
 
 export interface Filters {

@@ -1,4 +1,4 @@
-import type { Absence, AppData, Person, Task, WorkItem } from '../types'
+import type { Absence, AppData, BusinessPartner, Person, Task, WorkItem } from '../types'
 import { addDays, formatISODate, startOfWeek } from '../utils/dates'
 
 const monday = startOfWeek(new Date())
@@ -342,6 +342,103 @@ const absences: Absence[] = [
   { id: 'ab_vincenzo_mon', personId: 'p_vincenzo', type: 'trasferta', startDate: d(7), endDate: d(7), hoursPerDay: 8, notes: 'Sopralluogo cantiere Epsilon' },
 ]
 
+// Demo anagrafiche: pochi record fittizi per popolare la sezione Anagrafiche
+// senza dover importare il file reale. Per l'import reale di clienti/fornitori
+// usare il flusso "Importa XML" sulla vista Anagrafiche.
+const demoNow = new Date().toISOString()
+
+const businessPartners: BusinessPartner[] = [
+  {
+    id: 'bp_demo_alpha',
+    accountCode: 'C00001',
+    name: 'Alpha Industriale Spa',
+    type: 'cliente',
+    vatNumber: '01234567890',
+    fiscalCode: '01234567890',
+    sdiCode: 'ABCDEFG',
+    address: 'Via Roma 12',
+    postalCode: '20100',
+    city: 'Milano',
+    province: 'MI',
+    country: 'IT',
+    email: 'info@alpha-industriale.demo',
+    pec: 'alpha@pec.demo',
+    phone: '+39 02 1234567',
+    paymentCode: 'RB60',
+    paymentDescription: 'Riba 60 giorni',
+    active: true,
+    createdAt: demoNow,
+    updatedAt: demoNow,
+  },
+  {
+    id: 'bp_demo_beta',
+    accountCode: 'C00002',
+    name: 'Beta Meccanica Srl',
+    type: 'cliente',
+    vatNumber: '02345678901',
+    address: 'Via Industria 5',
+    postalCode: '24100',
+    city: 'Bergamo',
+    province: 'BG',
+    country: 'IT',
+    email: 'tecnico@beta-meccanica.demo',
+    phone: '+39 035 7654321',
+    active: true,
+    createdAt: demoNow,
+    updatedAt: demoNow,
+  },
+  {
+    id: 'bp_demo_delta',
+    accountCode: 'C00003',
+    name: 'Delta Packaging',
+    type: 'cliente',
+    vatNumber: '03456789012',
+    address: 'Strada Vicinale 8',
+    postalCode: '37100',
+    city: 'Verona',
+    province: 'VR',
+    country: 'IT',
+    email: 'acquisti@delta-packaging.demo',
+    active: true,
+    createdAt: demoNow,
+    updatedAt: demoNow,
+  },
+  {
+    id: 'bp_demo_acciaitaly',
+    accountCode: 'F00001',
+    name: 'Acciaitaly Srl',
+    type: 'fornitore',
+    vatNumber: '09876543210',
+    address: 'Via dei Fabbri 3',
+    postalCode: '20900',
+    city: 'Monza',
+    province: 'MB',
+    country: 'IT',
+    email: 'ordini@acciaitaly.demo',
+    paymentDescription: 'Bonifico 30 gg fine mese',
+    active: true,
+    createdAt: demoNow,
+    updatedAt: demoNow,
+  },
+  {
+    id: 'bp_demo_epsilon',
+    accountCode: 'C00099',
+    name: 'Epsilon Logistics',
+    type: 'cliente',
+    vatNumber: '04567890123',
+    address: 'Via dei Trasporti 100',
+    postalCode: '40100',
+    city: 'Bologna',
+    province: 'BO',
+    country: 'IT',
+    email: 'commerciale@epsilon-logistics.demo',
+    active: false,
+    notes: 'Cliente non più attivo dal 2024',
+    createdAt: demoNow,
+    updatedAt: demoNow,
+  },
+]
+
 export const demoData: AppData = {
   people,
   workItems,
@@ -349,6 +446,7 @@ export const demoData: AppData = {
   absences,
   activityLog: [],
   notifications: [],
+  businessPartners,
 }
 
 export function freshDemoData(): AppData {

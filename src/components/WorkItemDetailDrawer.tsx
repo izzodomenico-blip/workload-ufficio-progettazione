@@ -223,6 +223,8 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
           </div>
         </Section>
 
+        <CustomerPartnerSection item={item} />
+
         <TechnicalDetailsSection item={item} />
 
         {item.blockers.length > 0 && (
@@ -448,6 +450,61 @@ const COMMERCIAL_TONE: Record<string, string> = {
   media: 'bg-sky-500/15 text-sky-200 ring-sky-500/30',
   alta: 'bg-orange-500/15 text-orange-200 ring-orange-500/30',
   critica: 'bg-red-500/15 text-red-200 ring-red-500/40',
+}
+
+function CustomerPartnerSection({ item }: { item: WorkItem }) {
+  const { data } = useData()
+  const partner = item.customerPartnerId
+    ? data.businessPartners.find((p) => p.id === item.customerPartnerId)
+    : undefined
+
+  if (!item.customerPartnerId) {
+    return (
+      <Section title="Cliente">
+        <div className="rounded-md border border-dashed border-slate-700 bg-slate-900/40 px-3 py-2 text-xs text-slate-400">
+          {item.customer
+            ? <>Cliente libero / non collegato ad anagrafica: <span className="text-slate-200">{item.customer}</span></>
+            : 'Nessun cliente impostato.'}
+        </div>
+      </Section>
+    )
+  }
+
+  if (!partner) {
+    return (
+      <Section title="Cliente">
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
+          Anagrafica collegata ma non trovata (id: <code>{item.customerPartnerId}</code>).
+          {item.customerPartnerName ? <> Ultimo nome noto: <strong>{item.customerPartnerName}</strong>.</> : null}
+        </div>
+      </Section>
+    )
+  }
+
+  return (
+    <Section title="Cliente (collegato ad anagrafica)">
+      <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+              <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] capitalize text-sky-200 ring-1 ring-inset ring-sky-500/40">{partner.type}</span>
+              {partner.accountCode && <span className="font-mono">{partner.accountCode}</span>}
+              {!partner.active && <span className="rounded bg-zinc-700/40 px-1.5 py-0.5 text-[10px] text-zinc-300">disattivata</span>}
+            </div>
+            <div className="mt-0.5 truncate text-sm font-semibold text-slate-100">{partner.name}</div>
+          </div>
+        </div>
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+          {partner.vatNumber && <Row label="P.IVA" value={<code className="text-slate-300">{partner.vatNumber}</code>} />}
+          {partner.fiscalCode && <Row label="CF" value={<code className="text-slate-300">{partner.fiscalCode}</code>} />}
+          {(partner.city || partner.province) && <Row label="Città" value={[partner.city, partner.province].filter(Boolean).join(' · ')} />}
+          {partner.email && <Row label="Email" value={partner.email} />}
+          {partner.pec && <Row label="PEC" value={partner.pec} />}
+          {partner.phone && <Row label="Telefono" value={partner.phone} />}
+        </dl>
+      </div>
+    </Section>
+  )
 }
 
 function TechnicalDetailsSection({ item }: { item: WorkItem }) {

@@ -230,13 +230,136 @@ posta dell'utente.
 
 Non inserire credenziali email, password SMTP o token nel frontend.
 
+## Anagrafiche (clienti / fornitori / personale)
+
+Dalla v1.2 l'app gestisce un archivio di **anagrafiche** dedicato. La nuova vista
+**Anagrafiche** (tab in alto, accanto a Storico) consente di:
+
+- creare/modificare manualmente clienti, fornitori, personale e altri soggetti;
+- **disattivare/riattivare** un'anagrafica (soft delete: non viene mai
+  cancellata fisicamente di default);
+- ricercare per ragione sociale, P.IVA, codice fiscale, codice conto, email, PEC,
+  città o telefono;
+- importare in blocco dal file gestionale `ANAGRAFICA.xml` (formato Excel
+  SpreadsheetML 2003);
+- vedere i **lavori collegati** a ogni anagrafica nel pannello dettaglio.
+
+### Dove mettere `ANAGRAFICA.xml`
+
+Il file va salvato in `imports/` (cartella esclusa da Git via `.gitignore`).
+Esempio:
+
+```
+workload-ufficio-progettazione/
+└── imports/
+    └── ANAGRAFICA.xml           ← non tracciato da Git
+```
+
+> ⚠️ `imports/` e tutti i file `*.xml` sono **ignorati da Git**. Non spostare
+> mai il file dentro al repo principale, non includerlo nei commit e non
+> caricarlo su GitHub. Custodisci `ANAGRAFICA.xml` e i backup in una cartella
+> aziendale protetta.
+
+### Come importare
+
+1. Vai sul tab **Anagrafiche** → pulsante **↑ Importa XML/CSV/JSON**.
+2. Seleziona il file `ANAGRAFICA.xml`. Il backend lo legge in locale (nessun
+   upload cloud) ed esegue il parsing SpreadsheetML.
+3. Compare un'anteprima con: file, righe lette, **nuove**, **aggiornate**,
+   **scartate**, eventuali avvisi di parsing e i primi record con l'azione
+   pianificata.
+4. Conferma con **Conferma import**. L'app:
+   - aggiorna o crea le anagrafiche;
+   - **non cancella mai** anagrafiche esistenti;
+   - registra un singolo evento nello storico modifiche
+     (`Import anagrafica completato: X nuove, Y aggiornate, Z scartate`);
+   - innesca il backup automatico server e include `business_partners`.
+
+### Regole di deduplica
+
+Per ogni record letto dal file, il backend cerca un match in questo ordine:
+
+1. **codice conto** (`accountCode`) uguale;
+2. **P.IVA + ragione sociale** uguali;
+3. **codice fiscale + ragione sociale** uguali.
+
+Se trova un match, **aggiorna** l'anagrafica esistente (preservando id,
+`createdAt` e i campi non presenti nel file). Altrimenti **crea** un nuovo
+record. Le righe senza ragione sociale o senza alcun identificativo (conto /
+P.IVA / CF) vengono **scartate**.
+
+### Mappatura colonne XML → BusinessPartner
+
+| Colonna XML        | Campo BusinessPartner |
+|--------------------|------------------------|
+| Conto              | `accountCode`          |
+| Ragione Sociale    | `name` (obbligatorio)  |
+| Partita Iva        | `vatNumber`            |
+| Codice Fiscale     | `fiscalCode`           |
+| Codice SDI         | `sdiCode`              |
+| Indirizzo          | `address`              |
+| CAP                | `postalCode`           |
+| Località           | `city`                 |
+| Prov               | `province`             |
+| Nazione            | `country`              |
+| Telefono           | `phone`                |
+| Cod Pag            | `paymentCode`          |
+| Pagamento          | `paymentDescription`   |
+| Banca di appoggio  | `bankName`             |
+| ABI / CAB          | `abi` / `cab`          |
+| Cod. Iva/Esenzione | `vatExemptionCode`     |
+| Email              | `email`                |
+| PEC                | `pec`                  |
+| Saldo              | `balance`              |
+| Esposizione        | `exposure`             |
+| Fido               | `creditLimit`          |
+| Fuori fido         | `overCreditLimit`      |
+| Rischio            | `risk`                 |
+
+Se nel file non c'è una colonna `Tipo`, il default è `cliente` e `active=true`.
+
+### Autocomplete cliente nei lavori
+
+Nel form **Nuovo lavoro / Modifica lavoro**, dopo aver digitato almeno **3
+lettere** nel campo **Cliente** compare un menu a tendina con risultati
+dall'anagrafica (solo `active=true`). Selezionando una voce:
+
+- `customer` = ragione sociale dell'anagrafica;
+- `customerPartnerId` viene impostato sul lavoro (collegamento permanente).
+
+Se scrivi un cliente non in anagrafica, viene salvato come **testo libero**
+(`customer` solo, `customerPartnerId` vuoto) — comparirà la nota "Cliente non
+presente in anagrafica — verrà salvato come testo libero". I lavori esistenti
+con `customer` testuale **continuano a funzionare** senza migrazione: nel drawer
+appare "Cliente libero / non collegato ad anagrafica".
+
+### Backup e privacy
+
+I backup includono **sempre** la tabella `business_partners` sia in:
+
+- `.db` (snapshot SQLite, copia di tutta la base dati);
+- `.json` (export manuale e auto, struttura `data.businessPartners`).
+
+I JSON di backup contengono **dati aziendali sensibili** (P.IVA, codici
+fiscali, email, PEC, saldo, esposizione, fido, rischio). Trattali come
+documenti riservati:
+
+- non condividerli via canali pubblici;
+- conservali in `backups/` su disco aziendale protetto;
+- non committarli su Git (le cartelle `imports/`, `backups/`, `data/` sono
+  già escluse).
+
+I backup precedenti senza `businessPartners` continuano a funzionare: l'app
+inizializza l'array a vuoto.
+
 ## Sicurezza minima
 
 Questa versione non ha login ed è pensata per una rete locale aziendale fidata.
 
 Non esporre la porta `3000` su internet, non aprire port forwarding dal router e
 non pubblicare il server su cloud senza aggiungere autenticazione e protezioni
-adeguate.
+adeguate. **Da v1.2 il database contiene anche P.IVA, PEC, codici fiscali ed
+esposizione dei clienti** — il rischio di esposizione è aumentato.
 
 Il backend non abilita CORS aperto: in produzione il frontend e le API sono
 serviti dallo stesso server Express.
@@ -267,6 +390,15 @@ GET    /api/absences
 POST   /api/absences
 PUT    /api/absences/:id
 DELETE /api/absences/:id
+
+GET    /api/business-partners
+POST   /api/business-partners
+PUT    /api/business-partners/:id
+PUT    /api/business-partners/:id/activate
+PUT    /api/business-partners/:id/deactivate
+DELETE /api/business-partners/:id            ← soft delete (active=false)
+
+POST   /api/business-partners/parse-xml      ← body { xml, filename } → records[]
 
 GET /api/activity-log
 

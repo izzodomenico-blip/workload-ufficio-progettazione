@@ -22,6 +22,7 @@ const TABLES = {
   absences: 'absences',
   activityLog: 'activity_log',
   notifications: 'notifications',
+  businessPartners: 'business_partners',
 }
 
 let dbInstance = null
@@ -38,9 +39,15 @@ export function getDb() {
 }
 
 export function runMigrations(db = getDb()) {
-  const migrationPath = path.join(__dirname, 'migrations', '001_init.sql')
-  db.exec(fs.readFileSync(migrationPath, 'utf8'))
-  db.prepare('INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)').run('schemaVersion', '1')
+  const migrationsDir = path.join(__dirname, 'migrations')
+  const files = fs.readdirSync(migrationsDir)
+    .filter((name) => name.endsWith('.sql'))
+    .sort()
+  for (const file of files) {
+    db.exec(fs.readFileSync(path.join(migrationsDir, file), 'utf8'))
+  }
+  // schemaVersion riflette il numero di migrazioni applicate (al momento 2)
+  db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('schemaVersion', String(files.length))
 }
 
 export function isDatabaseEmpty(db = getDb()) {
@@ -61,6 +68,7 @@ export function getAppData(db = getDb()) {
     absences: readJsonRows(db, TABLES.absences),
     activityLog: readJsonRows(db, TABLES.activityLog, 'timestamp DESC'),
     notifications: readJsonRows(db, TABLES.notifications, 'timestamp DESC'),
+    businessPartners: readJsonRows(db, TABLES.businessPartners, 'name COLLATE NOCASE ASC'),
   }
 }
 
@@ -75,6 +83,7 @@ export function saveAppData(data, db = getDb()) {
     replaceTable(db, TABLES.absences, normalized.absences, now)
     replaceActivityLog(db, normalized.activityLog, now)
     replaceNotifications(db, normalized.notifications, now)
+    replaceBusinessPartners(db, normalized.businessPartners, now)
     db.exec('COMMIT;')
   } catch (error) {
     db.exec('ROLLBACK;')
@@ -164,6 +173,31 @@ function replaceNotifications(db, rows, now) {
   const insert = db.prepare('INSERT INTO notifications (id, timestamp, read, data, updated_at) VALUES (?, ?, ?, ?, ?)')
   for (const row of rows) {
     insert.run(row.id, row.timestamp, row.read ? 1 : 0, JSON.stringify(row), now)
+  }
+}
+
+function replaceBusinessPartners(db, rows, now) {
+  db.prepare('DELETE FROM business_partners').run()
+  const insert = db.prepare(`
+    INSERT INTO business_partners
+      (id, account_code, name, type, vat_number, fiscal_code, email, pec, city, active, data, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  for (const row of rows) {
+    insert.run(
+      row.id,
+      row.accountCode ?? null,
+      row.name,
+      row.type,
+      row.vatNumber ?? null,
+      row.fiscalCode ?? null,
+      row.email ?? null,
+      row.pec ?? null,
+      row.city ?? null,
+      row.active ? 1 : 0,
+      JSON.stringify(row),
+      now,
+    )
   }
 }
 

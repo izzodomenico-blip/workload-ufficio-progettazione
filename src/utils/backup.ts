@@ -12,6 +12,8 @@ import type {
   ActivityLogEntityType,
   ActivityLogEntry,
   AppData,
+  BusinessPartner,
+  BusinessPartnerType,
   Notification,
   NotificationEntityType,
   Person,
@@ -20,6 +22,7 @@ import type {
   WorkItem,
   WorkItemType,
 } from '../types'
+import { ALL_BUSINESS_PARTNER_TYPES } from '../types'
 import { mapLegacyStatus } from './progress'
 
 export const BACKUP_APP_NAME = 'workload-ufficio-progettazione'
@@ -33,6 +36,7 @@ export interface BackupCounts {
   absences: number
   activityLog: number
   notifications: number
+  businessPartners: number
 }
 
 export interface BackupInfo {
@@ -79,6 +83,7 @@ const WORK_ITEM_TYPES = new Set<string>(ALL_TYPES)
 const ABSENCE_TYPES = new Set<string>(ALL_ABSENCE_TYPES)
 const ACTIVITY_ACTIONS = new Set<string>(ALL_ACTIVITY_ACTIONS)
 const ACTIVITY_ENTITY_TYPES = new Set<string>(ALL_ACTIVITY_ENTITY_TYPES)
+const BUSINESS_PARTNER_TYPES = new Set<string>(ALL_BUSINESS_PARTNER_TYPES)
 
 export function createBackupPayload(data: AppData, exportedAt: Date = new Date()): BackupPayload {
   const backupData: AppData = {
@@ -89,6 +94,7 @@ export function createBackupPayload(data: AppData, exportedAt: Date = new Date()
     absences: data.absences ?? [],
     activityLog: data.activityLog ?? [],
     notifications: data.notifications ?? [],
+    businessPartners: data.businessPartners ?? [],
   }
 
   return {
@@ -129,6 +135,7 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   const rawAbsences = root.absences
   const rawActivityLog = root.activityLog
   const rawNotifications = root.notifications
+  const rawBusinessPartners = root.businessPartners
 
   if (!Array.isArray(rawPeople)) issues.push('people deve essere un array.')
   if (!Array.isArray(rawWorkItems)) issues.push('workItems deve essere un array.')
@@ -139,6 +146,9 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   }
   if (rawNotifications !== undefined && !Array.isArray(rawNotifications)) {
     issues.push('notifications deve essere un array oppure assente.')
+  }
+  if (rawBusinessPartners !== undefined && !Array.isArray(rawBusinessPartners)) {
+    issues.push('businessPartners deve essere un array oppure assente.')
   }
 
   const people: Person[] = []
@@ -185,6 +195,9 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   const notifications = Array.isArray(rawNotifications)
     ? rawNotifications.map(normalizeNotification).filter(isPresent)
     : []
+  const businessPartners = Array.isArray(rawBusinessPartners)
+    ? rawBusinessPartners.map(normalizeBusinessPartner).filter(isPresent)
+    : []
 
   const data = {
     ...root,
@@ -194,6 +207,7 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
     absences,
     activityLog,
     notifications,
+    businessPartners,
   } as AppData
   const summary = {
     source: source.kind,
@@ -273,6 +287,7 @@ function normalizeBackupInfo(value: unknown): BackupMetadata | undefined {
           absences: optionalNumber(counts.absences),
           activityLog: optionalNumber(counts.activityLog),
           notifications: optionalNumber(counts.notifications),
+          businessPartners: optionalNumber(counts.businessPartners),
         }
       : undefined,
   }
@@ -399,6 +414,48 @@ function normalizeActivityLogEntry(value: unknown): ActivityLogEntry | null {
   } as ActivityLogEntry
 }
 
+function normalizeBusinessPartner(value: unknown): BusinessPartner | null {
+  const o = asRecord(value)
+  if (!o) return null
+  if (!isNonEmptyString(o.id) || !isNonEmptyString(o.name)) return null
+  const type: BusinessPartnerType = BUSINESS_PARTNER_TYPES.has(o.type as string)
+    ? (o.type as BusinessPartnerType)
+    : 'cliente'
+  const now = new Date().toISOString()
+  return {
+    id: o.id,
+    accountCode: isString(o.accountCode) ? o.accountCode : '',
+    name: o.name,
+    type,
+    vatNumber: optionalString(o.vatNumber),
+    fiscalCode: optionalString(o.fiscalCode),
+    sdiCode: optionalString(o.sdiCode),
+    address: optionalString(o.address),
+    city: optionalString(o.city),
+    province: optionalString(o.province),
+    postalCode: optionalString(o.postalCode),
+    country: optionalString(o.country),
+    email: optionalString(o.email),
+    pec: optionalString(o.pec),
+    phone: optionalString(o.phone),
+    paymentCode: optionalString(o.paymentCode),
+    paymentDescription: optionalString(o.paymentDescription),
+    bankName: optionalString(o.bankName),
+    abi: optionalString(o.abi),
+    cab: optionalString(o.cab),
+    vatExemptionCode: optionalString(o.vatExemptionCode),
+    balance: optionalNumber(o.balance),
+    exposure: optionalNumber(o.exposure),
+    creditLimit: optionalNumber(o.creditLimit),
+    overCreditLimit: optionalNumber(o.overCreditLimit),
+    risk: optionalNumber(o.risk),
+    notes: optionalString(o.notes),
+    active: typeof o.active === 'boolean' ? o.active : true,
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
 function normalizeNotification(value: unknown): Notification | null {
   const o = asRecord(value)
   if (!o) return null
@@ -427,7 +484,7 @@ function normalizeNotification(value: unknown): Notification | null {
   } as Notification
 }
 
-function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications'>): BackupCounts {
+function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners'>): BackupCounts {
   return {
     people: data.people.length,
     workItems: data.workItems.length,
@@ -435,6 +492,7 @@ function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'ab
     absences: data.absences.length,
     activityLog: data.activityLog.length,
     notifications: data.notifications.length,
+    businessPartners: data.businessPartners.length,
   }
 }
 

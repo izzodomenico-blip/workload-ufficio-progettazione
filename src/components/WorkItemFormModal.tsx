@@ -3,6 +3,7 @@ import type { Priority, Status, TechnicalPhase, WorkItem, WorkItemType } from '.
 import { ALL_PRIORITIES, ALL_STATUSES, ALL_TYPES, TECHNICAL_PHASES } from '../types'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
+import { BusinessPartnerAutocomplete } from './BusinessPartnerAutocomplete'
 import { todayISO } from '../utils/dates'
 import { validateWorkItem } from '../utils/validation'
 import type { ValidationErrors, WorkItemField } from '../utils/validation'
@@ -15,6 +16,7 @@ interface FormValues {
   type: WorkItemType
   code: string
   customer: string
+  customerPartnerId: string
   title: string
   description: string
   priority: Priority
@@ -45,6 +47,7 @@ function emptyValues(defaultOwnerId: string): FormValues {
     type: 'commessa',
     code: '',
     customer: '',
+    customerPartnerId: '',
     title: '',
     description: '',
     priority: 'media',
@@ -74,6 +77,7 @@ function fromWorkItem(w: WorkItem): FormValues {
     type: w.type,
     code: w.code,
     customer: w.customer,
+    customerPartnerId: w.customerPartnerId ?? '',
     title: w.title,
     description: w.description,
     priority: w.priority,
@@ -155,8 +159,11 @@ export function WorkItemFormModal({ open, onClose, mode, workItem, onCreated }: 
       ...(values.offerReference.trim() ? { offerReference: values.offerReference.trim() } : {}),
       ...(values.commercialPriority ? { commercialPriority: values.commercialPriority } : {}),
       ...(values.managerNotes.trim() ? { managerNotes: values.managerNotes.trim() } : {}),
+      ...(values.customerPartnerId
+        ? { customerPartnerId: values.customerPartnerId, customerPartnerName: values.customer.trim() }
+        : {}),
     }
-  }, [values, isStudio])
+  }, [values, isStudio, workItem?.loggedHours])
 
   function handleSubmit() {
     setSubmitted(true)
@@ -226,11 +233,17 @@ export function WorkItemFormModal({ open, onClose, mode, workItem, onCreated }: 
           />
         </FormField>
 
-        <FormField label="Cliente" className="md:col-span-1">
-          <input
-            className="input-base"
+        <FormField label="Cliente" className="md:col-span-1" hint="Almeno 3 lettere per cercare in anagrafica; testo libero ammesso se non in elenco">
+          <BusinessPartnerAutocomplete
             value={values.customer}
-            onChange={(e) => set('customer', e.target.value)}
+            linkedPartnerId={values.customerPartnerId}
+            onChange={(text, partner) => {
+              setValues((prev) => ({
+                ...prev,
+                customer: text,
+                customerPartnerId: partner ? partner.id : '',
+              }))
+            }}
             placeholder="Nome cliente o reparto interno"
           />
         </FormField>
