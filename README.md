@@ -1,180 +1,193 @@
-# Workload · Ufficio Progettazione Meccanica
+# Workload - Ufficio Progettazione Meccanica
 
-App interna per il monitoraggio del carico di lavoro dell'ufficio tecnico/progettazione meccanica.
-Permette di tracciare commesse, studi/preventivi, attività interne e relativi task,
-con visione del carico settimanale per ogni progettista.
+App locale per monitorare carico di lavoro, commesse, studi, attività interne,
+task, assenze, pianificazione e report dell'ufficio progettazione.
 
-## Stato attuale
+La versione attuale è **v1.0-local**: è pronta per un primo uso reale locale sul
+PC aziendale, senza backend, senza database e senza autenticazione.
 
-**v0.2 — CRUD completo da interfaccia.**
+## Funzionalità principali
 
-L'app è **frontend-only**. Tutti i dati vivono nel `localStorage` del browser
-con chiave `workload-ufficio-progettazione:v1`. Non c'è ancora un backend né un
-database condiviso: aprendo l'app da un PC diverso vedrai dati diversi (a meno
-di trasferire un export JSON).
+- Dashboard con KPI, workload persone, lavori aperti, kanban e filtri.
+- CRUD per lavori, task, persone e assenze.
+- Campi tecnici dei lavori, stati semplificati, avanzamento reale vs atteso e salute automatica.
+- Ferie, permessi, malattie, trasferte e capacità teorica vs reale.
+- Pianificazione 4 settimane e agenda persone.
+- Report settimanale Markdown.
+- Report executive con anteprima e stampa/PDF dal browser.
+- Storico modifiche e notifiche interne su cambio stato.
+- Backup JSON robusto, import con anteprima e reset demo protetto.
 
-> Il prossimo step (v0.3) trasformerà l'app in **multiutente locale** con un
-> backend leggero **Node.js + Express + SQLite** in modo che le 5 postazioni
-> dell'ufficio condividano lo stesso stato in tempo reale.
+## Uso locale e sicurezza dati
 
-## Funzionalità
+L'app è frontend-only. Tutti i dati inseriti vengono salvati nel browser tramite
+`localStorage`, con chiave principale:
 
-### Dashboard
-- KPI settimana corrente: commesse aperte, studi aperti, task in ritardo, task bloccati, carico medio, persona più sovraccarica
-- Card workload per persona con barra %, ore/capacità, top task, evidenza ritardi
-- Tabella lavori aperti con cambio stato rapido inline
-- Kanban a 6 colonne (Da pianificare / In corso / In attesa / In verifica / Pronto-Rilasciato / Sospeso-Annullato)
-- Filtri persona / cliente / tipo / priorità / stato + ricerca testuale
+```text
+workload-ufficio-progettazione:v1
+```
 
-### CRUD da interfaccia (v0.2)
-- **Nuovo lavoro** dal pulsante in header (commessa, studio o interno)
-- **Modifica / Elimina** dal drawer di dettaglio (con conferma e cascade sui task)
-- **Aggiungi / Modifica / Elimina task** dal drawer
-- **Cambio stato rapido** via select inline su tabella, kanban e drawer (per work-item e task)
-- **Conversione studio → commessa** con possibilità di rinominare il codice
-- **Persone & capacità**: modifica nome, ruolo, ore settimanali, skill, attivo/disattivato, note
-- Toast di conferma su salvataggio / eliminazione
+GitHub salva il codice dell'app, non i dati reali inseriti durante l'uso. Se
+modifichi commesse, task, persone o assenze nel browser, quelle informazioni
+restano nel profilo browser del PC finché non esporti un backup JSON.
 
-### Validazioni
-- Work-item: titolo, tipo, stato, scadenza obbligatori; date e numeri coerenti
-- Task: titolo, assegnatario, scadenza obbligatori
-- Persona: nome, ruolo, capacità (0–80h)
+Il backup JSON è il file che salva i dati reali dell'app. Fai backup frequenti:
+è consigliato un backup giornaliero quando l'app viene usata ogni giorno, oppure
+almeno settimanale.
 
-### Import / Export
-- **Esporta JSON**: scarica i dati correnti
-- **Importa JSON**: carica un file precedentemente esportato (validazione struttura)
-- **Reset demo**: ripristina i dati di esempio (con conferma)
+Prima di cancellare cache, dati del browser o profilo utente, esporta un backup
+JSON. Prima di cambiare PC, esporta il backup dal vecchio PC e importalo sul
+nuovo. Sul PC aziendale usa sempre lo stesso browser e lo stesso profilo utente:
+aprire l'app da un altro browser o profilo può mostrare dati diversi.
 
-### Design
-- Dark mode, palette industriale (slate/sky/amber/violet)
-- Layout responsive, max-width 1600px
+La data dell'ultimo backup viene salvata separatamente in:
 
-## Avvio rapido
+```text
+workload-ufficio-progettazione:lastBackupAt
+```
+
+## Avvio dell'app
+
+Installazione dipendenze:
 
 ```powershell
 npm install
-npm run dev        # http://localhost:5173
-npm run build      # bundle di produzione in dist/
-npm run typecheck  # tsc -b --noEmit
 ```
 
-Richiede Node 20+ (testato su Node 24).
+Avvio in sviluppo:
 
-## Persistenza locale
-
-I dati vengono salvati automaticamente in `localStorage` ad ogni modifica.
-**Pulendo i dati del browser perdi tutto** — fai un export JSON regolare se vuoi
-conservare il lavoro.
-
-I dati seguono la struttura definita in [src/types/index.ts](src/types/index.ts):
-
-- `Person` — id, name, role, weeklyCapacityHours, skills, active, notes
-- `WorkItem` — type ('commessa' | 'studio' | 'interno'), code, customer, title,
-  description, priority, status, ownerId, assigneeIds, date, ore, progress,
-  acquisitionProbability (solo studio), blockers, notes
-- `Task` — workItemId, title, assigneeId, status, date, ore, progress, blockers, notes
-
-## Architettura
-
+```powershell
+npm run dev
 ```
+
+Apri l'indirizzo indicato da Vite, di solito:
+
+```text
+http://localhost:5173
+```
+
+Controlli tecnici:
+
+```powershell
+npm run typecheck
+npm run build
+```
+
+## Backup JSON
+
+Dal menu **Strumenti > Backup dati** usa **Scarica backup JSON**.
+
+Il file viene scaricato con nome automatico:
+
+```text
+backup_workload_ufficio_YYYY-MM-DD_HH-mm.json
+```
+
+Il backup contiene:
+
+- `backupInfo`: nome app, data/ora esportazione, versione `v1.0-local` e conteggi.
+- `data`: tutti i dati dell'app, inclusi persone, lavori, task, assenze, storico e notifiche.
+
+Ogni backup esportato registra anche un evento nello storico modifiche.
+
+## Import backup
+
+Dal menu **Strumenti > Backup dati** usa **Importa backup JSON**.
+
+L'import non sovrascrive subito i dati. Prima viene mostrata un'anteprima con:
+
+- nome file;
+- data esportazione, se presente;
+- versione, se presente;
+- conteggi di persone, lavori, task, assenze, eventi storico e notifiche.
+
+Solo il pulsante **Conferma import** sostituisce i dati presenti nel browser.
+Se il file non è valido, l'import viene bloccato e i dati attuali restano intatti.
+
+Sono accettati sia i nuovi backup con struttura `{ backupInfo, data }`, sia i
+vecchi export diretti `AppData`. I vecchi JSON senza `absences`, `activityLog` o
+`notifications` vengono completati con array vuoti. Gli stati legacy vengono
+mappati agli stati attuali.
+
+## Reset demo protetto
+
+Dal menu **Strumenti > Backup dati** usa **Reset demo protetto**.
+
+Il reset apre una modale dedicata e non parte finché non viene spuntata la
+checkbox:
+
+```text
+Ho capito che i dati attuali verranno sostituiti.
+```
+
+La modale mostra anche lo stato dell'ultimo backup e un pulsante **Scarica backup
+prima del reset**. Quel pulsante esporta i dati attuali, aggiorna la data
+dell'ultimo backup e lascia aperta la modale, così puoi procedere solo dopo aver
+messo al sicuro i dati.
+
+Il reset registra un evento nello storico modifiche.
+
+## Report PDF e Markdown
+
+Dal menu **Strumenti > Report**:
+
+- **Esporta report settimanale Markdown** scarica un file `.md` con il riepilogo.
+- **Anteprima report executive / Stampa PDF** apre l'anteprima stampabile.
+
+Per generare il PDF usa la stampa del browser:
+
+1. Apri l'anteprima report executive.
+2. Premi il pulsante di stampa oppure usa `Ctrl+P`.
+3. Seleziona "Salva come PDF" come stampante.
+4. Salva il file nella cartella desiderata.
+
+## Notifiche interne e mailto manuale
+
+L'app genera notifiche interne quando cambia lo stato di un lavoro o di un task.
+Le notifiche compaiono nella campanella in header e vengono salvate in
+`localStorage`.
+
+Il pulsante **Prepara email** apre un link `mailto:` verso il responsabile
+dell'ufficio tecnico con oggetto e corpo già compilati. L'invio resta manuale:
+l'utente deve confermare l'invio nel proprio client di posta.
+
+L'invio email automatico reale non è implementato in questa versione locale,
+perché richiederebbe un backend dove custodire credenziali SMTP o token. Non
+inserire password, token o credenziali email nel frontend.
+
+## Struttura tecnica
+
+```text
 src/
-├── App.tsx                       Mount providers + header globale
-├── main.tsx                      Entry React
-├── styles.css                    Tailwind v4 + theme + utility custom
-├── types/index.ts                Type definitions e costanti dominio
-├── data/demoData.ts              Dataset demo (5 persone, 11 lavori, 23 task)
-├── services/
-│   └── dataService.ts            CRUD puri immutabili su AppData
-├── state/
-│   ├── DataProvider.tsx          Context: stato + tutte le mutazioni + persistenza
-│   └── ToastProvider.tsx         Sistema notifiche
-├── storage/
-│   └── localStorage.ts           Layer di persistenza (load/save/clear/export/import)
-├── utils/
-│   ├── dates.ts                  ISO weeks, working days, ritardo
-│   ├── workload.ts               Calcolo carico settimanale
-│   ├── format.ts                 uid, clamp, ecc.
-│   └── validation.ts             Validatori workItem/task/person
-└── components/
-    ├── Dashboard.tsx             Orchestratore della dashboard
-    ├── HeroStats.tsx             KPI + settimana corrente
-    ├── WorkloadPersonCard.tsx    Card carico per persona
-    ├── WorkItemsTable.tsx        Tabella lavori
-    ├── WorkloadKanban.tsx        Kanban
-    ├── WorkItemDetailDrawer.tsx  Drawer dettaglio (Modifica/Elimina/+Task)
-    ├── WorkItemFormModal.tsx     Form creazione/modifica work-item
-    ├── TaskFormModal.tsx         Form creazione/modifica task
-    ├── PeopleSettingsModal.tsx   Form gestione persone
-    ├── FiltersBar.tsx            Filtri
-    ├── ImportExportPanel.tsx     Export/Import/Reset
-    ├── ConfirmDialog.tsx         Dialogo conferma generico
-    ├── Modal.tsx                 Shell modale riusabile
-    ├── StatusSelect.tsx          Select stato inline
-    ├── PriorityBadge.tsx
-    ├── TypeBadge.tsx
-    ├── BlockersEditor.tsx        Editor lista bloccanti
-    ├── AssigneesPicker.tsx       Multi-select assegnatari
-    └── FormField.tsx             Wrapper label + errore
+  App.tsx
+  main.tsx
+  styles.css
+  types/index.ts
+  data/demoData.ts
+  services/dataService.ts
+  state/DataProvider.tsx
+  state/ToastProvider.tsx
+  storage/localStorage.ts
+  utils/backup.ts
+  utils/activityLog.ts
+  utils/availability.ts
+  utils/dates.ts
+  utils/notifications.ts
+  utils/personAgenda.ts
+  utils/planning.ts
+  utils/progress.ts
+  utils/validation.ts
+  utils/weeklyReport.ts
+  components/
 ```
 
-### Centralizzazione dati
+Tutte le scritture passano dal `DataProvider`, che aggiorna lo stato React e
+persiste su `localStorage`. Il modulo `src/utils/backup.ts` gestisce backup,
+validazione import e data dell'ultimo backup.
 
-**Tutte le operazioni di scrittura passano per il `DataProvider`** (hook `useData()`),
-che internamente delega al modulo puro [src/services/dataService.ts](src/services/dataService.ts)
-e persiste su `localStorage`. **I componenti non toccano mai direttamente
-`localStorage`**: questo rende immediato lo step successivo (sostituire la
-persistenza con chiamate HTTP a un backend Express).
+## Note operative
 
-## Roadmap
-
-### v0.3 — Multiutente locale (prossimo step)
-
-Trasformare l'app in **client/server** accessibile dalle 5 postazioni dell'ufficio
-sulla stessa rete:
-
-- Backend **Node.js + Express** (server REST locale, porta `:3001`)
-- Database **SQLite** in un file su disco condiviso o sul PC di chi avvia il server
-- API REST: `GET/POST/PATCH/DELETE` su `/api/workitems`, `/api/tasks`, `/api/people`
-- Sostituzione del layer `storage/localStorage.ts` con un client HTTP
-  (`storage/apiClient.ts`); la firma del `dataService` resta invariata
-- Polling ogni 10–15 s o WebSocket per sincronizzazione tra postazioni
-- Import/Export JSON mantenuti come backup
-
-### Idee successive
-- Drag-and-drop nel Kanban
-- Vista carico multi-settimana / capacity planning
-- Autenticazione semplice e ruoli (responsabile vs progettista)
-- Invio email automatico reale tramite backend (vedi sezione "Notifiche ed email")
-- Allegati (link a Drive/SharePoint)
-
-## Notifiche ed email
-
-L'app genera **notifiche interne** automatiche al cambio di stato di un lavoro o
-di un task. Le notifiche compaiono nel centro notifiche (campanella in header)
-e sono persistite localmente in `localStorage`.
-
-Il pulsante **"Prepara email"** in ogni notifica apre un link `mailto:` verso il
-responsabile dell'ufficio tecnico (`utm@innotecsrl.eu`) con oggetto e corpo già
-compilati. L'invio è **manuale**: spetta all'utente confermarlo dal proprio
-client di posta.
-
-**L'invio email automatico reale non è implementato** in questa versione
-frontend-only e richiederà un **backend locale o un servizio dedicato**:
-le credenziali SMTP (es. Aruba) devono vivere lato server, mai nel browser.
-
-Per attivarlo in futuro:
-1. Implementare `sendEmailNotificationViaBackend(...)` in `src/utils/notifications.ts`
-   con un `fetch` verso un endpoint backend (es. `POST /api/notifications/email`).
-2. Registrare il dispatcher via `registerNotificationDispatcher(...)` perché
-   ogni nuova notifica tenti l'invio reale, mantenendo `mailto` come fallback.
-3. Il backend custodisce le credenziali SMTP e gestisce la consegna.
-
-**Non inserire mai password, token o credenziali email nel frontend.**
-
-## Note tecniche
-
-- **React 19** con `createRoot`, `<StrictMode>`
-- **Vite 7** + plugin React + plugin Tailwind nativo
-- **TypeScript 5.8** con `strict`, `verbatimModuleSyntax`, `erasableSyntaxOnly`
-- **Tailwind 4** con `@theme` per le custom property e `@utility` per le utility
-- Nessuna libreria UI esterna, nessun router (singola dashboard)
+- Non esiste sincronizzazione multiutente: ogni browser/profilo ha il proprio stato.
+- Il backup JSON è l'unico modo operativo per trasferire i dati su un altro PC.
+- Pulire i dati del browser senza backup può perdere il lavoro inserito.
+- La build di produzione viene generata in `dist/` con `npm run build`.

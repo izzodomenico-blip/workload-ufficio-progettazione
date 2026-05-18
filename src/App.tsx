@@ -66,7 +66,7 @@ function Shell() {
       </main>
 
       <footer className="mx-auto max-w-[1600px] px-5 py-6 text-center text-[11px] text-slate-600">
-        v0.3 · ferie/permessi · dati persistiti in <code className="text-slate-400">localStorage</code>
+        v1.0-local · backup JSON · dati persistiti in <code className="text-slate-400">localStorage</code>
       </footer>
 
       <WorkItemFormModal

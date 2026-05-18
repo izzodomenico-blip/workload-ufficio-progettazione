@@ -4,6 +4,11 @@ import type { Absence, AppData, Person, Status } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
 import {
+  createBackupPayload,
+  getBackupFilename,
+  setLastBackupAt,
+} from '../utils/backup'
+import {
   convertStudioToCommessa as svcConvertStudio,
   createAbsence as svcCreateAbsence,
   createTask as svcCreateTask,
@@ -58,14 +63,25 @@ interface DataContextValue {
   updateAbsence: (id: string, patch: UpdateAbsenceInput) => void
   deleteAbsence: (id: string) => void
   // import/export/reset
-  importData: (next: AppData) => void
-  exportData: () => void
+  importData: (next: AppData, options?: ImportDataOptions) => void
+  exportData: () => BackupExportResult
   resetData: () => void
   // notifications
   markNotificationAsRead: (id: string) => void
   markAllNotificationsAsRead: () => void
   clearReadNotifications: () => void
   clearAllNotifications: () => void
+}
+
+interface ImportDataOptions {
+  fileName?: string
+  exportedAt?: string
+  version?: string
+}
+
+interface BackupExportResult {
+  exportedAt: string
+  filename: string
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -151,7 +167,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setData((prev) => svcDeleteAbsence(prev, id))
   }, [])
 
-  const importData = useCallback((next: AppData) => {
+  const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
+    const description = [
+      `${next.workItems.length} lavori`,
+      `${next.tasks.length} task`,
+      `${next.absences.length} assenze`,
+      `${next.activityLog.length} eventi storico`,
+      `${next.notifications.length} notifiche`,
+      options.fileName ? `file: ${options.fileName}` : '',
+      options.exportedAt ? `esportato: ${options.exportedAt}` : '',
+      options.version ? `versione: ${options.version}` : '',
+    ].filter(Boolean).join(' - ')
+
     setData(
       appendActivityLog(
         next,
@@ -159,15 +186,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
           entityType: 'system',
           entityId: 'import',
           action: 'imported',
-          title: 'Import JSON',
-          description: `${next.workItems.length} lavori · ${next.tasks.length} task · ${next.absences.length} assenze · ${(next.activityLog ?? []).length} eventi storico`,
+          title: 'Backup JSON importato',
+          description,
         }),
       ),
     )
   }, [])
 
-  const exportData = useCallback(() => {
-    downloadJSON(data)
+  const exportData = useCallback((): BackupExportResult => {
+    const exportedAtDate = new Date()
+    const filename = getBackupFilename(exportedAtDate)
+    const nextData = appendActivityLog(
+      data,
+      createActivityLogEntry({
+        entityType: 'system',
+        entityId: 'backup',
+        action: 'exported',
+        title: 'Backup JSON esportato',
+        description: `${data.people.length} persone - ${data.workItems.length} lavori - ${data.tasks.length} task - file: ${filename}`,
+      }, exportedAtDate),
+    )
+    const exportedAt = setLastBackupAt(exportedAtDate)
+    downloadJSON(createBackupPayload(nextData, exportedAtDate), filename)
+    setData(nextData)
+    return { exportedAt, filename }
   }, [data])
 
   const resetData = useCallback(() => {

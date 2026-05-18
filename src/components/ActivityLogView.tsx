@@ -173,6 +173,7 @@ const ACTION_LABEL: Record<ActivityLogAction, string> = {
   status_changed: 'Cambio stato',
   progress_changed: 'Avanzamento',
   converted: 'Convertito',
+  exported: 'Export',
   imported: 'Import',
   reset: 'Reset',
 }
@@ -239,6 +240,7 @@ const ACTION_TONE: Record<ActivityLogAction, string> = {
   status_changed: 'bg-indigo-500/10 text-indigo-300 ring-indigo-500/30',
   progress_changed: 'bg-amber-500/10 text-amber-300 ring-amber-500/30',
   converted: 'bg-violet-500/10 text-violet-300 ring-violet-500/30',
+  exported: 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30',
   imported: 'bg-cyan-500/10 text-cyan-300 ring-cyan-500/30',
   reset: 'bg-slate-500/15 text-slate-300 ring-slate-500/30',
 }

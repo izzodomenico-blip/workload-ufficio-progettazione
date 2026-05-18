@@ -115,6 +115,7 @@ export type ActivityLogAction =
   | 'status_changed'
   | 'progress_changed'
   | 'converted'
+  | 'exported'
   | 'imported'
   | 'reset'
 
@@ -139,6 +140,7 @@ export const ALL_ACTIVITY_ACTIONS: ActivityLogAction[] = [
   'status_changed',
   'progress_changed',
   'converted',
+  'exported',
   'imported',
   'reset',
 ]

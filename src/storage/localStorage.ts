@@ -1,61 +1,10 @@
-import type { ActivityLogEntry, AppData, Notification } from '../types'
-import { mapLegacyStatus } from '../utils/progress'
+import type { AppData } from '../types'
+import { extractAppDataFromBackup, validateBackupPayload } from '../utils/backup'
 
 const STORAGE_KEY = 'workload-ufficio-progettazione:v1'
 
-function isPlainEntry(e: unknown): e is ActivityLogEntry {
-  if (!e || typeof e !== 'object') return false
-  const o = e as Record<string, unknown>
-  return (
-    typeof o.id === 'string' &&
-    typeof o.timestamp === 'string' &&
-    typeof o.entityType === 'string' &&
-    typeof o.entityId === 'string' &&
-    typeof o.action === 'string' &&
-    typeof o.title === 'string'
-  )
-}
-
-function isPlainNotification(n: unknown): n is Notification {
-  if (!n || typeof n !== 'object') return false
-  const o = n as Record<string, unknown>
-  return (
-    typeof o.id === 'string' &&
-    typeof o.timestamp === 'string' &&
-    typeof o.type === 'string' &&
-    typeof o.entityType === 'string' &&
-    typeof o.entityId === 'string' &&
-    typeof o.title === 'string' &&
-    typeof o.read === 'boolean' &&
-    typeof o.emailSubject === 'string' &&
-    typeof o.emailBody === 'string'
-  )
-}
-
 export function migrateAppData(data: AppData): AppData {
-  const absences = Array.isArray(data.absences) ? data.absences : []
-  const rawLog = (data as AppData & { activityLog?: unknown }).activityLog
-  const activityLog: ActivityLogEntry[] = Array.isArray(rawLog)
-    ? (rawLog as unknown[]).filter(isPlainEntry)
-    : []
-  const rawNotif = (data as AppData & { notifications?: unknown }).notifications
-  const notifications: Notification[] = Array.isArray(rawNotif)
-    ? (rawNotif as unknown[]).filter(isPlainNotification)
-    : []
-  return {
-    ...data,
-    absences,
-    activityLog,
-    notifications,
-    workItems: data.workItems.map((w) => ({
-      ...w,
-      status: mapLegacyStatus(w.status as string),
-    })),
-    tasks: data.tasks.map((t) => ({
-      ...t,
-      status: mapLegacyStatus(t.status as string),
-    })),
-  }
+  return extractAppDataFromBackup(data)
 }
 
 export function loadFromStorage(): AppData | null {
@@ -63,9 +12,9 @@ export function loadFromStorage(): AppData | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<AppData>
-    if (!parsed.people || !parsed.workItems || !parsed.tasks) return null
-    return migrateAppData(parsed as AppData)
+    const parsed = JSON.parse(raw) as unknown
+    const result = validateBackupPayload(parsed)
+    return result.ok ? result.data : null
   } catch {
     return null
   }
@@ -85,12 +34,12 @@ export function clearStorage(): void {
   window.localStorage.removeItem(STORAGE_KEY)
 }
 
-export function downloadJSON(data: AppData, filename?: string): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+export function downloadJSON(payload: unknown, filename: string): void {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = filename ?? `workload-${new Date().toISOString().slice(0, 10)}.json`
+  a.download = filename
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -109,17 +58,12 @@ export function downloadTextFile(text: string, filename: string, mimeType = 'tex
   URL.revokeObjectURL(url)
 }
 
-export function readJSONFile(file: File): Promise<AppData> {
+export function readJSONFile(file: File): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
       try {
-        const data = JSON.parse(String(reader.result)) as Partial<AppData>
-        if (!data.people || !data.workItems || !data.tasks) {
-          reject(new Error('Struttura JSON non valida: mancano people / workItems / tasks.'))
-          return
-        }
-        resolve(migrateAppData(data as AppData))
+        resolve(JSON.parse(String(reader.result)) as unknown)
       } catch (err) {
         reject(err instanceof Error ? err : new Error('Impossibile leggere il file.'))
       }
