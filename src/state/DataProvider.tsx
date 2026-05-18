@@ -1,8 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Absence, AppData, Person, Status } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
+import { fetchAppData, saveAppData as saveAppDataToApi } from '../services/apiClient'
+import { useToast } from './ToastProvider'
 import {
   createBackupPayload,
   getBackupFilename,
@@ -88,84 +90,104 @@ const DataContext = createContext<DataContextValue | null>(null)
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(() => loadFromStorage() ?? freshDemoData())
+  const dataRef = useRef(data)
+  const toast = useToast()
 
   useEffect(() => {
+    dataRef.current = data
     saveToStorage(data)
   }, [data])
 
-  const createWorkItem = useCallback((input: CreateWorkItemInput): string => {
-    let createdId = ''
-    setData((prev) => {
-      const result = svcCreateWorkItem(prev, input)
-      createdId = result.id
-      return result.data
+  useEffect(() => {
+    let cancelled = false
+    fetchAppData()
+      .then((remoteData) => {
+        if (cancelled) return
+        dataRef.current = remoteData
+        setData(remoteData)
+        saveToStorage(remoteData)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        console.error('Impossibile caricare i dati dal backend', err)
+        toast.error('Backend non raggiungibile: uso temporaneo della cache locale.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [toast])
+
+  const commitData = useCallback((next: AppData) => {
+    dataRef.current = next
+    setData(next)
+    saveToStorage(next)
+    void saveAppDataToApi(next).catch((err) => {
+      console.error('Salvataggio su database fallito', err)
+      toast.error(`Salvataggio database fallito: ${err instanceof Error ? err.message : 'errore sconosciuto'}`)
     })
-    return createdId
-  }, [])
+  }, [toast])
+
+  const createWorkItem = useCallback((input: CreateWorkItemInput): string => {
+    const result = svcCreateWorkItem(dataRef.current, input)
+    commitData(result.data)
+    return result.id
+  }, [commitData])
 
   const updateWorkItem = useCallback((id: string, patch: UpdateWorkItemInput) => {
-    setData((prev) => svcUpdateWorkItem(prev, id, patch))
-  }, [])
+    commitData(svcUpdateWorkItem(dataRef.current, id, patch))
+  }, [commitData])
 
   const deleteWorkItem = useCallback((id: string) => {
-    setData((prev) => svcDeleteWorkItem(prev, id))
-  }, [])
+    commitData(svcDeleteWorkItem(dataRef.current, id))
+  }, [commitData])
 
   const setWorkItemStatus = useCallback((id: string, status: Status) => {
-    setData((prev) => svcSetWorkItemStatus(prev, id, status))
-  }, [])
+    commitData(svcSetWorkItemStatus(dataRef.current, id, status))
+  }, [commitData])
 
   const convertStudioToCommessa = useCallback((id: string, newCode?: string) => {
-    setData((prev) => svcConvertStudio(prev, id, newCode))
-  }, [])
+    commitData(svcConvertStudio(dataRef.current, id, newCode))
+  }, [commitData])
 
   const createTask = useCallback((workItemId: string, input: CreateTaskInput): string => {
-    let createdId = ''
-    setData((prev) => {
-      const result = svcCreateTask(prev, workItemId, input)
-      createdId = result.id
-      return result.data
-    })
-    return createdId
-  }, [])
+    const result = svcCreateTask(dataRef.current, workItemId, input)
+    commitData(result.data)
+    return result.id
+  }, [commitData])
 
   const updateTask = useCallback((id: string, patch: UpdateTaskInput) => {
-    setData((prev) => svcUpdateTask(prev, id, patch))
-  }, [])
+    commitData(svcUpdateTask(dataRef.current, id, patch))
+  }, [commitData])
 
   const deleteTask = useCallback((id: string) => {
-    setData((prev) => svcDeleteTask(prev, id))
-  }, [])
+    commitData(svcDeleteTask(dataRef.current, id))
+  }, [commitData])
 
   const setTaskStatus = useCallback((id: string, status: Status) => {
-    setData((prev) => svcSetTaskStatus(prev, id, status))
-  }, [])
+    commitData(svcSetTaskStatus(dataRef.current, id, status))
+  }, [commitData])
 
   const updatePerson = useCallback((id: string, patch: UpdatePersonInput) => {
-    setData((prev) => svcUpdatePerson(prev, id, patch))
-  }, [])
+    commitData(svcUpdatePerson(dataRef.current, id, patch))
+  }, [commitData])
 
   const updatePeople = useCallback((nextPeople: Person[]) => {
-    setData((prev) => svcUpdatePeople(prev, nextPeople))
-  }, [])
+    commitData(svcUpdatePeople(dataRef.current, nextPeople))
+  }, [commitData])
 
   const createAbsence = useCallback((input: CreateAbsenceInput): string => {
-    let createdId = ''
-    setData((prev) => {
-      const result = svcCreateAbsence(prev, input)
-      createdId = result.id
-      return result.data
-    })
-    return createdId
-  }, [])
+    const result = svcCreateAbsence(dataRef.current, input)
+    commitData(result.data)
+    return result.id
+  }, [commitData])
 
   const updateAbsence = useCallback((id: string, patch: UpdateAbsenceInput) => {
-    setData((prev) => svcUpdateAbsence(prev, id, patch))
-  }, [])
+    commitData(svcUpdateAbsence(dataRef.current, id, patch))
+  }, [commitData])
 
   const deleteAbsence = useCallback((id: string) => {
-    setData((prev) => svcDeleteAbsence(prev, id))
-  }, [])
+    commitData(svcDeleteAbsence(dataRef.current, id))
+  }, [commitData])
 
   const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
     const description = [
@@ -179,7 +201,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       options.version ? `versione: ${options.version}` : '',
     ].filter(Boolean).join(' - ')
 
-    setData(
+    commitData(
       appendActivityLog(
         next,
         createActivityLogEntry({
@@ -191,29 +213,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }),
       ),
     )
-  }, [])
+  }, [commitData])
 
   const exportData = useCallback((): BackupExportResult => {
     const exportedAtDate = new Date()
     const filename = getBackupFilename(exportedAtDate)
     const nextData = appendActivityLog(
-      data,
+      dataRef.current,
       createActivityLogEntry({
         entityType: 'system',
         entityId: 'backup',
         action: 'exported',
         title: 'Backup JSON esportato',
-        description: `${data.people.length} persone - ${data.workItems.length} lavori - ${data.tasks.length} task - file: ${filename}`,
+        description: `${dataRef.current.people.length} persone - ${dataRef.current.workItems.length} lavori - ${dataRef.current.tasks.length} task - file: ${filename}`,
       }, exportedAtDate),
     )
     const exportedAt = setLastBackupAt(exportedAtDate)
     downloadJSON(createBackupPayload(nextData, exportedAtDate), filename)
-    setData(nextData)
+    commitData(nextData)
     return { exportedAt, filename }
-  }, [data])
+  }, [commitData])
 
   const resetData = useCallback(() => {
-    setData(
+    commitData(
       appendActivityLog(
         freshDemoData(),
         createActivityLogEntry({
@@ -225,23 +247,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }),
       ),
     )
-  }, [])
+  }, [commitData])
 
   const markNotificationAsRead = useCallback((id: string) => {
-    setData((prev) => svcMarkNotificationAsRead(prev, id))
-  }, [])
+    commitData(svcMarkNotificationAsRead(dataRef.current, id))
+  }, [commitData])
 
   const markAllNotificationsAsRead = useCallback(() => {
-    setData((prev) => svcMarkAllNotificationsAsRead(prev))
-  }, [])
+    commitData(svcMarkAllNotificationsAsRead(dataRef.current))
+  }, [commitData])
 
   const clearReadNotifications = useCallback(() => {
-    setData((prev) => svcClearReadNotifications(prev))
-  }, [])
+    commitData(svcClearReadNotifications(dataRef.current))
+  }, [commitData])
 
   const clearAllNotifications = useCallback(() => {
-    setData((prev) => svcClearAllNotifications(prev))
-  }, [])
+    commitData(svcClearAllNotifications(dataRef.current))
+  }, [commitData])
 
   const value = useMemo<DataContextValue>(() => ({
     data,

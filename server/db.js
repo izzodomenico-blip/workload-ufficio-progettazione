@@ -1,0 +1,158 @@
+import { DatabaseSync } from 'node:sqlite'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { EMPTY_APP_DATA, normalizeAppData } from './services/appData.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+export const ROOT_DIR = path.resolve(__dirname, '..')
+export const DATA_DIR = process.env.WORKLOAD_DATA_DIR
+  ? path.resolve(process.env.WORKLOAD_DATA_DIR)
+  : path.join(ROOT_DIR, 'data')
+export const DB_PATH = process.env.WORKLOAD_DB_PATH
+  ? path.resolve(process.env.WORKLOAD_DB_PATH)
+  : path.join(DATA_DIR, 'workload.db')
+
+const TABLES = {
+  people: 'people',
+  workItems: 'work_items',
+  tasks: 'tasks',
+  absences: 'absences',
+  activityLog: 'activity_log',
+  notifications: 'notifications',
+}
+
+let dbInstance = null
+
+export function getDb() {
+  if (dbInstance) return dbInstance
+  fs.mkdirSync(DATA_DIR, { recursive: true })
+  const db = new DatabaseSync(DB_PATH)
+  db.exec('PRAGMA journal_mode = WAL;')
+  db.exec('PRAGMA foreign_keys = ON;')
+  runMigrations(db)
+  dbInstance = db
+  return db
+}
+
+export function runMigrations(db = getDb()) {
+  const migrationPath = path.join(__dirname, 'migrations', '001_init.sql')
+  db.exec(fs.readFileSync(migrationPath, 'utf8'))
+  db.prepare('INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)').run('schemaVersion', '1')
+}
+
+export function isDatabaseEmpty(db = getDb()) {
+  const row = db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM people) AS people,
+      (SELECT COUNT(*) FROM work_items) AS workItems,
+      (SELECT COUNT(*) FROM tasks) AS tasks
+  `).get()
+  return Number(row.people) === 0 && Number(row.workItems) === 0 && Number(row.tasks) === 0
+}
+
+export function getAppData(db = getDb()) {
+  return {
+    people: readJsonRows(db, TABLES.people),
+    workItems: readJsonRows(db, TABLES.workItems),
+    tasks: readJsonRows(db, TABLES.tasks),
+    absences: readJsonRows(db, TABLES.absences),
+    activityLog: readJsonRows(db, TABLES.activityLog, 'timestamp DESC'),
+    notifications: readJsonRows(db, TABLES.notifications, 'timestamp DESC'),
+  }
+}
+
+export function saveAppData(data, db = getDb()) {
+  const normalized = normalizeAppData(data)
+  const now = new Date().toISOString()
+  db.exec('BEGIN IMMEDIATE TRANSACTION;')
+  try {
+    replaceTable(db, TABLES.people, normalized.people, now)
+    replaceTable(db, TABLES.workItems, normalized.workItems, now)
+    replaceTable(db, TABLES.tasks, normalized.tasks, now)
+    replaceTable(db, TABLES.absences, normalized.absences, now)
+    replaceActivityLog(db, normalized.activityLog, now)
+    replaceNotifications(db, normalized.notifications, now)
+    db.exec('COMMIT;')
+  } catch (error) {
+    db.exec('ROLLBACK;')
+    throw error
+  }
+  return normalized
+}
+
+export function getCollection(name, db = getDb()) {
+  const appData = getAppData(db)
+  if (!(name in appData)) throw new Error(`Collezione non supportata: ${name}`)
+  return appData[name]
+}
+
+export function upsertEntity(collection, entity, db = getDb()) {
+  if (!entity || typeof entity !== 'object' || typeof entity.id !== 'string') {
+    throw new Error('Entità non valida: manca id.')
+  }
+  const appData = getAppData(db)
+  const rows = appData[collection]
+  if (!Array.isArray(rows)) throw new Error(`Collezione non supportata: ${collection}`)
+  const index = rows.findIndex((item) => item.id === entity.id)
+  const nextRows = index >= 0
+    ? rows.map((item) => (item.id === entity.id ? { ...item, ...entity, id: item.id } : item))
+    : [...rows, entity]
+  saveAppData({ ...appData, [collection]: nextRows }, db)
+  return nextRows.find((item) => item.id === entity.id)
+}
+
+export function deleteEntity(collection, id, db = getDb()) {
+  const appData = getAppData(db)
+  const rows = appData[collection]
+  if (!Array.isArray(rows)) throw new Error(`Collezione non supportata: ${collection}`)
+  let nextData = { ...appData, [collection]: rows.filter((item) => item.id !== id) }
+  if (collection === 'workItems') {
+    nextData = {
+      ...nextData,
+      tasks: nextData.tasks.filter((task) => task.workItemId !== id),
+    }
+  }
+  saveAppData(nextData, db)
+}
+
+export function closeDb() {
+  if (!dbInstance) return
+  dbInstance.close()
+  dbInstance = null
+}
+
+function readJsonRows(db, table, orderBy = 'rowid ASC') {
+  const stmt = db.prepare(`SELECT data FROM ${table} ORDER BY ${orderBy}`)
+  return stmt.all().map((row) => JSON.parse(row.data))
+}
+
+function replaceTable(db, table, rows, now) {
+  db.prepare(`DELETE FROM ${table}`).run()
+  const insert = db.prepare(`INSERT INTO ${table} (id, data, updated_at) VALUES (?, ?, ?)`)
+  for (const row of rows) {
+    insert.run(row.id, JSON.stringify(row), now)
+  }
+}
+
+function replaceActivityLog(db, rows, now) {
+  db.prepare('DELETE FROM activity_log').run()
+  const insert = db.prepare('INSERT INTO activity_log (id, timestamp, data, updated_at) VALUES (?, ?, ?, ?)')
+  for (const row of rows) {
+    insert.run(row.id, row.timestamp, JSON.stringify(row), now)
+  }
+}
+
+function replaceNotifications(db, rows, now) {
+  db.prepare('DELETE FROM notifications').run()
+  const insert = db.prepare('INSERT INTO notifications (id, timestamp, read, data, updated_at) VALUES (?, ?, ?, ?, ?)')
+  for (const row of rows) {
+    insert.run(row.id, row.timestamp, row.read ? 1 : 0, JSON.stringify(row), now)
+  }
+}
+
+export function emptyAppData() {
+  return structuredClone(EMPTY_APP_DATA)
+}

@@ -23,7 +23,7 @@ import type {
 import { mapLegacyStatus } from './progress'
 
 export const BACKUP_APP_NAME = 'workload-ufficio-progettazione'
-export const BACKUP_VERSION = 'v1.0-local'
+export const BACKUP_VERSION = 'v1.1-sqlite-local'
 export const LAST_BACKUP_STORAGE_KEY = 'workload-ufficio-progettazione:lastBackupAt'
 
 export interface BackupCounts {

@@ -7,3 +7,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+data/*.db
+data/*.db-*
+!data/.gitkeep
+backups/*
+!backups/.gitkeep
