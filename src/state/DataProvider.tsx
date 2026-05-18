@@ -43,9 +43,11 @@ import type {
   UpdateWorkItemInput,
 } from '../services/dataService'
 import {
+  applyCustomerLinking as svcApplyCustomerLinking,
   applyImport as svcApplyPartnerImport,
   createBusinessPartner as svcCreatePartner,
   deleteBusinessPartner as svcDeletePartner,
+  planCustomerLinking as svcPlanCustomerLinking,
   planImport as svcPlanPartnerImport,
   setBusinessPartnerActive as svcSetPartnerActive,
   updateBusinessPartner as svcUpdatePartner,
@@ -55,6 +57,9 @@ import type {
   ImportPlan,
   ImportPlanRecord,
   ImportResult,
+  LinkApplyResult,
+  LinkPlan,
+  LinkSelection,
   UpdateBusinessPartnerInput,
 } from '../services/businessPartnersService'
 
@@ -87,6 +92,8 @@ interface DataContextValue {
   deleteBusinessPartner: (id: string) => void
   planBusinessPartnerImport: (records: ImportPlanRecord[], filename?: string) => ImportPlan
   applyBusinessPartnerImport: (plan: ImportPlan) => ImportResult
+  planCustomerLinking: () => LinkPlan
+  applyCustomerLinking: (selections: LinkSelection[]) => LinkApplyResult
   // import/export/reset
   importData: (next: AppData, options?: ImportDataOptions) => void
   exportData: () => BackupExportResult
@@ -330,6 +337,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return result
   }, [commitData])
 
+  const planCustomerLinking = useCallback((): LinkPlan => {
+    return svcPlanCustomerLinking(dataRef.current)
+  }, [])
+
+  const applyCustomerLinking = useCallback((selections: LinkSelection[]): LinkApplyResult => {
+    const { data: nextData, result } = svcApplyCustomerLinking(dataRef.current, selections)
+    commitData(
+      appendActivityLog(
+        nextData,
+        createActivityLogEntry({
+          entityType: 'system',
+          entityId: 'auto-link-customers',
+          action: 'updated',
+          title: 'Collegamento automatico clienti',
+          description: `${result.linked} lavori collegati ad anagrafiche${result.skipped > 0 ? ` · ${result.skipped} saltati (già collegati o anagrafica non trovata)` : ''}`,
+        }),
+      ),
+      { risky: true, reason: 'auto-link-customers' },
+    )
+    return result
+  }, [commitData])
+
   const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
     const description = [
       `${next.workItems.length} lavori`,
@@ -432,6 +461,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     deleteBusinessPartner,
     planBusinessPartnerImport,
     applyBusinessPartnerImport,
+    planCustomerLinking,
+    applyCustomerLinking,
     importData,
     exportData,
     resetData,
@@ -447,6 +478,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createAbsence, updateAbsence, deleteAbsence,
     createBusinessPartner, updateBusinessPartner, setBusinessPartnerActive, deleteBusinessPartner,
     planBusinessPartnerImport, applyBusinessPartnerImport,
+    planCustomerLinking, applyCustomerLinking,
     importData, exportData, resetData,
     markNotificationAsRead, markAllNotificationsAsRead,
     clearReadNotifications, clearAllNotifications,

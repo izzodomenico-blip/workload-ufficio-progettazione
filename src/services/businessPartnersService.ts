@@ -302,3 +302,194 @@ export function countByType(partners: BusinessPartner[]): Record<BusinessPartner
   }
   return counts
 }
+
+// === Auto-link clienti esistenti =========================================
+//
+// Confronta workItem.customer (testo libero) con businessPartners.name e
+// propone collegamenti, senza modificare il testo originale del campo customer
+// e senza toccare workItem già collegati.
+
+/**
+ * Normalizza una ragione sociale per il confronto. Operazioni:
+ *  - lowercase, trim
+ *  - "S.R.L." / "S R L" / "SRL" → "srl" (stessa cosa per spa, sas, snc, scarl, scrl)
+ *  - rimuove punteggiatura (.,;:'"`()&)
+ *  - collapse whitespace multipli
+ */
+export function normalizeCompanyName(name: string): string {
+  if (!name) return ''
+  let s = name.trim().toLowerCase()
+  // Normalizza suffissi societari italiani PRIMA di rimuovere i punti
+  s = s.replace(/\bs\.?\s*r\.?\s*l\.?(?=\s|$|[,;])/g, 'srl')
+  s = s.replace(/\bs\.?\s*p\.?\s*a\.?(?=\s|$|[,;])/g, 'spa')
+  s = s.replace(/\bs\.?\s*a\.?\s*s\.?(?=\s|$|[,;])/g, 'sas')
+  s = s.replace(/\bs\.?\s*n\.?\s*c\.?(?=\s|$|[,;])/g, 'snc')
+  s = s.replace(/\bs\.?\s*c\.?\s*a\.?\s*r\.?\s*l\.?(?=\s|$|[,;])/g, 'scarl')
+  s = s.replace(/\bs\.?\s*c\.?\s*r\.?\s*l\.?(?=\s|$|[,;])/g, 'scrl')
+  // Forme estese
+  s = s.replace(/\bsociet[àa']\s+(per\s+azioni|a\s+responsabilit[àa']\s+limitata)\b/g,
+    (_, kind: string) => (kind.startsWith('per') ? 'spa' : 'srl'))
+  // Rimuove punteggiatura residua
+  s = s.replace(/[.,;:'"`()&]/g, ' ')
+  // Collapse whitespace
+  s = s.replace(/\s+/g, ' ').trim()
+  return s
+}
+
+export type LinkDecision = 'certain' | 'ambiguous' | 'not-found'
+
+export interface LinkPlanItem {
+  workItemId: string
+  workItemCode: string
+  workItemTitle: string
+  originalCustomer: string
+  normalizedCustomer: string
+  decision: LinkDecision
+  candidatePartnerIds: string[]
+  /** Match suggerito di default (primo candidato). undefined per 'not-found'. */
+  suggestedPartnerId?: string
+}
+
+export interface LinkPlan {
+  totalWorkItems: number
+  alreadyLinked: number
+  withoutCustomer: number
+  certain: LinkPlanItem[]
+  ambiguous: LinkPlanItem[]
+  notFound: LinkPlanItem[]
+}
+
+export interface LinkSelection {
+  workItemId: string
+  partnerId: string
+}
+
+export interface LinkApplyResult {
+  linked: number
+  skipped: number
+}
+
+/**
+ * Costruisce il piano di collegamento. Salta WorkItem già con customerPartnerId
+ * o senza customer. Considera solo partner attivi come candidati.
+ */
+export function planCustomerLinking(data: AppData): LinkPlan {
+  // Indicizza partner attivi per chiave normalizzata
+  const exactByKey = new Map<string, BusinessPartner[]>()
+  const normalizedActive: { partner: BusinessPartner; key: string }[] = []
+  for (const p of data.businessPartners) {
+    if (!p.active) continue
+    const key = normalizeCompanyName(p.name)
+    if (!key) continue
+    normalizedActive.push({ partner: p, key })
+    const arr = exactByKey.get(key) ?? []
+    arr.push(p)
+    exactByKey.set(key, arr)
+  }
+
+  let alreadyLinked = 0
+  let withoutCustomer = 0
+  const certain: LinkPlanItem[] = []
+  const ambiguous: LinkPlanItem[] = []
+  const notFound: LinkPlanItem[] = []
+
+  for (const w of data.workItems) {
+    if (w.customerPartnerId) { alreadyLinked++; continue }
+    if (!w.customer || !w.customer.trim()) { withoutCustomer++; continue }
+    const key = normalizeCompanyName(w.customer)
+    const base = {
+      workItemId: w.id,
+      workItemCode: w.code,
+      workItemTitle: w.title,
+      originalCustomer: w.customer,
+      normalizedCustomer: key,
+    }
+    if (!key) {
+      notFound.push({ ...base, decision: 'not-found', candidatePartnerIds: [] })
+      continue
+    }
+    const exact = exactByKey.get(key) ?? []
+    if (exact.length === 1) {
+      certain.push({
+        ...base,
+        decision: 'certain',
+        candidatePartnerIds: [exact[0].id],
+        suggestedPartnerId: exact[0].id,
+      })
+      continue
+    }
+    if (exact.length > 1) {
+      ambiguous.push({
+        ...base,
+        decision: 'ambiguous',
+        candidatePartnerIds: exact.map((p) => p.id),
+        suggestedPartnerId: exact[0].id,
+      })
+      continue
+    }
+    // Fuzzy: substring containment (entrambi i versi). Tipico per
+    // "Iota Macchine" vs "Iota Macchine SRL", "Beta" vs "Beta Meccanica".
+    const fuzzy: BusinessPartner[] = []
+    for (const { partner, key: pk } of normalizedActive) {
+      if (pk === key) continue // già gestito da exact
+      if (pk.includes(key) || key.includes(pk)) fuzzy.push(partner)
+      if (fuzzy.length >= 5) break
+    }
+    if (fuzzy.length === 0) {
+      notFound.push({ ...base, decision: 'not-found', candidatePartnerIds: [] })
+    } else {
+      ambiguous.push({
+        ...base,
+        decision: 'ambiguous',
+        candidatePartnerIds: fuzzy.map((p) => p.id),
+        suggestedPartnerId: fuzzy[0].id,
+      })
+    }
+  }
+
+  return {
+    totalWorkItems: data.workItems.length,
+    alreadyLinked,
+    withoutCustomer,
+    certain,
+    ambiguous,
+    notFound,
+  }
+}
+
+/**
+ * Applica i collegamenti selezionati. Non modifica `customer` (testo libero),
+ * imposta solo `customerPartnerId` + `customerPartnerName` su workItem ancora
+ * non collegati (skip difensivo se nel frattempo un workItem ha già un link).
+ */
+export function applyCustomerLinking(
+  data: AppData,
+  selections: LinkSelection[],
+): { data: AppData; result: LinkApplyResult } {
+  const partnersById = new Map(data.businessPartners.map((p) => [p.id, p]))
+  const selectionsById = new Map<string, LinkSelection>()
+  for (const sel of selections) {
+    if (!sel.partnerId || !sel.workItemId) continue
+    selectionsById.set(sel.workItemId, sel)
+  }
+  let linked = 0
+  let skipped = 0
+  const nextWorkItems = data.workItems.map((w) => {
+    const sel = selectionsById.get(w.id)
+    if (!sel) return w
+    if (w.customerPartnerId) { skipped++; return w } // già collegato — non sovrascrivere
+    const partner = partnersById.get(sel.partnerId)
+    if (!partner) { skipped++; return w }
+    linked++
+    return {
+      ...w,
+      customerPartnerId: partner.id,
+      customerPartnerName: partner.name,
+      // `customer` (testo libero) viene volutamente preservato
+    }
+  })
+  return {
+    data: { ...data, workItems: nextWorkItems },
+    result: { linked, skipped },
+  }
+}

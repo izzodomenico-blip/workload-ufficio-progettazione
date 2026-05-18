@@ -6,6 +6,7 @@ import { useToast } from '../state/ToastProvider'
 import { countByType, getWorkItemsForPartner } from '../services/businessPartnersService'
 import { BusinessPartnerFormModal } from './BusinessPartnerFormModal'
 import { BusinessPartnerImportModal } from './BusinessPartnerImportModal'
+import { CustomerLinkModal } from './CustomerLinkModal'
 import { ConfirmDialog } from './ConfirmDialog'
 
 type TypeFilter = BusinessPartnerType | 'tutti'
@@ -37,6 +38,7 @@ export function BusinessPartnersView({ onWorkItemClick }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('attivi')
   const [createOpen, setCreateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [linkOpen, setLinkOpen] = useState(false)
   const [editing, setEditing] = useState<BusinessPartner | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [toggleConfirm, setToggleConfirm] = useState<{ id: string; nextActive: boolean; name: string } | null>(null)
@@ -86,6 +88,14 @@ export function BusinessPartnersView({ onWorkItemClick }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <button
+            className="btn-ghost"
+            onClick={() => setLinkOpen(true)}
+            title="Cerca e collega i lavori esistenti alle anagrafiche corrispondenti"
+          >
+            <LinkIcon />
+            Collega clienti esistenti
+          </button>
           <button className="btn-ghost" onClick={() => setImportOpen(true)}>↑ Importa XML/CSV/JSON</button>
           <button className="btn-primary" onClick={() => setCreateOpen(true)}>+ Nuova anagrafica</button>
         </div>
@@ -207,6 +217,11 @@ export function BusinessPartnersView({ onWorkItemClick }: Props) {
         onClose={() => setImportOpen(false)}
       />
 
+      <CustomerLinkModal
+        open={linkOpen}
+        onClose={() => setLinkOpen(false)}
+      />
+
       {detail && (
         <BusinessPartnerDetailDrawer
           partner={detail}
@@ -260,6 +275,15 @@ interface DrawerProps {
   onEdit: () => void
   onToggleActive: () => void
   onWorkItemClick?: (workItemId: string) => void
+}
+
+function LinkIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4.93" />
+      <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 19.07" />
+    </svg>
+  )
 }
 
 function BusinessPartnerDetailDrawer({ partner, onClose, onEdit, onToggleActive, onWorkItemClick }: DrawerProps) {

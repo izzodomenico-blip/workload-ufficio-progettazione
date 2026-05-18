@@ -30,12 +30,13 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export function fetchAppData(): Promise<AppData> {
-  return request<AppData>('/api/app-data')
+export async function fetchAppData(): Promise<AppData> {
+  const data = await request<Partial<AppData>>('/api/app-data')
+  return withAppDataDefaults(data)
 }
 
-export function saveAppData(data: AppData, options: SaveAppDataOptions = {}): Promise<AppData> {
-  return request<AppData>('/api/app-data', {
+export async function saveAppData(data: AppData, options: SaveAppDataOptions = {}): Promise<AppData> {
+  const saved = await request<Partial<AppData>>('/api/app-data', {
     method: 'PUT',
     headers: {
       'x-workload-mutation-kind': options.risky ? 'risky' : 'normal',
@@ -43,6 +44,7 @@ export function saveAppData(data: AppData, options: SaveAppDataOptions = {}): Pr
     },
     body: JSON.stringify(data),
   })
+  return withAppDataDefaults(saved)
 }
 
 export function fetchBackupStatus(): Promise<BackupStatus> {
@@ -55,5 +57,17 @@ async function readErrorMessage(response: Response): Promise<string> {
     return body.detail || body.error || `Errore API ${response.status}`
   } catch {
     return `Errore API ${response.status}`
+  }
+}
+
+function withAppDataDefaults(data: Partial<AppData>): AppData {
+  return {
+    people: Array.isArray(data.people) ? data.people : [],
+    workItems: Array.isArray(data.workItems) ? data.workItems : [],
+    tasks: Array.isArray(data.tasks) ? data.tasks : [],
+    absences: Array.isArray(data.absences) ? data.absences : [],
+    activityLog: Array.isArray(data.activityLog) ? data.activityLog : [],
+    notifications: Array.isArray(data.notifications) ? data.notifications : [],
+    businessPartners: Array.isArray(data.businessPartners) ? data.businessPartners : [],
   }
 }
