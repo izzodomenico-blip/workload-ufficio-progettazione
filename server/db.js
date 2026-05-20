@@ -25,6 +25,7 @@ const TABLES = {
   notifications: 'notifications',
   businessPartners: 'business_partners',
   machineTypes: 'machine_types',
+  workshopOutputs: 'workshop_outputs',
 }
 
 let dbInstance = null
@@ -73,6 +74,7 @@ export function getAppData(db = getDb()) {
     notifications: readJsonRows(db, TABLES.notifications, 'timestamp DESC'),
     businessPartners: readJsonRows(db, TABLES.businessPartners, 'name COLLATE NOCASE ASC'),
     machineTypes: readJsonRows(db, TABLES.machineTypes, 'code COLLATE NOCASE ASC'),
+    workshopOutputs: readJsonRows(db, TABLES.workshopOutputs, 'planned_release_date ASC, rowid ASC'),
   }
 }
 
@@ -89,6 +91,7 @@ export function saveAppData(data, db = getDb()) {
     replaceNotifications(db, normalized.notifications, now)
     replaceBusinessPartners(db, normalized.businessPartners, now)
     replaceMachineTypes(db, normalized.machineTypes, now)
+    replaceWorkshopOutputs(db, normalized.workshopOutputs, now)
     db.exec('COMMIT;')
   } catch (error) {
     db.exec('ROLLBACK;')
@@ -141,6 +144,7 @@ export function deleteEntity(collection, id, db = getDb()) {
     nextData = {
       ...nextData,
       tasks: nextData.tasks.filter((task) => task.workItemId !== id),
+      workshopOutputs: nextData.workshopOutputs.filter((output) => output.workItemId !== id),
     }
   }
   saveAppData(nextData, db)
@@ -220,6 +224,28 @@ function replaceMachineTypes(db, rows, now) {
       row.name,
       row.family,
       row.active ? 1 : 0,
+      JSON.stringify(row),
+      now,
+    )
+  }
+}
+
+function replaceWorkshopOutputs(db, rows, now) {
+  db.prepare('DELETE FROM workshop_outputs').run()
+  const insert = db.prepare(`
+    INSERT INTO workshop_outputs
+      (id, work_item_id, machine_type_id, machine_type_code, status, planned_release_date, actual_release_date, data, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  for (const row of rows) {
+    insert.run(
+      row.id,
+      row.workItemId,
+      row.machineTypeId || null,
+      row.machineTypeCode,
+      row.status,
+      row.plannedReleaseDate || null,
+      row.actualReleaseDate || null,
       JSON.stringify(row),
       now,
     )

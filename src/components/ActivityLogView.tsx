@@ -179,6 +179,7 @@ const ENTITY_LABEL: Record<ActivityLogEntityType, string> = {
   person: 'Persone',
   absence: 'Assenze',
   machineType: 'Tipologie disegno',
+  workshopOutput: 'Output officina',
   system: 'Sistema',
 }
 
@@ -270,6 +271,7 @@ const ENTITY_DOT: Record<ActivityLogEntityType, string> = {
   person: 'bg-violet-400',
   absence: 'bg-amber-400',
   machineType: 'bg-cyan-400',
+  workshopOutput: 'bg-orange-400',
   system: 'bg-slate-400',
 }
 

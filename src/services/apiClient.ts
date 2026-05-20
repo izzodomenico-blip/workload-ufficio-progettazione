@@ -125,5 +125,6 @@ function withAppDataDefaults(data: Partial<AppData>): AppData {
     notifications: Array.isArray(data.notifications) ? data.notifications : [],
     businessPartners: Array.isArray(data.businessPartners) ? data.businessPartners : [],
     machineTypes: Array.isArray(data.machineTypes) ? data.machineTypes : [],
+    workshopOutputs: Array.isArray(data.workshopOutputs) ? data.workshopOutputs : [],
   }
 }

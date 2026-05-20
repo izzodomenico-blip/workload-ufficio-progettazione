@@ -5,6 +5,7 @@ import {
   ALL_MACHINE_COMPLEXITIES,
   ALL_PRIORITIES,
   ALL_TYPES,
+  ALL_WORKSHOP_OUTPUT_STATUSES,
 } from '../types'
 import type {
   Absence,
@@ -24,6 +25,8 @@ import type {
   Task,
   WorkItem,
   WorkItemType,
+  WorkshopOutput,
+  WorkshopOutputStatus,
 } from '../types'
 import { ALL_BUSINESS_PARTNER_TYPES } from '../types'
 import { mapLegacyStatus } from './progress'
@@ -41,6 +44,7 @@ export interface BackupCounts {
   notifications: number
   businessPartners: number
   machineTypes: number
+  workshopOutputs: number
 }
 
 export interface BackupInfo {
@@ -89,6 +93,7 @@ const ACTIVITY_ACTIONS = new Set<string>(ALL_ACTIVITY_ACTIONS)
 const ACTIVITY_ENTITY_TYPES = new Set<string>(ALL_ACTIVITY_ENTITY_TYPES)
 const BUSINESS_PARTNER_TYPES = new Set<string>(ALL_BUSINESS_PARTNER_TYPES)
 const MACHINE_COMPLEXITIES = new Set<string>(ALL_MACHINE_COMPLEXITIES)
+const WORKSHOP_OUTPUT_STATUSES = new Set<string>(ALL_WORKSHOP_OUTPUT_STATUSES)
 
 export function createBackupPayload(data: AppData, exportedAt: Date = new Date()): BackupPayload {
   const backupData: AppData = {
@@ -101,6 +106,7 @@ export function createBackupPayload(data: AppData, exportedAt: Date = new Date()
     notifications: data.notifications ?? [],
     businessPartners: data.businessPartners ?? [],
     machineTypes: data.machineTypes ?? [],
+    workshopOutputs: data.workshopOutputs ?? [],
   }
 
   return {
@@ -143,6 +149,7 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   const rawNotifications = root.notifications
   const rawBusinessPartners = root.businessPartners
   const rawMachineTypes = root.machineTypes
+  const rawWorkshopOutputs = root.workshopOutputs
 
   if (!Array.isArray(rawPeople)) issues.push('people deve essere un array.')
   if (!Array.isArray(rawWorkItems)) issues.push('workItems deve essere un array.')
@@ -159,6 +166,9 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   }
   if (rawMachineTypes !== undefined && !Array.isArray(rawMachineTypes)) {
     issues.push('machineTypes deve essere un array oppure assente.')
+  }
+  if (rawWorkshopOutputs !== undefined && !Array.isArray(rawWorkshopOutputs)) {
+    issues.push('workshopOutputs deve essere un array oppure assente.')
   }
 
   const people: Person[] = []
@@ -206,6 +216,15 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
     })
   }
 
+  const workshopOutputs: WorkshopOutput[] = []
+  if (Array.isArray(rawWorkshopOutputs)) {
+    rawWorkshopOutputs.forEach((item, index) => {
+      const output = normalizeWorkshopOutput(item)
+      if (output) workshopOutputs.push(output)
+      else issues.push(`workshopOutputs[${index}] deve avere id, workItemId, machineTypeCode e machineTypeName validi.`)
+    })
+  }
+
   if (issues.length > 0) return invalid(issues)
 
   const activityLog = Array.isArray(rawActivityLog)
@@ -227,6 +246,7 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
     notifications,
     businessPartners,
     machineTypes,
+    workshopOutputs,
   } as AppData
   const summary = {
     source: source.kind,
@@ -308,6 +328,7 @@ function normalizeBackupInfo(value: unknown): BackupMetadata | undefined {
           notifications: optionalNumber(counts.notifications),
           businessPartners: optionalNumber(counts.businessPartners),
           machineTypes: optionalNumber(counts.machineTypes),
+          workshopOutputs: optionalNumber(counts.workshopOutputs),
         }
       : undefined,
   }
@@ -508,6 +529,46 @@ function normalizeMachineType(value: unknown): MachineType | null {
   }
 }
 
+function normalizeWorkshopOutput(value: unknown): WorkshopOutput | null {
+  const o = asRecord(value)
+  if (!o) return null
+  if (!isNonEmptyString(o.id) || !isNonEmptyString(o.workItemId)) return null
+  if (!isNonEmptyString(o.machineTypeCode) || !isNonEmptyString(o.machineTypeName)) return null
+  const now = new Date().toISOString()
+  const complexity: MachineComplexity = MACHINE_COMPLEXITIES.has(o.complexity as string)
+    ? (o.complexity as MachineComplexity)
+    : 'media'
+  const status: WorkshopOutputStatus = WORKSHOP_OUTPUT_STATUSES.has(o.status as string)
+    ? (o.status as WorkshopOutputStatus)
+    : 'previsto'
+  return {
+    id: o.id,
+    workItemId: o.workItemId,
+    machineTypeId: isString(o.machineTypeId) ? o.machineTypeId : '',
+    machineTypeCode: o.machineTypeCode.trim().toUpperCase(),
+    machineTypeName: o.machineTypeName.trim(),
+    description: isString(o.description) ? o.description : '',
+    quantity: positiveNumber(o.quantity, 1),
+    complexity,
+    assemblyCount: nonNegativeInteger(o.assemblyCount, 0),
+    estimatedPartCount: nonNegativeInteger(o.estimatedPartCount, 0),
+    requiresLaser: booleanOr(o.requiresLaser, false),
+    requiresTubeLaser: booleanOr(o.requiresTubeLaser, false),
+    requiresBending: booleanOr(o.requiresBending, false),
+    requiresWelding: booleanOr(o.requiresWelding, false),
+    requiresAssembly: booleanOr(o.requiresAssembly, false),
+    requiresPainting: booleanOr(o.requiresPainting, false),
+    requiresTesting: booleanOr(o.requiresTesting, false),
+    plannedReleaseDate: isString(o.plannedReleaseDate) ? o.plannedReleaseDate : '',
+    actualReleaseDate: isString(o.actualReleaseDate) ? o.actualReleaseDate : '',
+    impactScore: isNumber(o.impactScore) ? Math.max(0, Math.round(o.impactScore * 10) / 10) : 0,
+    status,
+    notes: isString(o.notes) ? o.notes : '',
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
 function normalizeNotification(value: unknown): Notification | null {
   const o = asRecord(value)
   if (!o) return null
@@ -536,7 +597,7 @@ function normalizeNotification(value: unknown): Notification | null {
   } as Notification
 }
 
-function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners' | 'machineTypes'>): BackupCounts {
+function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners' | 'machineTypes' | 'workshopOutputs'>): BackupCounts {
   return {
     people: data.people.length,
     workItems: data.workItems.length,
@@ -546,6 +607,7 @@ function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'ab
     notifications: data.notifications.length,
     businessPartners: data.businessPartners.length,
     machineTypes: data.machineTypes.length,
+    workshopOutputs: data.workshopOutputs.length,
   }
 }
 

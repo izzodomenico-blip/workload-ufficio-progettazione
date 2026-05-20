@@ -25,6 +25,14 @@ const VALID_PRIORITIES = new Set(['bassa', 'media', 'alta', 'critica'])
 const VALID_ABSENCE_TYPES = new Set(['ferie', 'permesso', 'malattia', 'trasferta', 'altro'])
 const VALID_BUSINESS_PARTNER_TYPES = new Set(['cliente', 'fornitore', 'personale', 'altro'])
 const VALID_MACHINE_COMPLEXITIES = new Set(['bassa', 'media', 'alta', 'speciale'])
+const VALID_WORKSHOP_OUTPUT_STATUSES = new Set([
+  'previsto',
+  'in_progettazione',
+  'pronto_rilascio',
+  'rilasciato_produzione',
+  'ricevuto_officina',
+  'sospeso',
+])
 const VALID_ACTIVITY_ACTIONS = new Set([
   'created',
   'updated',
@@ -36,7 +44,15 @@ const VALID_ACTIVITY_ACTIONS = new Set([
   'imported',
   'reset',
 ])
-const VALID_ACTIVITY_ENTITY_TYPES = new Set(['workItem', 'task', 'person', 'absence', 'machineType', 'system'])
+const VALID_ACTIVITY_ENTITY_TYPES = new Set([
+  'workItem',
+  'task',
+  'person',
+  'absence',
+  'machineType',
+  'workshopOutput',
+  'system',
+])
 
 export const EMPTY_APP_DATA = {
   people: [],
@@ -47,6 +63,7 @@ export const EMPTY_APP_DATA = {
   notifications: [],
   businessPartners: [],
   machineTypes: [],
+  workshopOutputs: [],
 }
 
 export function extractAppData(payload) {
@@ -77,6 +94,9 @@ export function normalizeAppData(input) {
   if (root.machineTypes !== undefined && !Array.isArray(root.machineTypes)) {
     throw new Error('machineTypes deve essere un array oppure assente.')
   }
+  if (root.workshopOutputs !== undefined && !Array.isArray(root.workshopOutputs)) {
+    throw new Error('workshopOutputs deve essere un array oppure assente.')
+  }
 
   return {
     people: root.people.map((item, index) => normalizePerson(item, index)),
@@ -87,6 +107,7 @@ export function normalizeAppData(input) {
     notifications: (root.notifications ?? []).map(normalizeNotification).filter(Boolean),
     businessPartners: (root.businessPartners ?? []).map(normalizeBusinessPartner).filter(Boolean),
     machineTypes: (root.machineTypes ?? []).map(normalizeMachineType).filter(Boolean),
+    workshopOutputs: (root.workshopOutputs ?? []).map(normalizeWorkshopOutput).filter(Boolean),
   }
 }
 
@@ -100,6 +121,7 @@ export function countAppData(data) {
     notifications: data.notifications.length,
     businessPartners: data.businessPartners.length,
     machineTypes: data.machineTypes.length,
+    workshopOutputs: data.workshopOutputs.length,
   }
 }
 
@@ -269,6 +291,40 @@ function normalizeMachineType(item) {
     typicalAssemblyCount: nonNegativeInteger(o.typicalAssemblyCount, 1),
     typicalPartCount: nonNegativeInteger(o.typicalPartCount, 10),
     active: typeof o.active === 'boolean' ? o.active : true,
+    notes: isString(o.notes) ? o.notes : '',
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
+function normalizeWorkshopOutput(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id) || !isNonEmptyString(o.workItemId)) return null
+  if (!isNonEmptyString(o.machineTypeCode) || !isNonEmptyString(o.machineTypeName)) return null
+  const now = new Date().toISOString()
+  return {
+    ...o,
+    id: o.id,
+    workItemId: o.workItemId,
+    machineTypeId: isString(o.machineTypeId) ? o.machineTypeId : '',
+    machineTypeCode: o.machineTypeCode.trim().toUpperCase(),
+    machineTypeName: o.machineTypeName.trim(),
+    description: isString(o.description) ? o.description : '',
+    quantity: positiveNumber(o.quantity, 1),
+    complexity: VALID_MACHINE_COMPLEXITIES.has(o.complexity) ? o.complexity : 'media',
+    assemblyCount: nonNegativeInteger(o.assemblyCount, 0),
+    estimatedPartCount: nonNegativeInteger(o.estimatedPartCount, 0),
+    requiresLaser: toBoolean(o.requiresLaser, false),
+    requiresTubeLaser: toBoolean(o.requiresTubeLaser, false),
+    requiresBending: toBoolean(o.requiresBending, false),
+    requiresWelding: toBoolean(o.requiresWelding, false),
+    requiresAssembly: toBoolean(o.requiresAssembly, false),
+    requiresPainting: toBoolean(o.requiresPainting, false),
+    requiresTesting: toBoolean(o.requiresTesting, false),
+    plannedReleaseDate: isString(o.plannedReleaseDate) ? o.plannedReleaseDate : '',
+    actualReleaseDate: isString(o.actualReleaseDate) ? o.actualReleaseDate : '',
+    impactScore: isNumber(o.impactScore) ? Math.max(0, Math.round(o.impactScore * 10) / 10) : 0,
+    status: VALID_WORKSHOP_OUTPUT_STATUSES.has(o.status) ? o.status : 'previsto',
     notes: isString(o.notes) ? o.notes : '',
     createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
     updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,

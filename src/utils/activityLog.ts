@@ -166,6 +166,7 @@ export function getRecentForWorkItem(
   limit = 5,
 ): ActivityLogEntry[] {
   const taskIds = new Set(data.tasks.filter((t) => t.workItemId === workItemId).map((t) => t.id))
+  const outputIds = new Set(data.workshopOutputs.filter((o) => o.workItemId === workItemId).map((o) => o.id))
   // Also include orphan task ids referenced in log (deleted tasks)
   const log = data.activityLog ?? []
   const filtered: ActivityLogEntry[] = []
@@ -174,6 +175,14 @@ export function getRecentForWorkItem(
       filtered.push(e)
     } else if (e.entityType === 'task') {
       if (taskIds.has(e.entityId)) {
+        filtered.push(e)
+      } else if (typeof e.before === 'object' && e.before && (e.before as Record<string, unknown>).workItemId === workItemId) {
+        filtered.push(e)
+      } else if (typeof e.after === 'object' && e.after && (e.after as Record<string, unknown>).workItemId === workItemId) {
+        filtered.push(e)
+      }
+    } else if (e.entityType === 'workshopOutput') {
+      if (outputIds.has(e.entityId)) {
         filtered.push(e)
       } else if (typeof e.before === 'object' && e.before && (e.before as Record<string, unknown>).workItemId === workItemId) {
         filtered.push(e)

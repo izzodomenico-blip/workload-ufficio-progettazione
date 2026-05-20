@@ -11,6 +11,8 @@ import { Modal } from './Modal'
 import { FormField } from './FormField'
 import { BlockersEditor } from './BlockersEditor'
 import { AssigneesPicker } from './AssigneesPicker'
+import { WorkshopOutputsFormSection } from './WorkshopOutputsFormSection'
+import type { WorkshopOutputDraft } from '../services/workshopOutputsService'
 
 interface FormValues {
   type: WorkItemType
@@ -111,20 +113,26 @@ interface Props {
 }
 
 export function WorkItemFormModal({ open, onClose, mode, workItem, onCreated }: Props) {
-  const { data, createWorkItem, updateWorkItem } = useData()
+  const { data, createWorkItemWithWorkshopOutputs, updateWorkItemWithWorkshopOutputs } = useData()
   const toast = useToast()
 
   const defaultOwnerId = data.people[0]?.id ?? ''
   const [values, setValues] = useState<FormValues>(() => emptyValues(defaultOwnerId))
+  const [workshopOutputs, setWorkshopOutputs] = useState<WorkshopOutputDraft[]>([])
   const [errors, setErrors] = useState<ValidationErrors<WorkItemField>>({})
   const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setValues(mode === 'edit' && workItem ? fromWorkItem(workItem) : emptyValues(defaultOwnerId))
+    setWorkshopOutputs(
+      mode === 'edit' && workItem
+        ? data.workshopOutputs.filter((output) => output.workItemId === workItem.id)
+        : [],
+    )
     setErrors({})
     setSubmitted(false)
-  }, [open, mode, workItem, defaultOwnerId])
+  }, [open, mode, workItem, defaultOwnerId, data.workshopOutputs])
 
   const set = <K extends keyof FormValues>(k: K, v: FormValues[K]) => setValues((prev) => ({ ...prev, [k]: v }))
 
@@ -174,11 +182,11 @@ export function WorkItemFormModal({ open, onClose, mode, workItem, onCreated }: 
       return
     }
     if (mode === 'create') {
-      const id = createWorkItem(payload)
+      const id = createWorkItemWithWorkshopOutputs(payload, workshopOutputs)
       toast.success(`Lavoro creato: ${payload.code || payload.title}`)
       onCreated?.(id)
     } else if (workItem) {
-      updateWorkItem(workItem.id, payload)
+      updateWorkItemWithWorkshopOutputs(workItem.id, payload, workshopOutputs)
       toast.success('Lavoro aggiornato.')
     }
     onClose()
@@ -444,6 +452,14 @@ export function WorkItemFormModal({ open, onClose, mode, workItem, onCreated }: 
             onChange={(e) => set('actualProductionReleaseDate', e.target.value)}
           />
         </FormField>
+
+        <WorkshopOutputsFormSection
+          workItemType={values.type}
+          outputs={workshopOutputs}
+          machineTypes={data.machineTypes}
+          defaultPlannedReleaseDate={values.plannedProductionReleaseDate || values.dueDate}
+          onChange={setWorkshopOutputs}
+        />
 
         <FormField label="Link cartella commessa" className="md:col-span-2" hint="URL o percorso file (es. file:///… oppure https://…)">
           <input

@@ -130,7 +130,14 @@ export type ActivityLogAction =
   | 'imported'
   | 'reset'
 
-export type ActivityLogEntityType = 'workItem' | 'task' | 'person' | 'absence' | 'machineType' | 'system'
+export type ActivityLogEntityType =
+  | 'workItem'
+  | 'task'
+  | 'person'
+  | 'absence'
+  | 'machineType'
+  | 'workshopOutput'
+  | 'system'
 
 export interface ActivityLogEntry {
   id: string
@@ -162,6 +169,7 @@ export const ALL_ACTIVITY_ENTITY_TYPES: ActivityLogEntityType[] = [
   'person',
   'absence',
   'machineType',
+  'workshopOutput',
   'system',
 ]
 
@@ -273,6 +281,52 @@ export interface MachineType {
   updatedAt: string
 }
 
+// === Output verso officina ===
+
+export type WorkshopOutputStatus =
+  | 'previsto'
+  | 'in_progettazione'
+  | 'pronto_rilascio'
+  | 'rilasciato_produzione'
+  | 'ricevuto_officina'
+  | 'sospeso'
+
+export const ALL_WORKSHOP_OUTPUT_STATUSES: WorkshopOutputStatus[] = [
+  'previsto',
+  'in_progettazione',
+  'pronto_rilascio',
+  'rilasciato_produzione',
+  'ricevuto_officina',
+  'sospeso',
+]
+
+export interface WorkshopOutput {
+  id: string
+  workItemId: string
+  machineTypeId: string
+  machineTypeCode: string
+  machineTypeName: string
+  description: string
+  quantity: number
+  complexity: MachineComplexity
+  assemblyCount: number
+  estimatedPartCount: number
+  requiresLaser: boolean
+  requiresTubeLaser: boolean
+  requiresBending: boolean
+  requiresWelding: boolean
+  requiresAssembly: boolean
+  requiresPainting: boolean
+  requiresTesting: boolean
+  plannedReleaseDate: string
+  actualReleaseDate: string
+  impactScore: number
+  status: WorkshopOutputStatus
+  notes: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AppData {
   people: Person[]
   workItems: WorkItem[]
@@ -282,6 +336,7 @@ export interface AppData {
   notifications: Notification[]
   businessPartners: BusinessPartner[]
   machineTypes: MachineType[]
+  workshopOutputs: WorkshopOutput[]
 }
 
 export interface Filters {

@@ -15,9 +15,10 @@ import { PersonAgendaView } from './PersonAgendaView'
 import { ActivityLogView } from './ActivityLogView'
 import { BusinessPartnersView } from './BusinessPartnersView'
 import { MachineTypesLibraryView } from './MachineTypesLibraryView'
+import { WorkshopLoadView } from './WorkshopLoadView'
 
 type ViewMode = 'table' | 'kanban'
-type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche' | 'disegni'
+type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche' | 'disegni' | 'officina'
 
 interface TabDef {
   id: MainTab
@@ -32,6 +33,7 @@ const TABS: TabDef[] = [
   { id: 'agenda', label: 'Agenda persone', icon: 'M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z', hint: 'Vista singola persona' },
   { id: 'anagrafiche', label: 'Anagrafiche', icon: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', hint: 'Clienti, fornitori, personale' },
   { id: 'disegni', label: 'Libreria disegni', icon: 'M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v17.5A2.5 2.5 0 0 1 17.5 22H6.5A2.5 2.5 0 0 1 4 19.5ZM8 6h8M8 10h8M8 14h5', hint: 'Registro disegni e tipologie macchina' },
+  { id: 'officina', label: 'Carico officina', icon: 'M14.7 6.3a4 4 0 0 0-5.6 5.6L3 18v3h3l6.1-6.1a4 4 0 0 0 5.6-5.6l-2.5 2.5-2.1-2.1z', hint: 'Cosa arriva in officina dopo il rilascio progettazione' },
   { id: 'log', label: 'Storico', icon: 'M3 3v18h18M7 13l3-3 3 3 5-5', hint: 'Cronologia modifiche' },
 ]
 
@@ -174,6 +176,8 @@ export function Dashboard() {
         />
       ) : tab === 'disegni' ? (
         <MachineTypesLibraryView />
+      ) : tab === 'officina' ? (
+        <WorkshopLoadView />
       ) : (
         <ActivityLogView />
       )}

@@ -94,17 +94,22 @@ export function deleteWorkItem(data: AppData, id: string): AppData {
   const before = data.workItems.find((w) => w.id === id)
   if (!before) return data
   const removedTaskCount = data.tasks.filter((t) => t.workItemId === id).length
+  const removedWorkshopOutputCount = data.workshopOutputs.filter((output) => output.workItemId === id).length
   const next: AppData = {
     ...data,
     workItems: data.workItems.filter((w) => w.id !== id),
     tasks: data.tasks.filter((t) => t.workItemId !== id),
+    workshopOutputs: data.workshopOutputs.filter((output) => output.workItemId !== id),
   }
   return logEntry(next, {
     entityType: 'workItem',
     entityId: id,
     action: 'deleted',
     title: workItemLabel(before),
-    description: removedTaskCount > 0 ? `eliminati anche ${removedTaskCount} task collegati` : undefined,
+    description: [
+      removedTaskCount > 0 ? `${removedTaskCount} task collegati` : '',
+      removedWorkshopOutputCount > 0 ? `${removedWorkshopOutputCount} output officina collegati` : '',
+    ].filter(Boolean).join(' - ') || undefined,
     before: { status: before.status, type: before.type, code: before.code },
   })
 }

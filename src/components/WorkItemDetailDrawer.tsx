@@ -15,6 +15,7 @@ import { getAssigneeAbsencesDuringTask } from '../utils/availability'
 import { calculateExpectedProgress, getTaskHealth } from '../utils/progress'
 import { getRecentForWorkItem } from '../utils/activityLog'
 import { HealthBadge } from './HealthBadge'
+import { WorkshopOutputsDetailSection } from './WorkshopOutputsDetailSection'
 
 interface Props {
   workItemId: string | null
@@ -265,6 +266,8 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
         <CustomerPartnerSection item={item} />
 
         <TechnicalDetailsSection item={item} />
+
+        <WorkshopOutputsDetailSection item={item} />
 
         {item.blockers.length > 0 && (
           <Section title="Bloccanti">
@@ -726,7 +729,7 @@ function RecentLogRow({ entry }: { entry: ActivityLogEntry }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="text-slate-200">
-          {entry.entityType === 'task' ? 'Task' : entry.entityType === 'workItem' ? 'Lavoro' : entry.entityType}
+          {recentEntityLabel(entry.entityType)}
         </span>{' '}
         <span className="text-slate-300">{entry.title}</span>
         {entry.description && (
@@ -735,4 +738,11 @@ function RecentLogRow({ entry }: { entry: ActivityLogEntry }) {
       </span>
     </li>
   )
+}
+
+function recentEntityLabel(entityType: string): string {
+  if (entityType === 'task') return 'Task'
+  if (entityType === 'workItem') return 'Lavoro'
+  if (entityType === 'workshopOutput') return 'Output officina'
+  return entityType
 }

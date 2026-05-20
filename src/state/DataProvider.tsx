@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Absence, AppData, BusinessPartner, MachineType, Person, Status } from '../types'
+import type { Absence, AppData, BusinessPartner, MachineType, Person, Status, WorkshopOutput } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
 import { fetchAppData, saveAppData as saveAppDataToApi } from '../services/apiClient'
@@ -71,6 +71,17 @@ import type {
   CreateMachineTypeInput,
   UpdateMachineTypeInput,
 } from '../services/machineTypesService'
+import {
+  createWorkshopOutput as svcCreateWorkshopOutput,
+  deleteWorkshopOutput as svcDeleteWorkshopOutput,
+  replaceWorkshopOutputsForWorkItem as svcReplaceWorkshopOutputsForWorkItem,
+  updateWorkshopOutput as svcUpdateWorkshopOutput,
+} from '../services/workshopOutputsService'
+import type {
+  CreateWorkshopOutputInput,
+  UpdateWorkshopOutputInput,
+  WorkshopOutputDraft,
+} from '../services/workshopOutputsService'
 
 interface UpdatePeopleOptions {
   /** Password admin per autorizzare modifiche a baselineLoadPercent */
@@ -82,9 +93,12 @@ interface DataContextValue {
   absences: Absence[]
   businessPartners: BusinessPartner[]
   machineTypes: MachineType[]
+  workshopOutputs: WorkshopOutput[]
   // workItems
   createWorkItem: (input: CreateWorkItemInput) => string
   updateWorkItem: (id: string, patch: UpdateWorkItemInput) => void
+  createWorkItemWithWorkshopOutputs: (input: CreateWorkItemInput, outputs: WorkshopOutputDraft[]) => string
+  updateWorkItemWithWorkshopOutputs: (id: string, patch: UpdateWorkItemInput, outputs: WorkshopOutputDraft[]) => void
   deleteWorkItem: (id: string) => void
   setWorkItemStatus: (id: string, status: Status) => void
   convertStudioToCommessa: (id: string, newCode?: string) => void
@@ -113,6 +127,11 @@ interface DataContextValue {
   createMachineType: (input: CreateMachineTypeInput) => string
   updateMachineType: (id: string, patch: UpdateMachineTypeInput) => void
   setMachineTypeActive: (id: string, active: boolean) => void
+  // workshop outputs
+  createWorkshopOutput: (workItemId: string, input: CreateWorkshopOutputInput) => string
+  updateWorkshopOutput: (id: string, patch: UpdateWorkshopOutputInput) => void
+  deleteWorkshopOutput: (id: string) => void
+  replaceWorkshopOutputsForWorkItem: (workItemId: string, outputs: WorkshopOutputDraft[]) => void
   // import/export
   importData: (next: AppData, options?: ImportDataOptions) => void
   exportData: () => BackupExportResult
@@ -194,6 +213,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const updateWorkItem = useCallback((id: string, patch: UpdateWorkItemInput) => {
     commitData(svcUpdateWorkItem(dataRef.current, id, patch))
+  }, [commitData])
+
+  const createWorkItemWithWorkshopOutputs = useCallback((input: CreateWorkItemInput, outputs: WorkshopOutputDraft[]): string => {
+    const result = svcCreateWorkItem(dataRef.current, input)
+    const nextData = input.type === 'commessa' && outputs.length > 0
+      ? svcReplaceWorkshopOutputsForWorkItem(result.data, result.id, outputs)
+      : result.data
+    commitData(nextData)
+    return result.id
+  }, [commitData])
+
+  const updateWorkItemWithWorkshopOutputs = useCallback((id: string, patch: UpdateWorkItemInput, outputs: WorkshopOutputDraft[]) => {
+    const nextData = svcUpdateWorkItem(dataRef.current, id, patch)
+    commitData(
+      patch.type === 'commessa'
+        ? svcReplaceWorkshopOutputsForWorkItem(nextData, id, outputs)
+        : nextData,
+    )
   }, [commitData])
 
   const deleteWorkItem = useCallback((id: string) => {
@@ -397,6 +434,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
     commitData(svcSetMachineTypeActive(dataRef.current, id, active))
   }, [commitData])
 
+  const createWorkshopOutput = useCallback((workItemId: string, input: CreateWorkshopOutputInput): string => {
+    const result = svcCreateWorkshopOutput(dataRef.current, workItemId, input)
+    commitData(result.data)
+    return result.id
+  }, [commitData])
+
+  const updateWorkshopOutput = useCallback((id: string, patch: UpdateWorkshopOutputInput) => {
+    commitData(svcUpdateWorkshopOutput(dataRef.current, id, patch))
+  }, [commitData])
+
+  const deleteWorkshopOutput = useCallback((id: string) => {
+    commitData(svcDeleteWorkshopOutput(dataRef.current, id))
+  }, [commitData])
+
+  const replaceWorkshopOutputsForWorkItem = useCallback((workItemId: string, outputs: WorkshopOutputDraft[]) => {
+    commitData(svcReplaceWorkshopOutputsForWorkItem(dataRef.current, workItemId, outputs))
+  }, [commitData])
+
   const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
     const description = [
       `${next.workItems.length} lavori`,
@@ -405,6 +460,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       `${next.activityLog.length} eventi storico`,
       `${next.notifications.length} notifiche`,
       `${next.machineTypes.length} tipologie disegno`,
+      `${next.workshopOutputs.length} output officina`,
       options.fileName ? `file: ${options.fileName}` : '',
       options.exportedAt ? `esportato: ${options.exportedAt}` : '',
       options.version ? `versione: ${options.version}` : '',
@@ -435,7 +491,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         entityId: 'backup',
         action: 'exported',
         title: 'Backup JSON esportato',
-        description: `${dataRef.current.people.length} persone - ${dataRef.current.workItems.length} lavori - ${dataRef.current.tasks.length} task - ${dataRef.current.machineTypes.length} tipologie disegno - file: ${filename}`,
+        description: `${dataRef.current.people.length} persone - ${dataRef.current.workItems.length} lavori - ${dataRef.current.tasks.length} task - ${dataRef.current.machineTypes.length} tipologie disegno - ${dataRef.current.workshopOutputs.length} output officina - file: ${filename}`,
       }, exportedAtDate),
     )
     const exportedAt = setLastBackupAt(exportedAtDate)
@@ -465,8 +521,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     absences: data.absences,
     businessPartners: data.businessPartners,
     machineTypes: data.machineTypes,
+    workshopOutputs: data.workshopOutputs,
     createWorkItem,
     updateWorkItem,
+    createWorkItemWithWorkshopOutputs,
+    updateWorkItemWithWorkshopOutputs,
     deleteWorkItem,
     setWorkItemStatus,
     convertStudioToCommessa,
@@ -490,6 +549,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createMachineType,
     updateMachineType,
     setMachineTypeActive,
+    createWorkshopOutput,
+    updateWorkshopOutput,
+    deleteWorkshopOutput,
+    replaceWorkshopOutputsForWorkItem,
     importData,
     exportData,
     markNotificationAsRead,
@@ -498,7 +561,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     clearAllNotifications,
   }), [
     data,
-    createWorkItem, updateWorkItem, deleteWorkItem, setWorkItemStatus, convertStudioToCommessa,
+    createWorkItem, updateWorkItem, createWorkItemWithWorkshopOutputs, updateWorkItemWithWorkshopOutputs,
+    deleteWorkItem, setWorkItemStatus, convertStudioToCommessa,
     createTask, updateTask, deleteTask, setTaskStatus,
     updatePerson, updatePeople,
     createAbsence, updateAbsence, deleteAbsence,
@@ -506,6 +570,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     planBusinessPartnerImport, applyBusinessPartnerImport,
     planCustomerLinking, applyCustomerLinking,
     createMachineType, updateMachineType, setMachineTypeActive,
+    createWorkshopOutput, updateWorkshopOutput, deleteWorkshopOutput, replaceWorkshopOutputsForWorkItem,
     importData, exportData,
     markNotificationAsRead, markAllNotificationsAsRead,
     clearReadNotifications, clearAllNotifications,

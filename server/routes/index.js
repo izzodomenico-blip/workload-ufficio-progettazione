@@ -122,6 +122,10 @@ export function createApiRouter() {
     collection: 'machineTypes',
     allowDelete: false,
   })
+  registerCollectionRoutes(router, {
+    apiName: 'workshop-outputs',
+    collection: 'workshopOutputs',
+  })
 
   router.put('/business-partners/:id/activate', (req, res, next) => {
     try {

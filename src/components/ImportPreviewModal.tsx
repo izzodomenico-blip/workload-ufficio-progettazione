@@ -26,6 +26,7 @@ export function ImportPreviewModal({
     ['Eventi storico', summary.counts.activityLog],
     ['Notifiche', summary.counts.notifications],
     ['Tipologie disegno', summary.counts.machineTypes],
+    ['Output officina', summary.counts.workshopOutputs],
   ] as const
 
   return (

@@ -2,7 +2,7 @@
 
 Web app locale per gestire carico di lavoro, commesse, studi, attività interne,
 task, persone, assenze, pianificazione, anagrafiche, libreria Registro Disegni
-e report dell'ufficio progettazione.
+output verso officina e report dell'ufficio progettazione.
 
 La versione attuale è **v1.1**: frontend React/Vite + backend Node.js/Express +
 database SQLite locale condiviso.
@@ -127,6 +127,7 @@ Backup da interfaccia:
 - **Strumenti > Backup dati > Scarica backup JSON** esporta tutti i dati in JSON.
 - Il file contiene `backupInfo` e `data`.
 - Il JSON include anche `businessPartners` e `machineTypes`.
+- Il JSON include anche `workshopOutputs`.
 - L'export registra un evento nello storico.
 
 Backup da terminale:
@@ -218,6 +219,7 @@ Compatibilità mantenuta:
 - JSON senza `activityLog`;
 - JSON senza `notifications`;
 - JSON senza `machineTypes`;
+- JSON senza `workshopOutputs`;
 - stati legacy rimappati agli stati attuali.
 
 ## Report e notifiche
@@ -398,6 +400,198 @@ I backup `.db` e `.json` includono sempre la tabella/collezione
 `machine_types` / `data.machineTypes`. I backup vecchi senza `machineTypes`
 restano importabili e inizializzano la libreria come array vuoto.
 
+## Output verso officina
+
+Le commesse possono avere una sezione **Output verso officina** dentro:
+
+- **Nuovo lavoro / Modifica lavoro**;
+- drawer dettaglio lavoro.
+
+La sezione compare solo quando il tipo lavoro è **Commessa**. Per gli **Studi**
+compare solo una nota leggera: gli output saranno disponibili quando lo studio
+diventa commessa. Per i lavori **Interni** la sezione resta nascosta.
+
+Gli output descrivono cosa arriverà in officina al rilascio progettazione:
+tipologia macchina/disegno, quantità, complessità, complessivi, particolari
+stimati, processi previsti, data rilascio prevista/effettiva e stato. Non sono
+obbligatori e non sostituiscono i task dell'ufficio tecnico.
+
+La tipologia viene selezionata dalla **Libreria disegni** usando ricerca per
+codice, nome o famiglia. Alla selezione vengono copiati i default della
+tipologia (`defaultComplexity`, processi, conteggi tipici), ma l'utente può
+modificarli sulla singola commessa senza cambiare la libreria.
+
+### Indice impatto officina
+
+Ogni output ha un `impactScore` calcolato automaticamente. L'indice non
+rappresenta ore, ma un peso relativo per aiutare la produzione a pianificare il
+carico futuro.
+
+La formula usa:
+
+- quantità;
+- peso base della tipologia (`defaultImpactWeight`);
+- fattore complessità;
+- processi richiesti;
+- numero complessivi;
+- numero particolari stimati.
+
+Livelli indicativi:
+
+- `0-10`: basso;
+- `10-25`: medio;
+- `25-50`: alto;
+- `>50`: critico.
+
+Gli output sono salvati in `workshop_outputs` e nei backup JSON come
+`data.workshopOutputs`. I backup precedenti senza `workshopOutputs` restano
+importabili e inizializzano l'array a vuoto.
+
+## Dashboard Carico officina
+
+La vista **Carico officina** (tab principale, vicino a *Libreria disegni*) è una
+vista di **analisi e lettura** pensata per il responsabile produzione: mostra
+cosa arriverà in officina nei prossimi giorni/settimane dopo il rilascio della
+progettazione. La compilazione degli output resta nella commessa: qui non si
+modifica nulla, si legge e si filtra.
+
+Legge `workItems`, `workshopOutputs`, `machineTypes`, `people` e, dove
+disponibili, le anagrafiche clienti.
+
+### Cos'è `workshopDate`
+
+Per ogni output la **data di arrivo officina** è calcolata in cascata:
+
+1. `actualReleaseDate` dell'output, se valorizzata;
+2. altrimenti `plannedReleaseDate` dell'output;
+3. altrimenti `plannedProductionReleaseDate` del lavoro collegato;
+4. altrimenti `dueDate` del lavoro.
+
+Quando la data deriva dal lavoro (punti 3-4) e non dall'output, la riga viene
+marcata con `~` e generata una criticità "output senza data di rilascio
+impostata".
+
+### Cos'è `impactScore` e perché non sono ore
+
+`impactScore` è un **peso relativo** (vedi *Indice impatto officina*), non una
+stima di ore officina. La dashboard non converte mai l'indice in ore: serve solo
+a confrontare il peso relativo di output, settimane, processi e tipologie. La
+nota *"L'indice di impatto è un valore relativo, non rappresenta ore officina"*
+è sempre visibile.
+
+### KPI
+
+In alto, KPI su settimana corrente e prossima: output previsti, output
+rilasciati, indice impatto settimana corrente e prossima, complessivi e
+particolari previsti, output con laser piano e laser tubo. Più due KPI
+sull'intero periodo selezionato: **tipologia più impattante** e **commessa più
+impattante** (cliccabile per aprire il lavoro).
+
+### Come leggere le prossime 4 settimane
+
+Quattro card, una per settimana ISO, sempre a partire dalla settimana corrente
+(indipendenti dal filtro periodo). Per ognuna: indice impatto totale, numero
+output, complessivi, particolari, output laser piano/tubo, commesse coinvolte e
+un **livello aggregato**:
+
+- `0-20`: basso;
+- `20-50`: medio;
+- `50-90`: alto;
+- `>90`: critico.
+
+I livelli aggregati (`getAggregatedWorkshopImpactLevel`) sono più alti di quelli
+del singolo output (`getWorkshopImpactLevel`) perché sommano più output.
+
+### Come leggere il carico per processo
+
+Aggrega gli output del **periodo selezionato** per processo (laser piano, laser
+tubo, piega, saldatura, montaggio, verniciatura, collaudo). Per ognuno: numero
+output, quantità, particolari, indice impatto totale, commesse coinvolte. Una
+barra confronta visivamente il peso dei processi tra loro. Serve a vedere subito
+dove si concentra il carico (es. laser tubo o saldatura).
+
+### Come leggere il carico per tipologia
+
+Aggrega per tipologia macchina/disegno (`I.TS`, `I.RM`, …) nel periodo
+selezionato: quantità, output, complessivi, particolari, indice impatto totale,
+commesse coinvolte e livello aggregato. Ordinato per impatto decrescente.
+
+### Flusso giornaliero
+
+Tabella raggruppata per giorno di arrivo officina (`workshopDate`), in ordine
+crescente. Per ogni output: commessa/codice, cliente, tipologia, progettista,
+quantità, complessivi, particolari, processi, indice impatto con livello e
+stato. Cliccando una riga si apre il dettaglio della commessa.
+
+### Criticità
+
+Poche segnalazioni automatiche e leggibili: settimane con impatto critico, molti
+output ad alta/speciale complessità o molti particolari nella stessa settimana,
+concentrazioni di laser tubo o saldatura, output senza data di rilascio
+impostata, output ancora "previsto" con data passata, output sospesi.
+
+### Filtri
+
+Periodo (settimana corrente, prossima, prossime 4/8 settimane, personalizzato),
+cliente, commessa/codice, tipologia, famiglia, stato output, progettista,
+processo. I filtri aggiornano flusso giornaliero, carico per processo e carico
+per tipologia. KPI e prossime 4 settimane restano ancorati a settimana
+corrente/prossima e ai filtri non temporali.
+
+### Limiti
+
+I dati dipendono dagli output inseriti nelle commesse: se una commessa non ha
+output, non compare nel carico officina. L'indice impatto è relativo e
+indicativo, non sostituisce una schedulazione di reparto.
+
+### Report flusso officina (PDF / stampa)
+
+Dalla dashboard Carico officina il pulsante **Report produzione** apre
+un'anteprima in **tema chiaro pronta per stampa o PDF**, pensata da condividere
+con il responsabile produzione.
+
+**Come generarlo**
+
+1. Apri il tab **Carico officina**.
+2. Imposta i filtri desiderati (periodo, cliente, tipologia, ecc.).
+3. Clicca **Report produzione**: si apre l'anteprima.
+4. Clicca **Stampa · Salva PDF**: parte `window.print()`. Dal dialog del browser
+   scegli "Salva come PDF" oppure una stampante. Viene stampata **solo l'area
+   report**, non l'interfaccia dell'app.
+5. **Chiudi** per tornare alla dashboard.
+
+Non servono librerie esterne: usa la stampa nativa del browser e il CSS
+`@media print` già presente (`.report-print-area`).
+
+**Cosa contiene**
+
+- intestazione con periodo analizzato e data/ora di generazione;
+- nota fissa: l'indice di impatto **non rappresenta ore**, è relativo;
+- riga "Filtri applicati" con i filtri attivi della dashboard;
+- **Sintesi**: output previsti/rilasciati nel periodo, indice impatto totale,
+  livello complessivo, complessivi, particolari, commesse, più una frase di
+  criticità;
+- **Flusso previsto verso officina**: tabella per data (prime 25 righe, con nota
+  se ce ne sono altre);
+- **Carico per processo** (laser piano/tubo, piega, saldatura, montaggio,
+  verniciatura, collaudo);
+- **Carico per tipologia** (prime 8 per impatto);
+- **Distribuzione prossime 4 settimane**;
+- **Criticità / attenzioni** (massimo 8, con badge gravità).
+
+**Come si legge `impactScore`**
+
+È un indicatore **relativo** (tipologia, quantità, complessità, complessivi,
+particolari, processi). Serve a confrontare il peso tra output, settimane,
+processi e tipologie. **Non sono ore** preventive o consuntive.
+
+**Come usarlo con la produzione**
+
+Il report rispetta i filtri correnti della dashboard: imposta il periodo
+(es. prossime 4 settimane), genera il PDF e condividilo nella riunione di
+produzione per concordare priorità e colli di bottiglia (laser tubo, saldatura,
+settimane critiche) senza dover ragionare in ore.
+
 ## Sicurezza minima
 
 Questa versione non ha login ed è pensata per una rete locale aziendale fidata.
@@ -449,6 +643,11 @@ POST   /api/business-partners/parse-xml      ← body { xml, filename } → reco
 GET    /api/machine-types
 POST   /api/machine-types
 PUT    /api/machine-types/:id                <- active=false per disattivare
+
+GET    /api/workshop-outputs
+POST   /api/workshop-outputs
+PUT    /api/workshop-outputs/:id
+DELETE /api/workshop-outputs/:id
 
 GET /api/activity-log
 
