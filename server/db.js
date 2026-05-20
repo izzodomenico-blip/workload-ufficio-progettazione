@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { EMPTY_APP_DATA, normalizeAppData } from './services/appData.js'
+import { seedDefaultMachineTypes } from './services/machineTypesSeed.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -23,6 +24,7 @@ const TABLES = {
   activityLog: 'activity_log',
   notifications: 'notifications',
   businessPartners: 'business_partners',
+  machineTypes: 'machine_types',
 }
 
 let dbInstance = null
@@ -34,6 +36,7 @@ export function getDb() {
   db.exec('PRAGMA journal_mode = WAL;')
   db.exec('PRAGMA foreign_keys = ON;')
   runMigrations(db)
+  seedDefaultMachineTypes(db)
   dbInstance = db
   return db
 }
@@ -46,7 +49,7 @@ export function runMigrations(db = getDb()) {
   for (const file of files) {
     db.exec(fs.readFileSync(path.join(migrationsDir, file), 'utf8'))
   }
-  // schemaVersion riflette il numero di migrazioni applicate (al momento 2)
+  // schemaVersion riflette il numero di migrazioni applicate.
   db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('schemaVersion', String(files.length))
 }
 
@@ -69,6 +72,7 @@ export function getAppData(db = getDb()) {
     activityLog: readJsonRows(db, TABLES.activityLog, 'timestamp DESC'),
     notifications: readJsonRows(db, TABLES.notifications, 'timestamp DESC'),
     businessPartners: readJsonRows(db, TABLES.businessPartners, 'name COLLATE NOCASE ASC'),
+    machineTypes: readJsonRows(db, TABLES.machineTypes, 'code COLLATE NOCASE ASC'),
   }
 }
 
@@ -84,6 +88,7 @@ export function saveAppData(data, db = getDb()) {
     replaceActivityLog(db, normalized.activityLog, now)
     replaceNotifications(db, normalized.notifications, now)
     replaceBusinessPartners(db, normalized.businessPartners, now)
+    replaceMachineTypes(db, normalized.machineTypes, now)
     db.exec('COMMIT;')
   } catch (error) {
     db.exec('ROLLBACK;')
@@ -194,6 +199,26 @@ function replaceBusinessPartners(db, rows, now) {
       row.email ?? null,
       row.pec ?? null,
       row.city ?? null,
+      row.active ? 1 : 0,
+      JSON.stringify(row),
+      now,
+    )
+  }
+}
+
+function replaceMachineTypes(db, rows, now) {
+  db.prepare('DELETE FROM machine_types').run()
+  const insert = db.prepare(`
+    INSERT INTO machine_types
+      (id, code, name, family, active, data, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `)
+  for (const row of rows) {
+    insert.run(
+      row.id,
+      row.code,
+      row.name,
+      row.family,
       row.active ? 1 : 0,
       JSON.stringify(row),
       now,

@@ -121,6 +121,9 @@ export function describePersonChange(before: Person, after: Person): string {
   if (before.role !== after.role) parts.push('ruolo aggiornato')
   if (before.active !== after.active) parts.push(after.active ? 'persona attivata' : 'persona disattivata')
   if (before.name !== after.name) parts.push('nome aggiornato')
+  if ((before.baselineLoadPercent ?? 0) !== (after.baselineLoadPercent ?? 0)) {
+    parts.push(`carico base ${before.baselineLoadPercent ?? 0}% → ${after.baselineLoadPercent ?? 0}%`)
+  }
   return parts.length === 0 ? '' : parts.join(' · ')
 }
 
@@ -129,7 +132,8 @@ export function shouldLogPersonChange(before: Person, after: Person): boolean {
     before.weeklyCapacityHours !== after.weeklyCapacityHours ||
     before.role !== after.role ||
     before.active !== after.active ||
-    before.name !== after.name
+    before.name !== after.name ||
+    (before.baselineLoadPercent ?? 0) !== (after.baselineLoadPercent ?? 0)
   )
 }
 

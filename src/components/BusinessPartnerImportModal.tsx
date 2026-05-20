@@ -123,18 +123,27 @@ export function BusinessPartnerImportModal({ open, onClose }: Props) {
       <input ref={inputRef} type="file" accept=".xml,.csv,.json,application/xml,text/xml" onChange={handleFile} className="hidden" />
 
       {step === 'pick' && (
-        <div className="space-y-3">
-          <p className="text-sm text-slate-300">
-            Seleziona il file <code className="rounded bg-slate-800 px-1.5 py-0.5 text-xs">ANAGRAFICA.xml</code> esportato dal
-            gestionale (formato Excel SpreadsheetML 2003). Il file viene letto in locale dal backend; nessun upload cloud.
-          </p>
+        <div className="space-y-4">
+          <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300 ring-1 ring-inset ring-sky-500/30">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                </svg>
+              </span>
+              <div className="text-sm text-slate-300">
+                Seleziona il file <code className="rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-xs text-slate-200">ANAGRAFICA.xml</code> esportato dal gestionale (Excel SpreadsheetML 2003).
+                Il parsing è locale — nessun upload cloud.
+              </div>
+            </div>
+          </div>
           <ul className="space-y-1 text-xs text-slate-400">
-            <li>• Header riconosciuto cercando una cella con valore "Conto"</li>
-            <li>• Colonne mappate per nome (non per posizione fissa)</li>
-            <li>• Righe vuote o senza ragione sociale vengono scartate</li>
-            <li>• Deduplica per <em>codice conto</em>, poi <em>P.IVA + nome</em>, poi <em>CF + nome</em></li>
+            <li className="flex items-start gap-2"><span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden /> Header riconosciuto cercando una cella con valore "Conto"</li>
+            <li className="flex items-start gap-2"><span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden /> Colonne mappate per nome (non per posizione fissa)</li>
+            <li className="flex items-start gap-2"><span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden /> Righe vuote o senza ragione sociale vengono scartate</li>
+            <li className="flex items-start gap-2"><span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden /> Deduplica per <em>codice conto</em>, poi <em>P.IVA + nome</em>, poi <em>CF + nome</em></li>
           </ul>
-          <button onClick={pickFile} className="btn-primary mt-2">Seleziona file XML</button>
+          <button onClick={pickFile} className="btn-primary">Seleziona file XML</button>
         </div>
       )}
 
@@ -147,9 +156,14 @@ export function BusinessPartnerImportModal({ open, onClose }: Props) {
 
       {step === 'preview' && plan && parseResp && (
         <div className="space-y-4">
-          <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-xs text-sky-100">
-            Questa operazione <strong>aggiornerà o aggiungerà</strong> anagrafiche.
-            Non verrà cancellata nessuna anagrafica esistente.
+          <div className="flex items-start gap-2.5 rounded-md border border-sky-500/35 bg-sky-500/8 px-3 py-2.5 text-xs text-sky-100">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0" aria-hidden>
+              <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+            </svg>
+            <span>
+              L'operazione <strong>aggiornerà o aggiungerà</strong> anagrafiche.
+              Nessuna anagrafica esistente verrà cancellata.
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -201,8 +215,11 @@ export function BusinessPartnerImportModal({ open, onClose }: Props) {
 
       {step === 'done' && result && (
         <div className="space-y-3">
-          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-100">
-            Import completato.
+          <div className="flex items-center gap-2.5 rounded-md border border-emerald-500/35 bg-emerald-500/8 px-3 py-2.5 text-sm text-emerald-100">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            <span className="font-medium">Import completato.</span>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <Stat label="Nuove" value={result.created} tone="emerald" />
@@ -216,8 +233,11 @@ export function BusinessPartnerImportModal({ open, onClose }: Props) {
       )}
 
       {step === 'error' && error && (
-        <div className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
-          {error}
+        <div className="flex items-start gap-2.5 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-sm text-red-200">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0" aria-hidden>
+            <circle cx="12" cy="12" r="10" /><path d="m15 9-6 6m0-6 6 6" />
+          </svg>
+          <span>{error}</span>
         </div>
       )}
     </Modal>

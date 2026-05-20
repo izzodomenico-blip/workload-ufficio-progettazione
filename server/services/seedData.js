@@ -1,4 +1,5 @@
 import { REQUIRED_OFFICE_PEOPLE } from './officePeople.js'
+import { getDefaultMachineTypes } from './machineTypesSeed.js'
 
 function iso(date) {
   return date.toISOString().slice(0, 10)
@@ -157,5 +158,7 @@ export function freshSeedData() {
     absences,
     activityLog: [],
     notifications: [],
+    businessPartners: [],
+    machineTypes: getDefaultMachineTypes(),
   }
 }

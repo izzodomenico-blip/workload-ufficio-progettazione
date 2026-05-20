@@ -1,18 +1,37 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0b1020;
-  --color-bg-soft: #0f172a;
-  --color-panel: #111a30;
-  --color-panel-hi: #172139;
-  --color-edge: #1f2a44;
-  --color-edge-soft: #182238;
-  --color-ink: #e2e8f0;
-  --color-ink-dim: #94a3b8;
-  --color-ink-faint: #64748b;
+  /* Background layers — gradiente sottile da profondo a meno profondo */
+  --color-bg: #070b18;
+  --color-bg-soft: #0c1326;
+  --color-surface-1: #0f1730;
+  --color-surface-2: #131c38;
+  --color-surface-3: #17213f;
+
+  /* Pannelli */
+  --color-panel: #111a33;
+  --color-panel-hi: #182246;
+
+  /* Bordi */
+  --color-edge: #25325a;
+  --color-edge-soft: #1b2547;
+  --color-edge-strong: #324272;
+
+  /* Testo */
+  --color-ink: #e8ecf6;
+  --color-ink-dim: #a3b0cf;
+  --color-ink-faint: #6f7da3;
+
+  /* Accenti */
   --color-accent: #38bdf8;
+  --color-accent-hi: #7dd3fc;
   --color-accent-2: #818cf8;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Shadow tokens */
+  --shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 6px 18px -10px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 48px -20px rgba(0, 0, 0, 0.75);
 }
 
 html, body, #root {
@@ -21,49 +40,197 @@ html, body, #root {
 
 body {
   background:
-    radial-gradient(1200px 800px at 0% 0%, #122044 0%, transparent 60%),
-    radial-gradient(1000px 700px at 100% 0%, #0e1a3d 0%, transparent 55%),
+    radial-gradient(1200px 800px at 10% -10%, #14224d 0%, transparent 55%),
+    radial-gradient(900px 700px at 100% 0%, #0e1a3d 0%, transparent 55%),
+    radial-gradient(800px 600px at 50% 110%, #0a1230 0%, transparent 60%),
     var(--color-bg);
   color: var(--color-ink);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 * { border-color: var(--color-edge); }
 
+/* ===========================
+   Surface & Panel utilities
+   =========================== */
+
 @utility panel {
-  @apply rounded-xl border bg-[color:var(--color-panel)] shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)];
+  @apply rounded-xl border bg-[color:var(--color-panel)];
+  border-color: var(--color-edge);
+  box-shadow: var(--shadow-soft);
+}
+
+@utility panel-soft {
+  @apply rounded-lg border bg-[color:var(--color-surface-2)]/60;
+  border-color: var(--color-edge-soft);
+}
+
+@utility panel-flat {
+  @apply rounded-lg border bg-[color:var(--color-surface-1)];
+  border-color: var(--color-edge-soft);
+}
+
+@utility surface {
+  background-color: var(--color-surface-1);
   border-color: var(--color-edge);
 }
+
+/* ===========================
+   Inputs
+   =========================== */
 
 @utility input-base {
-  @apply block w-full rounded-md border bg-[color:var(--color-bg-soft)] px-3 py-1.5 text-sm text-[color:var(--color-ink)] outline-none transition placeholder:text-[color:var(--color-ink-faint)] focus:border-[color:var(--color-accent)] focus:ring-2 focus:ring-sky-500/20;
+  @apply block w-full rounded-md border bg-[color:var(--color-bg-soft)] px-3 py-1.5 text-sm text-[color:var(--color-ink)] outline-none transition placeholder:text-[color:var(--color-ink-faint)] focus:border-[color:var(--color-accent)] focus:ring-2 focus:ring-sky-500/25 hover:border-[color:var(--color-edge-strong)];
   border-color: var(--color-edge);
 }
 
+/* ===========================
+   Buttons
+   =========================== */
+
 @utility btn-primary {
-  @apply inline-flex items-center gap-1.5 rounded-md bg-sky-500 px-3 py-1.5 text-sm font-medium text-slate-950 transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-300/50;
+  @apply inline-flex items-center gap-1.5 rounded-md bg-sky-500 px-3 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 active:bg-sky-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-bg)];
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 8px 18px -10px rgba(56, 189, 248, 0.55);
 }
 
 @utility btn-ghost {
-  @apply inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-[color:var(--color-ink)] transition hover:bg-[color:var(--color-panel-hi)];
+  @apply inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-[color:var(--color-ink)] transition hover:bg-[color:var(--color-panel-hi)] hover:border-[color:var(--color-edge-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40;
   border-color: var(--color-edge);
 }
+
+@utility btn-danger {
+  @apply inline-flex items-center gap-1.5 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:border-red-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300/40;
+}
+
+@utility btn-icon {
+  @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-[color:var(--color-panel-hi)] hover:text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40;
+}
+
+/* ===========================
+   Chips / Badges
+   =========================== */
 
 @utility chip {
   @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset;
 }
 
+@utility chip-sm {
+  @apply inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset;
+}
+
+@utility chip-pill {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1 ring-inset;
+}
+
+/* ===========================
+   Tabs
+   =========================== */
+
+@utility tabs-track {
+  @apply inline-flex gap-1 rounded-xl border p-1 text-sm;
+  border-color: var(--color-edge);
+  background-color: var(--color-surface-1);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+}
+
+@utility tab-item {
+  @apply inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium text-slate-400 transition;
+}
+
+@utility tab-item-active {
+  background-color: var(--color-panel-hi);
+  color: #f1f5ff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 4px 12px -6px rgba(56, 189, 248, 0.35);
+}
+
+/* ===========================
+   Table row hover & header
+   =========================== */
+
+@utility table-head {
+  @apply bg-[color:var(--color-surface-1)]/80 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400;
+}
+
+@utility table-row {
+  @apply cursor-pointer transition hover:bg-sky-500/5;
+}
+
+/* ===========================
+   Scrollbar
+   =========================== */
+
 @utility scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-edge) transparent;
+  scrollbar-color: var(--color-edge-strong) transparent;
 }
+.scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-thin::-webkit-scrollbar-track { background: transparent; }
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--color-edge-strong);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover { background-color: #44558a; background-clip: padding-box; }
+
+/* ===========================
+   Section helpers
+   =========================== */
+
+@utility section-label {
+  @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400;
+}
+
+@utility section-accent {
+  @apply inline-block h-3 w-1 rounded-sm;
+}
+
+/* ===========================
+   Misc
+   =========================== */
 
 ::selection {
   background: rgba(56, 189, 248, 0.3);
   color: white;
 }
 
+:focus-visible {
+  outline: none;
+}
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="menuitem"]:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.55);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Animazione skeleton/empty state */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.05) 50%, transparent 65%);
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Print */
 @media print {
   @page {
     size: A4;

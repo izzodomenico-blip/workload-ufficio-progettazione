@@ -25,12 +25,17 @@ export function FiltersBar({ data, filters, onChange }: Props) {
   return (
     <div className="panel flex flex-wrap items-end gap-2 p-3">
       <Field label="Cerca">
-        <input
-          className="input-base w-44"
-          placeholder="codice, titolo…"
-          value={filters.search}
-          onChange={(e) => set('search', e.target.value)}
-        />
+        <div className="relative">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500">
+            <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            className="input-base w-48 pl-8"
+            placeholder="codice, titolo, cliente…"
+            value={filters.search}
+            onChange={(e) => set('search', e.target.value)}
+          />
+        </div>
       </Field>
       <Field label="Persona">
         <select className="input-base w-40" value={filters.personId} onChange={(e) => set('personId', e.target.value)}>

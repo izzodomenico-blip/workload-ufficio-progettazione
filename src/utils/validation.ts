@@ -67,7 +67,7 @@ export function validateTask(
   return Object.keys(errors).length === 0 ? { ok: true } : { ok: false, errors }
 }
 
-export type PersonField = 'name' | 'role' | 'weeklyCapacityHours'
+export type PersonField = 'name' | 'role' | 'weeklyCapacityHours' | 'baselineLoadPercent'
 
 export function validatePerson(input: Partial<Omit<Person, 'id'>>): ValidationResult<PersonField> {
   const errors: ValidationErrors<PersonField> = {}
@@ -76,6 +76,11 @@ export function validatePerson(input: Partial<Omit<Person, 'id'>>): ValidationRe
   if (!input.role || !input.role.trim()) errors.role = 'Il ruolo è obbligatorio'
   if (typeof input.weeklyCapacityHours !== 'number' || input.weeklyCapacityHours < 0 || input.weeklyCapacityHours > 80) {
     errors.weeklyCapacityHours = 'La capacità deve essere tra 0 e 80 ore'
+  }
+  if (input.baselineLoadPercent !== undefined && input.baselineLoadPercent !== null) {
+    if (typeof input.baselineLoadPercent !== 'number' || input.baselineLoadPercent < 0 || input.baselineLoadPercent > 100) {
+      errors.baselineLoadPercent = 'Il carico base deve essere tra 0 e 100'
+    }
   }
 
   return Object.keys(errors).length === 0 ? { ok: true } : { ok: false, errors }

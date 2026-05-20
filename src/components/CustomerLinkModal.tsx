@@ -105,12 +105,16 @@ export function CustomerLinkModal({ open, onClose }: Props) {
         <p className="text-sm text-slate-400">Analisi in corso…</p>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-xs text-sky-100">
-            L'operazione collega lavori esistenti alle anagrafiche aggiornando solo
-            <code className="mx-1 rounded bg-slate-800 px-1.5 py-0.5">customerPartnerId</code> e
-            <code className="mx-1 rounded bg-slate-800 px-1.5 py-0.5">customerPartnerName</code>.
-            Il testo originale del campo <em>customer</em> non viene modificato. I lavori già collegati
-            vengono saltati. Un backup automatico viene creato prima dell'operazione.
+          <div className="flex items-start gap-2.5 rounded-md border border-sky-500/35 bg-sky-500/8 px-3 py-2.5 text-xs text-sky-100">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0" aria-hidden>
+              <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+            </svg>
+            <span>
+              L'operazione aggiorna solo i collegamenti
+              <code className="mx-1 rounded bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-mono">customerPartnerId</code> e
+              <code className="mx-1 rounded bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-mono">customerPartnerName</code>.
+              Il testo del campo <em>customer</em> non viene modificato. I lavori già collegati vengono saltati. Un backup automatico viene creato prima dell'operazione.
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">

@@ -1,5 +1,5 @@
-import type { Absence, AppData, Person, Task } from '../types'
-import { CLOSED_STATUSES, isOpen } from '../types'
+import type { Absence, AppData, Person, Task, WorkItem } from '../types'
+import { CLOSED_STATUSES } from '../types'
 import {
   addDays,
   endOfWeek,
@@ -8,8 +8,8 @@ import {
   startOfWeek,
   workingDaysOverlap,
 } from './dates'
-import { computeWorkload, type WorkloadLevel } from './workload'
-import { getTaskHealth } from './progress'
+import { computeWorkload, getWorkloadActivitiesForPerson, type WorkloadActivity, type WorkloadLevel } from './workload'
+import { getTaskHealth, getWorkItemHealth } from './progress'
 
 export interface PlanningWeek {
   index: number
@@ -31,7 +31,14 @@ export interface PersonWeekCell {
   weekEndISO: string
   weekLabel: string
   weekRangeLabel: string
+  /** Ore totali considerate per il carico (dichiarate + base) */
   assignedHours: number
+  /** Solo ore da task/lavori dichiarati */
+  declaredHours: number
+  /** Ore derivate dal carico base configurato sulla persona */
+  baselineHours: number
+  /** % carico base configurato (0 se non impostato) */
+  baselinePercent: number
   theoreticalCapacity: number
   absenceHours: number
   realCapacity: number
@@ -92,22 +99,27 @@ export function getPlanningWeeks(today: Date = new Date(), count: number = 4): P
 export function computePersonWeeklyPlanning(
   person: Person,
   tasks: Task[],
+  workItems: WorkItem[],
   absences: Absence[],
   week: PlanningWeek,
+  today: Date = new Date(),
 ): PersonWeekCell {
-  // Riusa la logica esistente per la singola settimana
-  const w = computeWorkload(person, tasks, absences, week.weekStart)
+  // Riusa la logica workload per la singola settimana: task + lavori senza task.
+  // `today` distingue il giorno corrente dall'inizio della settimana analizzata
+  // (importante per le settimane future della pianificazione).
+  const w = computeWorkload(person, tasks, absences, week.weekStart, workItems, today)
+  const activities = getWorkloadActivitiesForPerson(person, tasks, workItems, week.weekStart, week.weekEnd, today)
 
-  // Conta task per persona attivi nella settimana e classifica salute
-  const todayISO = formatISODate(new Date())
+  // Conta attività per persona attive nella settimana e classifica salute.
+  const todayISO = formatISODate(today)
   let riskCount = 0
   let delayCount = 0
-  for (const t of tasks) {
-    if (t.assigneeId !== person.id) continue
-    if (!isOpen(t.status)) continue
-    const overlap = workingDaysOverlap(t.startDate, t.dueDate, week.weekStart, week.weekEnd)
-    if (overlap === 0) continue
-    const health = getTaskHealth(t, todayISO)
+  for (const activity of activities) {
+    const health = activity.kind === 'task' && activity.task
+      ? getTaskHealth(activity.task, todayISO)
+      : activity.workItem
+        ? getWorkItemHealth(activity.workItem, [], todayISO)
+        : 'ok'
     if (health === 'in ritardo') delayCount++
     else if (health === 'a rischio') riskCount++
   }
@@ -119,13 +131,9 @@ export function computePersonWeeklyPlanning(
   )
   let hasTasksDuringAbsence = false
   if (weekAbsences.length > 0) {
-    for (const t of tasks) {
-      if (t.assigneeId !== person.id) continue
-      if (CLOSED_STATUSES.includes(t.status)) continue
-      const overlap = workingDaysOverlap(t.startDate, t.dueDate, week.weekStart, week.weekEnd)
-      if (overlap === 0) continue
+    for (const activity of activities) {
       for (const a of weekAbsences) {
-        if (t.startDate <= a.endDate && a.startDate <= t.dueDate) {
+        if (activity.startDate <= a.endDate && a.startDate <= activity.dueDate) {
           hasTasksDuringAbsence = true
           break
         }
@@ -144,12 +152,15 @@ export function computePersonWeeklyPlanning(
     weekLabel: week.weekLabel,
     weekRangeLabel: week.weekRangeLabel,
     assignedHours: w.weekHours,
+    declaredHours: w.declaredHours,
+    baselineHours: w.baselineHours,
+    baselinePercent: w.baselinePercent,
     theoreticalCapacity: w.capacityHours,
     absenceHours: w.absenceHours,
     realCapacity: w.realCapacityHours,
     loadPercent: w.loadPercent,
     level: w.level,
-    taskCount: w.taskCount,
+    taskCount: w.activityCount,
     riskCount,
     delayCount,
     hasTasksDuringAbsence,
@@ -167,7 +178,7 @@ export function computePlanningMatrix(
 
   const rows: PersonPlanningRow[] = activePeople.map((person) => ({
     person,
-    weeks: weeks.map((w) => computePersonWeeklyPlanning(person, data.tasks, data.absences, w)),
+    weeks: weeks.map((w) => computePersonWeeklyPlanning(person, data.tasks, data.workItems, data.absences, w, today)),
   }))
 
   let criticalWeeks = 0
@@ -226,6 +237,16 @@ export function getTasksForPersonInWeek(
       return overlap > 0
     })
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+}
+
+export function getActivitiesForPersonInWeek(
+  person: Person,
+  tasks: Task[],
+  workItems: WorkItem[],
+  week: PlanningWeek,
+  today: Date = new Date(),
+): WorkloadActivity[] {
+  return getWorkloadActivitiesForPerson(person, tasks, workItems, week.weekStart, week.weekEnd, today)
 }
 
 /**

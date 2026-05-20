@@ -38,8 +38,8 @@ export function WorkItemDetailDrawer({ workItemId, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-40">
-      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div className="absolute right-0 top-0 h-full w-full max-w-[680px] overflow-y-auto scroll-thin border-l border-slate-800 bg-[color:var(--color-panel)] shadow-2xl">
+      <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div className="absolute right-0 top-0 h-full w-full max-w-[720px] overflow-y-auto scroll-thin border-l border-slate-800 bg-[color:var(--color-panel)] shadow-2xl">
         <DetailContent item={item} onClose={onClose} />
       </div>
     </div>
@@ -52,8 +52,17 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
   const personById = useMemo(() => new Map(data.people.map((p) => [p.id, p])), [data.people])
   const owner = personById.get(item.ownerId)
   const tasks = useMemo(() => data.tasks.filter((t) => t.workItemId === item.id), [data.tasks, item.id])
+  const hasTaskDetails = tasks.length > 0
 
   const totals = useMemo(() => {
+    if (tasks.length === 0) {
+      const residual = Math.max(0, item.estimatedHours * (1 - item.progressPercent / 100))
+      return {
+        est: item.estimatedHours,
+        residual: Math.round(residual * 10) / 10,
+        avgProgress: item.progressPercent,
+      }
+    }
     const est = tasks.reduce((s, t) => s + t.estimatedHours, 0)
     const residual = tasks.reduce(
       (s, t) => s + Math.max(0, t.estimatedHours * (1 - t.progressPercent / 100)),
@@ -61,7 +70,7 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
     )
     const avgProgress = tasks.length === 0 ? 0 : Math.round(tasks.reduce((s, t) => s + t.progressPercent, 0) / tasks.length)
     return { est, residual: Math.round(residual * 10) / 10, avgProgress }
-  }, [tasks])
+  }, [tasks, item.estimatedHours, item.progressPercent])
 
   const recentLog = useMemo(() => getRecentForWorkItem(data, item.id, 5), [data, item.id])
 
@@ -90,18 +99,25 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
 
   return (
     <>
-      <header className="sticky top-0 z-10 border-b border-slate-800 bg-[color:var(--color-panel)] px-5 py-4">
+      <header className="sticky top-0 z-10 border-b border-slate-800 bg-[color:var(--color-panel)]/95 backdrop-blur-md px-5 py-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <TypeBadge type={item.type} />
-              <span className="font-mono text-xs text-slate-400">{item.code || '— senza codice —'}</span>
-              {item.blockers.length > 0 && <span className="chip bg-amber-500/15 text-amber-300 ring-amber-500/40">⛔ bloccato</span>}
+              <span className="rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-[11px] text-slate-300 ring-1 ring-inset ring-slate-700/70">
+                {item.code || '— senza codice —'}
+              </span>
+              {item.blockers.length > 0 && (
+                <span className="chip-sm bg-amber-500/15 text-amber-200 ring-amber-500/40">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden />
+                  Bloccato
+                </span>
+              )}
             </div>
-            <h2 className="mt-1 text-lg font-semibold text-slate-100">{item.title}</h2>
+            <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-100">{item.title}</h2>
             <div className="mt-0.5 text-sm text-slate-400">{item.customer || '—'}</div>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200" aria-label="Chiudi">
+          <button onClick={onClose} className="btn-icon" aria-label="Chiudi">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </div>
@@ -114,25 +130,26 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
           />
           <PriorityBadge priority={item.priority} />
           {item.type === 'studio' && typeof item.acquisitionProbability === 'number' && (
-            <span className="chip bg-violet-500/10 text-violet-300 ring-violet-500/30">
+            <span className="chip-sm bg-violet-500/12 text-violet-200 ring-violet-500/35">
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-400" aria-hidden />
               prob. acquisizione {item.acquisitionProbability}%
             </span>
           )}
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => setEditOpen(true)} className="btn-ghost" title="Modifica i dati del lavoro">
-              ✎ Modifica
+              <PencilIcon /> Modifica
             </button>
             {item.type === 'studio' && (
               <button onClick={() => setShowConvert((v) => !v)} className="btn-primary">
-                {showConvert ? '× Annulla' : '→ Converti in commessa'}
+                {showConvert ? 'Annulla' : 'Converti in commessa'}
               </button>
             )}
             <button
               onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-1.5 text-sm font-medium text-red-300 transition hover:bg-red-500/10"
+              className="btn-danger"
               title="Elimina questo lavoro e tutti i suoi task"
             >
-              🗑 Elimina
+              <TrashIcon /> Elimina
             </button>
           </div>
         </div>
@@ -156,32 +173,40 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
         )}
       </header>
 
-      <div className="space-y-5 px-5 py-4">
+      <div className="space-y-5 px-5 py-5">
         <Section title="Dati principali">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <div className="grid grid-cols-2 gap-3">
             <Row label="Owner" value={owner?.name ?? '—'} />
             <Row label="Assegnati" value={item.assigneeIds.map((id) => personById.get(id)?.name).filter(Boolean).join(', ') || '—'} />
             <Row label="Inizio" value={formatItalian(item.startDate)} />
-            <Row label="Scadenza" value={
-              <span className={overdue ? 'text-red-300 font-medium' : ''}>
-                {formatItalian(item.dueDate)} <span className="text-slate-500">({overdue ? `${Math.abs(days)} gg di ritardo` : `tra ${days} gg`})</span>
-              </span>
-            } />
+            <Row
+              label="Scadenza"
+              value={
+                <span className={overdue ? 'font-semibold text-red-300' : 'text-slate-200'}>
+                  {formatItalian(item.dueDate)}
+                  <span className="ml-1 text-[10px] font-normal text-slate-500">
+                    ({overdue ? `${Math.abs(days)} gg di ritardo` : `tra ${days} gg`})
+                  </span>
+                </span>
+              }
+            />
             <Row label="Ore stimate" value={`${item.estimatedHours}h`} />
             <Row
-              label="Ore residue calcolate"
+              label="Ore residue"
               value={`${Math.round(Math.max(0, item.estimatedHours * (1 - item.progressPercent / 100)) * 10) / 10}h`}
+              hint="calcolate sulle ore residue"
             />
-            <Row label="Avanzamento" value={
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block h-1.5 w-24 overflow-hidden rounded-full bg-slate-800">
-                  <span className="block h-full bg-sky-500" style={{ width: `${item.progressPercent}%` }} />
-                </span>
-                <span className="tabular-nums">{item.progressPercent}%</span>
-              </span>
-            } />
-          </dl>
-          {item.description && <p className="mt-3 text-sm text-slate-300">{item.description}</p>}
+          </div>
+          <div className="mt-3 rounded-md border border-slate-800/80 bg-slate-900/40 p-3">
+            <div className="flex items-baseline justify-between">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Avanzamento</div>
+              <div className="text-sm font-semibold tabular-nums text-slate-100">{item.progressPercent}%</div>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800">
+              <div className="h-full bg-gradient-to-r from-sky-500 to-sky-400" style={{ width: `${item.progressPercent}%` }} />
+            </div>
+          </div>
+          {item.description && <p className="mt-3 text-sm leading-relaxed text-slate-300">{item.description}</p>}
         </Section>
 
         <Section
@@ -196,26 +221,40 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
           }
         >
           {tasks.length === 0 ? (
-            <p className="rounded-md border border-dashed border-slate-700 px-3 py-6 text-center text-sm text-slate-500">
-              Nessun task collegato. Aggiungine uno per iniziare a tracciare l’avanzamento.
-            </p>
+            <div className="rounded-lg border border-dashed border-slate-700/70 bg-slate-900/30 px-3 py-6 text-center">
+              <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-slate-800/60 ring-1 ring-inset ring-slate-700">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
+                  <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+              </div>
+              <div className="text-sm font-medium text-slate-300">Lavoro monitorato a livello generale</div>
+              <p className="mt-1 text-[12px] text-slate-500">
+                Aggiungi task se vuoi dettagliare le attività. <br />
+                Carico calcolato dalle ore generali del lavoro.
+              </p>
+            </div>
           ) : (
-            <ul className="space-y-2">
-              {tasks.map((t) => (
-                <TaskRow
-                  key={t.id}
-                  task={t}
-                  assigneeName={personById.get(t.assigneeId)?.name ?? '—'}
-                  absenceConflicts={getAssigneeAbsencesDuringTask(t.assigneeId, data.absences, t.startDate, t.dueDate)}
-                  onEdit={() => setTaskFormState({ open: true, mode: 'edit', task: t })}
-                  onDelete={() => setConfirmDeleteTaskId(t.id)}
-                />
-              ))}
-            </ul>
+            <>
+              <p className="mb-2 rounded-md border border-sky-500/25 bg-sky-500/8 px-3 py-2 text-[12px] text-sky-100">
+                Sono presenti task: il carico viene calcolato dai task, non dalle ore generali del lavoro.
+              </p>
+              <ul className="space-y-2">
+                {tasks.map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    assigneeName={personById.get(t.assigneeId)?.name ?? '—'}
+                    absenceConflicts={getAssigneeAbsencesDuringTask(t.assigneeId, data.absences, t.startDate, t.dueDate)}
+                    onEdit={() => setTaskFormState({ open: true, mode: 'edit', task: t })}
+                    onDelete={() => setConfirmDeleteTaskId(t.id)}
+                  />
+                ))}
+              </ul>
+            </>
           )}
         </Section>
 
-        <Section title="Totali (da task)">
+        <Section title={hasTaskDetails ? 'Totali (da task)' : 'Totali (dal lavoro)'}>
           <div className="grid grid-cols-3 gap-3">
             <Stat label="Ore stimate" value={`${totals.est}h`} />
             <Stat label="Ore residue" value={`${totals.residual}h`} />
@@ -418,8 +457,8 @@ function DeleteTaskDialog({ open, taskId, onClose }: { open: boolean; taskId: st
 function Section({ title, children, right }: { title: string; children: ReactNode; right?: ReactNode }) {
   return (
     <section>
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{title}</h3>
+      <div className="mb-2.5 flex items-center justify-between gap-3">
+        <h3 className="section-label">{title}</h3>
         {right}
       </div>
       {children}
@@ -427,21 +466,38 @@ function Section({ title, children, right }: { title: string; children: ReactNod
   )
 }
 
-function Row({ label, value }: { label: string; value: ReactNode }) {
+function Row({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
-    <>
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="text-slate-200">{value}</dd>
-    </>
+    <div className="rounded-md border border-slate-800/70 bg-slate-900/30 px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
+      <div className="mt-1 text-sm text-slate-200">{value}</div>
+      {hint && <div className="mt-0.5 text-[10px] text-slate-500">{hint}</div>}
+    </div>
   )
 }
 
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-md border border-slate-800 bg-slate-900/40 p-3">
-      <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
       <div className="mt-1 text-lg font-semibold text-slate-100 tabular-nums">{value}</div>
     </div>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+    </svg>
   )
 }
 
@@ -482,28 +538,46 @@ function CustomerPartnerSection({ item }: { item: WorkItem }) {
   }
 
   return (
-    <Section title="Cliente (collegato ad anagrafica)">
-      <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-3">
+    <Section title="Cliente collegato ad anagrafica">
+      <div className="rounded-lg border border-sky-500/35 bg-sky-500/6 p-3.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400">
-              <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] capitalize text-sky-200 ring-1 ring-inset ring-sky-500/40">{partner.type}</span>
-              {partner.accountCode && <span className="font-mono">{partner.accountCode}</span>}
-              {!partner.active && <span className="rounded bg-zinc-700/40 px-1.5 py-0.5 text-[10px] text-zinc-300">disattivata</span>}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-200 ring-1 ring-inset ring-sky-500/40">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden />
+                {partner.type}
+              </span>
+              {partner.accountCode && (
+                <span className="rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] text-slate-300 ring-1 ring-inset ring-slate-700">
+                  {partner.accountCode}
+                </span>
+              )}
+              {!partner.active && (
+                <span className="rounded-full bg-zinc-700/40 px-2 py-0.5 text-[10px] text-zinc-300">disattivata</span>
+              )}
             </div>
-            <div className="mt-0.5 truncate text-sm font-semibold text-slate-100">{partner.name}</div>
+            <div className="mt-1.5 truncate text-sm font-semibold text-slate-100">{partner.name}</div>
           </div>
         </div>
-        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-          {partner.vatNumber && <Row label="P.IVA" value={<code className="text-slate-300">{partner.vatNumber}</code>} />}
-          {partner.fiscalCode && <Row label="CF" value={<code className="text-slate-300">{partner.fiscalCode}</code>} />}
-          {(partner.city || partner.province) && <Row label="Città" value={[partner.city, partner.province].filter(Boolean).join(' · ')} />}
-          {partner.email && <Row label="Email" value={partner.email} />}
-          {partner.pec && <Row label="PEC" value={partner.pec} />}
-          {partner.phone && <Row label="Telefono" value={partner.phone} />}
+        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+          {partner.vatNumber && <FieldRow label="P.IVA" value={<code className="text-slate-200">{partner.vatNumber}</code>} />}
+          {partner.fiscalCode && <FieldRow label="CF" value={<code className="text-slate-200">{partner.fiscalCode}</code>} />}
+          {(partner.city || partner.province) && <FieldRow label="Città" value={[partner.city, partner.province].filter(Boolean).join(' · ')} />}
+          {partner.email && <FieldRow label="Email" value={partner.email} />}
+          {partner.pec && <FieldRow label="PEC" value={partner.pec} />}
+          {partner.phone && <FieldRow label="Telefono" value={partner.phone} />}
         </dl>
       </div>
     </Section>
+  )
+}
+
+function FieldRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</dt>
+      <dd className="mt-0.5 text-sm text-slate-200">{value}</dd>
+    </div>
   )
 }
 
@@ -530,12 +604,12 @@ function TechnicalDetailsSection({ item }: { item: WorkItem }) {
 
   return (
     <Section title="Dettagli tecnici">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+      <div className="grid grid-cols-2 gap-3">
         {item.technicalPhase && (
           <Row
             label="Fase tecnica"
             value={
-              <span className="inline-flex items-center rounded bg-indigo-500/15 px-2 py-0.5 text-[11px] font-medium text-indigo-200 ring-1 ring-inset ring-indigo-500/30">
+              <span className="chip-sm bg-indigo-500/15 text-indigo-200 ring-indigo-500/35">
                 {item.technicalPhase}
               </span>
             }
@@ -546,7 +620,7 @@ function TechnicalDetailsSection({ item }: { item: WorkItem }) {
             label="Priorità commerciale"
             value={
               <span
-                className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium capitalize ring-1 ring-inset ${COMMERCIAL_TONE[item.commercialPriority] ?? COMMERCIAL_TONE.media}`}
+                className={`chip-sm capitalize ${COMMERCIAL_TONE[item.commercialPriority] ?? COMMERCIAL_TONE.media}`}
               >
                 {item.commercialPriority}
               </span>
@@ -555,7 +629,7 @@ function TechnicalDetailsSection({ item }: { item: WorkItem }) {
         )}
         {item.plannedProductionReleaseDate && (
           <Row
-            label="Rilascio produzione previsto"
+            label="Rilascio previsto"
             value={
               <span className={item.actualProductionReleaseDate ? 'text-slate-400 line-through' : ''}>
                 {formatItalian(item.plannedProductionReleaseDate)}
@@ -565,16 +639,16 @@ function TechnicalDetailsSection({ item }: { item: WorkItem }) {
         )}
         {item.actualProductionReleaseDate && (
           <Row
-            label="Rilascio produzione effettivo"
+            label="Rilascio effettivo"
             value={
-              <span className="font-medium text-emerald-300">
+              <span className="font-semibold text-emerald-300">
                 {formatItalian(item.actualProductionReleaseDate)}
               </span>
             }
           />
         )}
         {item.customerRequestDate && (
-          <Row label="Data richiesta cliente" value={formatItalian(item.customerRequestDate)} />
+          <Row label="Richiesta cliente" value={formatItalian(item.customerRequestDate)} />
         )}
         {item.offerReference && (
           <Row
@@ -582,7 +656,7 @@ function TechnicalDetailsSection({ item }: { item: WorkItem }) {
             value={<span className="font-mono text-[12px] text-slate-200">{item.offerReference}</span>}
           />
         )}
-      </dl>
+      </div>
 
       {item.workFolderLink && (
         <div className="mt-3">

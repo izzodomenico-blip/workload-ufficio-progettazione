@@ -5,14 +5,13 @@ import type { Absence, Person, Task, WorkItem } from '../types'
 import {
   computePlanningMatrix,
   getAbsencesForPersonInWeek,
-  getTasksForPersonInWeek,
+  getActivitiesForPersonInWeek,
   type PersonWeekCell,
   type PlanningMatrix as PlanningMatrixData,
   type PlanningWeek,
 } from '../utils/planning'
-import { hoursAssignedInWeek } from '../utils/workload'
-import type { WorkloadLevel } from '../utils/workload'
-import { getTaskHealth } from '../utils/progress'
+import type { WorkloadActivity, WorkloadLevel } from '../utils/workload'
+import { getTaskHealth, getWorkItemHealth } from '../utils/progress'
 import { formatItalianShort, todayISO } from '../utils/dates'
 import type { Status } from '../types'
 import { HealthBadge } from './HealthBadge'
@@ -38,22 +37,27 @@ export function PlanningMatrix() {
       <SummaryStrip summary={matrix.summary} count={count} />
 
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-slate-100">Pianificazione · prossime {count} settimane</h2>
-          <p className="text-xs text-slate-500">
-            Carico previsto per persona settimana per settimana. Clic su una cella per il dettaglio.
-          </p>
+        <div className="flex items-start gap-3">
+          <span className="mt-1 h-7 w-1 rounded-full bg-gradient-to-b from-violet-400 to-violet-600" aria-hidden />
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-slate-100">Pianificazione · prossime {count} settimane</h2>
+            <p className="text-[11px] text-slate-500">
+              Carico previsto per persona settimana per settimana. Clic su una cella per il dettaglio.
+            </p>
+          </div>
         </div>
-        <div className="inline-flex rounded-md border border-slate-700 bg-slate-900 p-0.5 text-xs">
+        <div className="inline-flex rounded-lg border border-slate-800 bg-[color:var(--color-surface-1)] p-0.5 text-xs">
           <button
             onClick={() => setCount(4)}
-            className={`rounded px-2.5 py-1 transition ${count === 4 ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+            aria-pressed={count === 4}
+            className={`rounded-md px-3 py-1.5 font-medium transition ${count === 4 ? 'bg-slate-700/80 text-slate-100 shadow-inner' : 'text-slate-400 hover:text-slate-200'}`}
           >
             4 sett.
           </button>
           <button
             onClick={() => setCount(8)}
-            className={`rounded px-2.5 py-1 transition ${count === 8 ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
+            aria-pressed={count === 8}
+            className={`rounded-md px-3 py-1.5 font-medium transition ${count === 8 ? 'bg-slate-700/80 text-slate-100 shadow-inner' : 'text-slate-400 hover:text-slate-200'}`}
           >
             8 sett.
           </button>
@@ -61,8 +65,16 @@ export function PlanningMatrix() {
       </div>
 
       {matrix.rows.length === 0 ? (
-        <div className="panel p-6 text-center text-sm text-slate-400">
-          Nessuna persona attiva.
+        <div className="panel p-10 text-center">
+          <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/60 ring-1 ring-inset ring-slate-700">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
+                <path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 0a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" />
+              </svg>
+            </div>
+            <div className="text-sm font-medium text-slate-300">Nessuna persona attiva</div>
+            <p className="text-[12px] text-slate-500">Aggiungi membri al team dal pulsante "Persone" in alto.</p>
+          </div>
         </div>
       ) : (
         <MatrixTable
@@ -137,11 +149,11 @@ const TONE: Record<string, { bg: string; text: string }> = {
 function SummaryTile({ label, value, tone, hint }: { label: string; value: string; tone: string; hint: string }) {
   const t = TONE[tone] ?? TONE.slate
   return (
-    <div className="panel relative overflow-hidden p-4">
+    <div className="panel group relative overflow-hidden p-4 transition hover:border-slate-700">
       <div className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b ${t.bg} to-transparent`} aria-hidden />
       <div className="relative">
-        <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
-        <div className={`mt-1.5 text-2xl font-semibold ${t.text}`}>{value}</div>
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</div>
+        <div className={`mt-1.5 text-[22px] font-semibold tracking-tight tabular-nums ${t.text}`}>{value}</div>
         <div className="mt-0.5 text-[11px] text-slate-500">{hint}</div>
       </div>
     </div>
@@ -326,7 +338,7 @@ function MatrixCell({ cell, onClick }: { cell: PersonWeekCell; onClick: () => vo
       <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px]">
         {cell.taskCount > 0 && (
           <span className="text-slate-400">
-            {cell.taskCount} {cell.taskCount === 1 ? 'task' : 'task'}
+            {cell.taskCount} {cell.taskCount === 1 ? 'attività' : 'attività'}
           </span>
         )}
         {cell.absenceHours > 0 && (
@@ -336,13 +348,13 @@ function MatrixCell({ cell, onClick }: { cell: PersonWeekCell; onClick: () => vo
           </span>
         )}
         {cell.hasTasksDuringAbsence && (
-          <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/15 px-1 py-px text-amber-200 ring-1 ring-inset ring-amber-500/30" title="Task in giorni di assenza">
+          <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/15 px-1 py-px text-amber-200 ring-1 ring-inset ring-amber-500/30" title="Attività in giorni di assenza">
             ⚠ giorni ass.
           </span>
         )}
         {criticalAbsence && (
           <span className="inline-flex items-center gap-0.5 rounded bg-red-500/15 px-1 py-px text-red-200 ring-1 ring-inset ring-red-500/40">
-            ⚠ task & assente
+            ⚠ attività & assente
           </span>
         )}
       </div>
@@ -354,15 +366,15 @@ function MatrixCell({ cell, onClick }: { cell: PersonWeekCell; onClick: () => vo
 
 function Legend() {
   const items: Array<{ level: WorkloadLevel; label: string }> = [
-    { level: 'available', label: 'Disponibile (≤60%)' },
-    { level: 'normal', label: 'Normale (≤85%)' },
-    { level: 'full', label: 'Pieno (≤100%)' },
-    { level: 'overloaded', label: 'Sovraccarico (>100%)' },
+    { level: 'available', label: 'Disponibile ≤60%' },
+    { level: 'normal', label: 'Normale ≤85%' },
+    { level: 'full', label: 'Pieno ≤100%' },
+    { level: 'overloaded', label: 'Sovraccarico >100%' },
     { level: 'absent', label: 'Assente' },
   ]
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-      <span>Legenda:</span>
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-800/70 bg-slate-900/30 px-3 py-2 text-[11px] text-slate-400">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Legenda</span>
       {items.map((i) => (
         <span key={i.level} className="inline-flex items-center gap-1.5">
           <span className={`h-2 w-2 rounded-full ${CELL_BAR[i.level]}`} aria-hidden />
@@ -404,7 +416,10 @@ function CellDetailDrawer({
     }
   }, [onClose])
 
-  const weekTasks = useMemo(() => getTasksForPersonInWeek(person, tasks, week), [person, tasks, week])
+  const weekActivities = useMemo(
+    () => getActivitiesForPersonInWeek(person, tasks, workItems, week),
+    [person, tasks, workItems, week],
+  )
   const weekAbsences = useMemo(
     () => getAbsencesForPersonInWeek(person.id, absences, week),
     [person.id, absences, week],
@@ -448,27 +463,26 @@ function CellDetailDrawer({
             <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
               <span className="font-semibold">Attenzione:</span>{' '}
               {cell.isFullyAbsent && cell.assignedHours > 0
-                ? `${person.name} risulta assente tutta la settimana ma ha ${cell.assignedHours}h di task pianificate.`
-                : 'Ci sono task pianificati in giorni di assenza dell’assegnatario.'}
+                ? `${person.name} risulta assente tutta la settimana ma ha ${cell.assignedHours}h di attività pianificate.`
+                : 'Ci sono attività pianificate in giorni di assenza dell’assegnatario.'}
             </div>
           )}
 
           <section className="mt-5">
             <SectionLabel>
-              Task della settimana · <span className="text-slate-500 font-normal">{weekTasks.length}</span>
+              Attività della settimana · <span className="text-slate-500 font-normal">{weekActivities.length}</span>
             </SectionLabel>
-            {weekTasks.length === 0 ? (
-              <div className="mt-2 rounded-md border border-dashed border-slate-700 px-3 py-3 text-center text-[12px] text-slate-500">
-                Nessun task attivo in questa settimana.
+            {weekActivities.length === 0 ? (
+              <div className="mt-2 rounded-md border border-dashed border-slate-700/70 bg-slate-900/30 px-3 py-4 text-center text-[12px] text-slate-500">
+                Nessuna attività attiva in questa settimana.
               </div>
             ) : (
               <ul className="mt-2 space-y-2">
-                {weekTasks.map((t) => (
-                  <TaskRow
-                    key={t.id}
-                    task={t}
-                    workItem={workItemById.get(t.workItemId)}
-                    week={week}
+                {weekActivities.map((activity) => (
+                  <ActivityRow
+                    key={`${activity.kind}-${activity.id}`}
+                    activity={activity}
+                    workItem={activity.workItem ?? workItemById.get(activity.workItemId)}
                     today={today}
                   />
                 ))}
@@ -584,37 +598,47 @@ function DetailSummary({ cell }: { cell: PersonWeekCell }) {
   )
 }
 
-function TaskRow({
-  task,
+function ActivityRow({
+  activity,
   workItem,
-  week,
   today,
 }: {
-  task: Task
+  activity: WorkloadActivity
   workItem: WorkItem | undefined
-  week: PlanningWeek
   today: string
 }) {
-  const remainingInWeek = useMemo(
-    () => Math.round(hoursAssignedInWeek(task, week.weekStart, week.weekEnd) * 10) / 10,
-    [task, week],
+  const health = useMemo(
+    () =>
+      activity.kind === 'task' && activity.task
+        ? getTaskHealth(activity.task, today)
+        : workItem
+          ? getWorkItemHealth(workItem, [], today)
+          : 'ok',
+    [activity, today, workItem],
   )
-  const health = useMemo(() => getTaskHealth(task, today), [task, today])
+  const kindLabel = activity.kind === 'task' ? 'Task' : 'Lavoro'
   return (
     <li className="rounded-md border border-slate-800 bg-slate-900/40 p-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-center gap-2">
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${
+              activity.kind === 'task'
+                ? 'bg-sky-500/10 text-sky-300 ring-sky-500/30'
+                : 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30'
+            }`}>
+              {kindLabel}
+            </span>
             {workItem?.code && (
               <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
                 {workItem.code}
               </span>
             )}
-            <div className="truncate text-sm font-medium text-slate-100">{task.title}</div>
+            <div className="truncate text-sm font-medium text-slate-100">{activity.title}</div>
           </div>
           {workItem && (
             <div className="mt-0.5 truncate text-[11px] text-slate-400">
-              {workItem.title}
+              {activity.kind === 'task' ? workItem.title : 'Lavoro senza task'}
               {workItem.customer && <> · <span className="text-slate-500">{workItem.customer}</span></>}
             </div>
           )}
@@ -624,15 +648,15 @@ function TaskRow({
         </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
-        <StatusChip status={task.status} />
+        <StatusChip status={activity.status} />
         <span>
-          <span className="text-slate-500">Inizio:</span> <span className="text-slate-300">{formatItalianShort(task.startDate)}</span>
+          <span className="text-slate-500">Inizio:</span> <span className="text-slate-300">{formatItalianShort(activity.startDate)}</span>
         </span>
         <span>
-          <span className="text-slate-500">Scad:</span> <span className="text-slate-300">{formatItalianShort(task.dueDate)}</span>
+          <span className="text-slate-500">Scad:</span> <span className="text-slate-300">{formatItalianShort(activity.dueDate)}</span>
         </span>
         <span className="ml-auto tabular-nums">
-          <span className="text-slate-500">In settimana:</span> <span className="text-slate-200">{remainingInWeek}h</span>
+          <span className="text-slate-500">In settimana:</span> <span className="text-slate-200">{activity.hoursInWeek}h</span>
         </span>
       </div>
     </li>

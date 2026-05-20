@@ -137,7 +137,7 @@ export function getCurrentWeekReportData(data: AppData, today: Date = new Date()
   // === workload per person (only active people)
   const activePeople = data.people.filter((p) => p.active)
   const workload: PersonWorkloadReport[] = activePeople.map((p) => {
-    const w = computeWorkload(p, data.tasks, data.absences, today)
+    const w = computeWorkload(p, data.tasks, data.absences, today, data.workItems)
     return {
       person: p,
       capacity: w.capacityHours,
@@ -232,11 +232,18 @@ export function getCurrentWeekReportData(data: AppData, today: Date = new Date()
       criticalIssues.push(`${pl.person.name} è in sovraccarico (${pl.loadPercent}%) per la settimana corrente.`)
     }
     if (pl.level === 'absent' && pl.weekHours > 0) {
-      criticalIssues.push(`${pl.person.name} è assente tutta la settimana ma ha ${pl.weekHours}h di task assegnate.`)
+      criticalIssues.push(`${pl.person.name} è assente tutta la settimana ma ha ${pl.weekHours}h di attività assegnate.`)
     }
     if (pl.level !== 'absent' && pl.absenceHours > 0 && pl.realCapacity < pl.capacity / 2) {
       criticalIssues.push(`${pl.person.name} ha capacità reale ridotta (${pl.realCapacity} h su ${pl.capacity} h teoriche) per assenze.`)
     }
+  }
+  for (const w of workItemsLate) {
+    criticalIssues.push(`Lavoro "${w.code || w.title}" (${w.customer || 'cliente n/d'}) in ritardo.`)
+  }
+  for (const w of workItemsRisk) {
+    const expected = calculateExpectedProgress(w.startDate, w.dueDate, todayISO)
+    criticalIssues.push(`Lavoro "${w.code || w.title}" (${w.customer || 'cliente n/d'}) a rischio: avanzamento ${w.progressPercent}% vs atteso ${expected}%.`)
   }
   for (const tr of tasksLate) {
     const a = personById.get(tr.task.assigneeId)?.name ?? '—'
@@ -255,14 +262,6 @@ export function getCurrentWeekReportData(data: AppData, today: Date = new Date()
     if (conflicts.length > 0) {
       const a = personById.get(t.assigneeId)?.name ?? '—'
       criticalIssues.push(`Task "${t.title}" (${a}) interseca un’assenza dell’assegnatario.`)
-    }
-  }
-  // Work item aperti senza task
-  for (const w of data.workItems) {
-    if (!isOpen(w.status)) continue
-    const tasks = itemTasksMap.get(w.id) ?? []
-    if (tasks.length === 0) {
-      criticalIssues.push(`Lavoro "${w.code || w.title}" (${w.customer || 'cliente n/d'}) è aperto ma non ha task collegati.`)
     }
   }
   // Studi vicini a scadenza (entro 7 gg)
@@ -395,7 +394,7 @@ export function formatReportMarkdown(
       push(`- Capacità reale: **${wl.realCapacity} h**`)
       push(`- Ore assegnate: **${wl.weekHours} h**`)
       push(`- Carico: **${wl.loadPercent}%** (${LEVEL_LABEL[wl.level]})`)
-      if (wl.hasTasksDuringAbsence) push('- ⚠ Ha task pianificati in giorni di assenza')
+      if (wl.hasTasksDuringAbsence) push('- ⚠ Ha attività pianificate in giorni di assenza')
       push()
     }
   }

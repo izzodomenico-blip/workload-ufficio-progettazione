@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Absence, AppData, BusinessPartner, Person, Status } from '../types'
+import type { Absence, AppData, BusinessPartner, MachineType, Person, Status } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
 import { fetchAppData, saveAppData as saveAppDataToApi } from '../services/apiClient'
@@ -62,11 +62,26 @@ import type {
   LinkSelection,
   UpdateBusinessPartnerInput,
 } from '../services/businessPartnersService'
+import {
+  createMachineType as svcCreateMachineType,
+  setMachineTypeActive as svcSetMachineTypeActive,
+  updateMachineType as svcUpdateMachineType,
+} from '../services/machineTypesService'
+import type {
+  CreateMachineTypeInput,
+  UpdateMachineTypeInput,
+} from '../services/machineTypesService'
+
+interface UpdatePeopleOptions {
+  /** Password admin per autorizzare modifiche a baselineLoadPercent */
+  adminPassword?: string
+}
 
 interface DataContextValue {
   data: AppData
   absences: Absence[]
   businessPartners: BusinessPartner[]
+  machineTypes: MachineType[]
   // workItems
   createWorkItem: (input: CreateWorkItemInput) => string
   updateWorkItem: (id: string, patch: UpdateWorkItemInput) => void
@@ -79,8 +94,8 @@ interface DataContextValue {
   deleteTask: (id: string) => void
   setTaskStatus: (id: string, status: Status) => void
   // people
-  updatePerson: (id: string, patch: UpdatePersonInput) => void
-  updatePeople: (people: Person[]) => void
+  updatePerson: (id: string, patch: UpdatePersonInput, options?: UpdatePeopleOptions) => void
+  updatePeople: (people: Person[], options?: UpdatePeopleOptions) => void
   // absences
   createAbsence: (input: CreateAbsenceInput) => string
   updateAbsence: (id: string, patch: UpdateAbsenceInput) => void
@@ -94,10 +109,13 @@ interface DataContextValue {
   applyBusinessPartnerImport: (plan: ImportPlan) => ImportResult
   planCustomerLinking: () => LinkPlan
   applyCustomerLinking: (selections: LinkSelection[]) => LinkApplyResult
-  // import/export/reset
+  // machine types
+  createMachineType: (input: CreateMachineTypeInput) => string
+  updateMachineType: (id: string, patch: UpdateMachineTypeInput) => void
+  setMachineTypeActive: (id: string, active: boolean) => void
+  // import/export
   importData: (next: AppData, options?: ImportDataOptions) => void
   exportData: () => BackupExportResult
-  resetData: () => void
   // notifications
   markNotificationAsRead: (id: string) => void
   markAllNotificationsAsRead: () => void
@@ -119,6 +137,7 @@ interface BackupExportResult {
 interface CommitOptions {
   risky?: boolean
   reason?: string
+  adminPassword?: string
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -153,10 +172,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [toast])
 
   const commitData = useCallback((next: AppData, options: CommitOptions = {}) => {
+    const previous = dataRef.current
     dataRef.current = next
     setData(next)
     saveToStorage(next)
     void saveAppDataToApi(next, options).catch((err) => {
+      // Rollback dello stato locale se il backend rifiuta (es. password mancante)
+      dataRef.current = previous
+      setData(previous)
+      saveToStorage(previous)
       console.error('Salvataggio su database fallito', err)
       toast.error(`Salvataggio database fallito: ${err instanceof Error ? err.message : 'errore sconosciuto'}`)
     })
@@ -202,12 +226,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     commitData(svcSetTaskStatus(dataRef.current, id, status))
   }, [commitData])
 
-  const updatePerson = useCallback((id: string, patch: UpdatePersonInput) => {
-    commitData(svcUpdatePerson(dataRef.current, id, patch))
+  const updatePerson = useCallback((id: string, patch: UpdatePersonInput, options?: UpdatePeopleOptions) => {
+    commitData(svcUpdatePerson(dataRef.current, id, patch), { adminPassword: options?.adminPassword })
   }, [commitData])
 
-  const updatePeople = useCallback((nextPeople: Person[]) => {
-    commitData(svcUpdatePeople(dataRef.current, nextPeople))
+  const updatePeople = useCallback((nextPeople: Person[], options?: UpdatePeopleOptions) => {
+    commitData(svcUpdatePeople(dataRef.current, nextPeople), { adminPassword: options?.adminPassword })
   }, [commitData])
 
   const createAbsence = useCallback((input: CreateAbsenceInput): string => {
@@ -359,6 +383,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return result
   }, [commitData])
 
+  const createMachineType = useCallback((input: CreateMachineTypeInput): string => {
+    const result = svcCreateMachineType(dataRef.current, input)
+    commitData(result.data)
+    return result.id
+  }, [commitData])
+
+  const updateMachineType = useCallback((id: string, patch: UpdateMachineTypeInput) => {
+    commitData(svcUpdateMachineType(dataRef.current, id, patch))
+  }, [commitData])
+
+  const setMachineTypeActive = useCallback((id: string, active: boolean) => {
+    commitData(svcSetMachineTypeActive(dataRef.current, id, active))
+  }, [commitData])
+
   const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
     const description = [
       `${next.workItems.length} lavori`,
@@ -366,6 +404,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       `${next.absences.length} assenze`,
       `${next.activityLog.length} eventi storico`,
       `${next.notifications.length} notifiche`,
+      `${next.machineTypes.length} tipologie disegno`,
       options.fileName ? `file: ${options.fileName}` : '',
       options.exportedAt ? `esportato: ${options.exportedAt}` : '',
       options.version ? `versione: ${options.version}` : '',
@@ -396,29 +435,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         entityId: 'backup',
         action: 'exported',
         title: 'Backup JSON esportato',
-        description: `${dataRef.current.people.length} persone - ${dataRef.current.workItems.length} lavori - ${dataRef.current.tasks.length} task - file: ${filename}`,
+        description: `${dataRef.current.people.length} persone - ${dataRef.current.workItems.length} lavori - ${dataRef.current.tasks.length} task - ${dataRef.current.machineTypes.length} tipologie disegno - file: ${filename}`,
       }, exportedAtDate),
     )
     const exportedAt = setLastBackupAt(exportedAtDate)
     downloadJSON(createBackupPayload(nextData, exportedAtDate), filename)
     commitData(nextData, { reason: 'export-json-activity-log' })
     return { exportedAt, filename }
-  }, [commitData])
-
-  const resetData = useCallback(() => {
-    commitData(
-      appendActivityLog(
-        freshDemoData(),
-        createActivityLogEntry({
-          entityType: 'system',
-          entityId: 'reset',
-          action: 'reset',
-          title: 'Reset dati demo',
-          description: 'Tutti i dati sono stati ripristinati ai valori demo iniziali',
-        }),
-      ),
-      { risky: true, reason: 'reset-demo' },
-    )
   }, [commitData])
 
   const markNotificationAsRead = useCallback((id: string) => {
@@ -441,6 +464,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     data,
     absences: data.absences,
     businessPartners: data.businessPartners,
+    machineTypes: data.machineTypes,
     createWorkItem,
     updateWorkItem,
     deleteWorkItem,
@@ -463,9 +487,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     applyBusinessPartnerImport,
     planCustomerLinking,
     applyCustomerLinking,
+    createMachineType,
+    updateMachineType,
+    setMachineTypeActive,
     importData,
     exportData,
-    resetData,
     markNotificationAsRead,
     markAllNotificationsAsRead,
     clearReadNotifications,
@@ -479,7 +505,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createBusinessPartner, updateBusinessPartner, setBusinessPartnerActive, deleteBusinessPartner,
     planBusinessPartnerImport, applyBusinessPartnerImport,
     planCustomerLinking, applyCustomerLinking,
-    importData, exportData, resetData,
+    createMachineType, updateMachineType, setMachineTypeActive,
+    importData, exportData,
     markNotificationAsRead, markAllNotificationsAsRead,
     clearReadNotifications, clearAllNotifications,
   ])

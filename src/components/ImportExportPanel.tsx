@@ -10,7 +10,6 @@ import type { BackupSummary } from '../utils/backup'
 import { getLastBackupAt, validateBackupPayload } from '../utils/backup'
 import { generateWeeklyAdminReport } from '../utils/weeklyReport'
 import { ImportPreviewModal } from './ImportPreviewModal'
-import { ResetDemoConfirmModal } from './ResetDemoConfirmModal'
 import { WeeklyReportModal } from './WeeklyReportModal'
 
 interface PendingImport {
@@ -20,12 +19,11 @@ interface PendingImport {
 }
 
 export function ImportExportPanel() {
-  const { data, exportData, importData, resetData } = useData()
+  const { data, exportData, importData } = useData()
   const toast = useToast()
   const inputRef = useRef<HTMLInputElement | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
-  const [confirmReset, setConfirmReset] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null)
   const [lastBackupAt, setLastBackupAtState] = useState<string | null>(() => getLastBackupAt())
@@ -97,18 +95,6 @@ export function ImportExportPanel() {
     toast.success('Backup JSON importato.')
   }
 
-  function handleReset() {
-    resetData()
-    setConfirmReset(false)
-    toast.info('Dati demo ripristinati.')
-  }
-
-  function handleBackupBeforeReset() {
-    const result = exportData()
-    setLastBackupAtState(result.exportedAt)
-    toast.success(`Backup JSON scaricato: ${result.filename}`)
-  }
-
   function handleReport() {
     try {
       const md = generateWeeklyAdminReport(data)
@@ -143,7 +129,7 @@ export function ImportExportPanel() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-40 mt-1 w-80 overflow-hidden rounded-lg border border-slate-700 bg-[color:var(--color-panel)] shadow-2xl"
+          className="absolute right-0 top-full z-40 mt-2 w-80 overflow-hidden rounded-xl border border-slate-700/80 bg-[color:var(--color-panel)] shadow-2xl"
         >
           <SectionLabel>Backup dati</SectionLabel>
           {reminder && <BackupReminderBox reminder={reminder} />}
@@ -156,12 +142,6 @@ export function ImportExportPanel() {
           <ServerBackupStatusBox status={serverBackupStatus} />
           <MenuItem onClick={handlePickFile} icon={<Icon path="M12 21V9m0 0-4 4m4-4 4 4M5 3h14" />}>
             Importa backup JSON
-          </MenuItem>
-          <MenuItem
-            onClick={() => { setConfirmReset(true); setOpen(false) }}
-            icon={<Icon path="M4 4v6h6M20 20v-6h-6M5 19a9 9 0 0 0 14-5M19 5a9 9 0 0 0-14 5" />}
-          >
-            Reset demo protetto
           </MenuItem>
 
           <div className="my-1 border-t border-slate-800" />
@@ -192,14 +172,6 @@ export function ImportExportPanel() {
         onCancel={() => setPendingImport(null)}
       />
 
-      <ResetDemoConfirmModal
-        open={confirmReset}
-        lastBackupAt={lastBackupAt}
-        onDownloadBackup={handleBackupBeforeReset}
-        onConfirm={handleReset}
-        onCancel={() => setConfirmReset(false)}
-      />
-
       <WeeklyReportModal open={previewOpen} onClose={() => setPreviewOpen(false)} />
     </div>
   )
@@ -218,9 +190,9 @@ function MenuItem({ onClick, icon, children }: { onClick: () => void; icon: Reac
     <button
       onClick={onClick}
       role="menuitem"
-      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-200 transition hover:bg-slate-800/70"
+      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-slate-200 transition hover:bg-slate-800/70 focus:outline-none focus-visible:bg-slate-800/70"
     >
-      <span className="text-slate-400">{icon}</span>
+      <span className="text-slate-400 transition group-hover:text-slate-200">{icon}</span>
       <span className="flex-1">{children}</span>
     </button>
   )

@@ -59,19 +59,22 @@ export function ActivityLogView() {
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-slate-100">Storico modifiche</h2>
-          <p className="text-xs text-slate-500">
-            Eventi locali tracciati su questa postazione. Limite: ultimi {ACTIVITY_LIMIT_LABEL} eventi.
-            {' · '}
-            <span className="text-slate-400">{log.length} totali</span>
-            {filtered.length !== log.length && (
-              <>
-                {' · '}
-                <span className="text-sky-300">{filtered.length} dopo filtri</span>
-              </>
-            )}
-          </p>
+        <div className="flex items-start gap-3">
+          <span className="mt-1 h-7 w-1 rounded-full bg-gradient-to-b from-amber-400 to-amber-600" aria-hidden />
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-slate-100">Storico modifiche</h2>
+            <p className="text-[11px] text-slate-500">
+              Eventi locali tracciati sul database condiviso · ultimi {ACTIVITY_LIMIT_LABEL} eventi
+              {' · '}
+              <span className="text-slate-400">{log.length} totali</span>
+              {filtered.length !== log.length && (
+                <>
+                  {' · '}
+                  <span className="text-sky-300">{filtered.length} dopo filtri</span>
+                </>
+              )}
+            </p>
+          </div>
         </div>
         {(filters.entityType !== '' ||
           filters.action !== '' ||
@@ -86,10 +89,22 @@ export function ActivityLogView() {
       <FiltersBar filters={filters} onChange={setFilters} />
 
       {grouped.length === 0 ? (
-        <div className="panel p-8 text-center text-sm text-slate-400">
-          {log.length === 0
-            ? 'Nessun evento ancora registrato. Le prossime modifiche compariranno qui.'
-            : 'Nessun evento corrisponde ai filtri.'}
+        <div className="panel p-10 text-center">
+          <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/60 ring-1 ring-inset ring-slate-700">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
+                <path d="M3 3v18h18" /><path d="M7 13l3-3 3 3 5-5" />
+              </svg>
+            </div>
+            <div className="text-sm font-medium text-slate-300">
+              {log.length === 0 ? 'Nessun evento ancora registrato' : 'Nessun evento corrisponde ai filtri'}
+            </div>
+            <p className="text-[12px] text-slate-500">
+              {log.length === 0
+                ? 'Le prossime modifiche compariranno qui automaticamente.'
+                : 'Modifica i filtri o esegui un reset per allargare i risultati.'}
+            </p>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -163,6 +178,7 @@ const ENTITY_LABEL: Record<ActivityLogEntityType, string> = {
   task: 'Task',
   person: 'Persone',
   absence: 'Assenze',
+  machineType: 'Tipologie disegno',
   system: 'Sistema',
 }
 
@@ -219,8 +235,11 @@ function fmtDay(iso: string): string {
 function DayGroup({ dayISO, entries }: { dayISO: string; entries: ActivityLogEntry[] }) {
   return (
     <section className="panel overflow-hidden">
-      <header className="border-b border-slate-800 bg-slate-900/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-        {fmtDay(dayISO)} <span className="ml-1 font-normal normal-case tracking-normal text-slate-500">· {entries.length} evento{entries.length === 1 ? '' : 'i'}</span>
+      <header className="flex items-center justify-between border-b border-slate-800 bg-[color:var(--color-surface-1)]/60 px-3 py-2">
+        <span className="section-label">{fmtDay(dayISO)}</span>
+        <span className="rounded-full bg-slate-800/60 px-2 py-0.5 text-[10px] tabular-nums text-slate-400 ring-1 ring-inset ring-slate-700/60">
+          {entries.length} evento{entries.length === 1 ? '' : 'i'}
+        </span>
       </header>
       <ul className="divide-y divide-slate-800/60">
         {entries.map((e) => (
@@ -250,6 +269,7 @@ const ENTITY_DOT: Record<ActivityLogEntityType, string> = {
   task: 'bg-emerald-400',
   person: 'bg-violet-400',
   absence: 'bg-amber-400',
+  machineType: 'bg-cyan-400',
   system: 'bg-slate-400',
 }
 
@@ -260,16 +280,16 @@ function fmtTime(iso: string): string {
 
 function EntryRow({ entry }: { entry: ActivityLogEntry }) {
   return (
-    <li className="grid grid-cols-[58px_auto_1fr] items-start gap-3 px-3 py-2.5">
+    <li className="grid grid-cols-[58px_auto_1fr] items-start gap-3 px-3 py-2.5 transition hover:bg-slate-800/30">
       <div className="text-[11px] tabular-nums text-slate-500">{fmtTime(entry.timestamp)}</div>
       <div className="flex items-center gap-1.5">
         <span className={`h-2 w-2 rounded-full ${ENTITY_DOT[entry.entityType]}`} aria-hidden />
         <span
-          className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${ACTION_TONE[entry.action]}`}
+          className={`inline-flex items-center rounded-full px-2 py-[2px] text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${ACTION_TONE[entry.action]}`}
         >
           {ACTION_LABEL[entry.action]}
         </span>
-        <span className="text-[10px] uppercase tracking-wide text-slate-500">{ENTITY_LABEL[entry.entityType]}</span>
+        <span className="text-[10px] uppercase tracking-[0.12em] text-slate-500">{ENTITY_LABEL[entry.entityType]}</span>
       </div>
       <div className="min-w-0">
         <div className="text-sm font-medium text-slate-100">{entry.title}</div>

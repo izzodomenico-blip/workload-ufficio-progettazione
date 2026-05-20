@@ -47,6 +47,12 @@ export interface Person {
   skills: string[]
   active: boolean
   notes?: string
+  /**
+   * Carico base non dichiarato come task/lavoro (es. supervisione, riunioni tecniche,
+   * gestione clienti). Espresso in % della capacità reale settimanale (0–100).
+   * Si scala proporzionalmente alle assenze. Campo protetto da password lato backend.
+   */
+  baselineLoadPercent?: number
 }
 
 export interface WorkItem {
@@ -124,7 +130,7 @@ export type ActivityLogAction =
   | 'imported'
   | 'reset'
 
-export type ActivityLogEntityType = 'workItem' | 'task' | 'person' | 'absence' | 'system'
+export type ActivityLogEntityType = 'workItem' | 'task' | 'person' | 'absence' | 'machineType' | 'system'
 
 export interface ActivityLogEntry {
   id: string
@@ -155,6 +161,7 @@ export const ALL_ACTIVITY_ENTITY_TYPES: ActivityLogEntityType[] = [
   'task',
   'person',
   'absence',
+  'machineType',
   'system',
 ]
 
@@ -224,6 +231,48 @@ export interface BusinessPartner {
   updatedAt: string
 }
 
+// === Libreria Registro Disegni / tipologie macchina ===
+
+export type MachineComplexity = 'bassa' | 'media' | 'alta' | 'speciale'
+
+export const ALL_MACHINE_COMPLEXITIES: MachineComplexity[] = ['bassa', 'media', 'alta', 'speciale']
+
+export const MACHINE_TYPE_FAMILIES = [
+  'Rulliere',
+  'Trasportatori',
+  'Tendostrutture / Strutture',
+  'Manipolazione',
+  'Sollevamento',
+  'Ripari / Sicurezza',
+  'Standard',
+  'Attrezzature',
+  'Impianti',
+  'Generico',
+] as const
+
+export interface MachineType {
+  id: string
+  code: string
+  name: string
+  family: string
+  description: string
+  defaultImpactWeight: number
+  defaultComplexity: MachineComplexity
+  defaultRequiresLaser: boolean
+  defaultRequiresTubeLaser: boolean
+  defaultRequiresBending: boolean
+  defaultRequiresWelding: boolean
+  defaultRequiresAssembly: boolean
+  defaultRequiresPainting: boolean
+  defaultRequiresTesting: boolean
+  typicalAssemblyCount: number
+  typicalPartCount: number
+  active: boolean
+  notes: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AppData {
   people: Person[]
   workItems: WorkItem[]
@@ -232,6 +281,7 @@ export interface AppData {
   activityLog: ActivityLogEntry[]
   notifications: Notification[]
   businessPartners: BusinessPartner[]
+  machineTypes: MachineType[]
 }
 
 export interface Filters {

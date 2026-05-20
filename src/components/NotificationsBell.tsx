@@ -42,7 +42,7 @@ export function NotificationsBell() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="relative inline-flex items-center justify-center rounded-md border border-slate-700 px-2.5 py-1.5 text-slate-200 transition hover:bg-slate-800"
+        className="relative inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 transition hover:bg-slate-800/70 hover:text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
         title={
           unread > 0
             ? `${unread} notifich${unread === 1 ? 'a' : 'e'} non lett${unread === 1 ? 'a' : 'e'}`
@@ -54,7 +54,7 @@ export function NotificationsBell() {
       >
         <BellIcon />
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-[color:var(--color-bg)]">
+          <span className="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--color-bg)]">
             {unread > 99 ? '99+' : unread}
           </span>
         )}
@@ -64,14 +64,14 @@ export function NotificationsBell() {
         <div
           role="dialog"
           aria-label="Centro notifiche"
-          className="absolute right-0 top-full z-50 mt-2 flex max-h-[80vh] w-[380px] flex-col overflow-hidden rounded-lg border border-slate-700 bg-[color:var(--color-panel)] shadow-2xl"
+          className="absolute right-0 top-full z-50 mt-2 flex max-h-[80vh] w-[400px] flex-col overflow-hidden rounded-xl border border-slate-700/80 bg-[color:var(--color-panel)] shadow-2xl"
         >
-          <header className="flex items-start justify-between gap-3 border-b border-slate-800 px-4 py-3">
+          <header className="flex items-start justify-between gap-3 border-b border-slate-800 bg-gradient-to-b from-slate-900/40 to-transparent px-4 py-3.5">
             <div>
-              <div className="text-sm font-semibold text-slate-100">Notifiche</div>
+              <div className="text-sm font-semibold tracking-tight text-slate-100">Notifiche</div>
               <div className="text-[11px] text-slate-500">
                 {myNotifications.length === 0
-                  ? 'Nessuna notifica.'
+                  ? 'Nessuna notifica'
                   : `${myNotifications.length} total${myNotifications.length === 1 ? 'e' : 'i'} · ${unread} non lett${unread === 1 ? 'a' : 'e'}`}
               </div>
             </div>
@@ -108,10 +108,15 @@ export function NotificationsBell() {
 
           <div className="flex-1 overflow-y-auto scroll-thin">
             {myNotifications.length === 0 ? (
-              <div className="px-4 py-8 text-center text-[12px] text-slate-500">
-                Nessuna notifica.
-                <div className="mt-1 text-[11px] text-slate-600">
-                  Compariranno qui quando cambierà lo stato di un lavoro o di un task.
+              <div className="flex flex-col items-center px-4 py-10 text-center">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/60 ring-1 ring-inset ring-slate-700">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                  </svg>
+                </div>
+                <div className="text-sm font-medium text-slate-300">Tutto in ordine</div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  Le notifiche compariranno qui ai cambi di stato dei lavori o dei task.
                 </div>
               </div>
             ) : (

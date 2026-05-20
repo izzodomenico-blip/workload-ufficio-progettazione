@@ -14,9 +14,26 @@ import { PlanningMatrix } from './PlanningMatrix'
 import { PersonAgendaView } from './PersonAgendaView'
 import { ActivityLogView } from './ActivityLogView'
 import { BusinessPartnersView } from './BusinessPartnersView'
+import { MachineTypesLibraryView } from './MachineTypesLibraryView'
 
 type ViewMode = 'table' | 'kanban'
-type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche'
+type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche' | 'disegni'
+
+interface TabDef {
+  id: MainTab
+  label: string
+  icon: string
+  hint: string
+}
+
+const TABS: TabDef[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'M3 12h4l3-9 4 18 3-9h4', hint: 'Carico settimana e lavori aperti' },
+  { id: 'planning', label: 'Pianificazione', icon: 'M3 5h18M3 12h18M3 19h18', hint: 'Matrice carico 4–8 settimane' },
+  { id: 'agenda', label: 'Agenda persone', icon: 'M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z', hint: 'Vista singola persona' },
+  { id: 'anagrafiche', label: 'Anagrafiche', icon: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', hint: 'Clienti, fornitori, personale' },
+  { id: 'disegni', label: 'Libreria disegni', icon: 'M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v17.5A2.5 2.5 0 0 1 17.5 22H6.5A2.5 2.5 0 0 1 4 19.5ZM8 6h8M8 10h8M8 14h5', hint: 'Registro disegni e tipologie macchina' },
+  { id: 'log', label: 'Storico', icon: 'M3 3v18h18M7 13l3-3 3 3 5-5', hint: 'Cronologia modifiche' },
+]
 
 export function Dashboard() {
   const { data } = useData()
@@ -59,54 +76,30 @@ export function Dashboard() {
   }, [data.workItems, filters])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div
+        <nav
           role="tablist"
           aria-label="Sezione principale"
-          className="inline-flex rounded-lg border border-slate-700 bg-slate-900 p-0.5 text-sm"
+          className="tabs-track overflow-x-auto scroll-thin"
         >
-          <button
-            role="tab"
-            aria-selected={tab === 'dashboard'}
-            onClick={() => setTab('dashboard')}
-            className={`rounded-md px-3 py-1.5 font-medium transition ${tab === 'dashboard' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            Dashboard
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === 'planning'}
-            onClick={() => setTab('planning')}
-            className={`rounded-md px-3 py-1.5 font-medium transition ${tab === 'planning' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            Pianificazione
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === 'agenda'}
-            onClick={() => setTab('agenda')}
-            className={`rounded-md px-3 py-1.5 font-medium transition ${tab === 'agenda' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            Agenda persone
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === 'log'}
-            onClick={() => setTab('log')}
-            className={`rounded-md px-3 py-1.5 font-medium transition ${tab === 'log' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            Storico
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === 'anagrafiche'}
-            onClick={() => setTab('anagrafiche')}
-            className={`rounded-md px-3 py-1.5 font-medium transition ${tab === 'anagrafiche' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            Anagrafiche
-          </button>
-        </div>
+          {TABS.map((t) => {
+            const active = tab === t.id
+            return (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(t.id)}
+                title={t.hint}
+                className={`tab-item ${active ? 'tab-item-active' : 'hover:text-slate-200 hover:bg-slate-800/40'}`}
+              >
+                <TabIcon path={t.icon} />
+                {t.label}
+              </button>
+            )
+          })}
+        </nav>
         <ImportExportPanel />
       </div>
 
@@ -116,15 +109,17 @@ export function Dashboard() {
 
           <section>
             <SectionHeader
+              accent="sky"
               title="Workload per persona"
-              subtitle="Carico settimana corrente, capacità e principali task"
+              subtitle="Carico settimana corrente · calcolato sulle ore residue"
             />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {data.people.filter((p) => p.active).map((p) => (
                 <WorkloadPersonCard
                   key={p.id}
                   person={p}
                   tasks={data.tasks}
+                  workItems={data.workItems}
                   absences={data.absences}
                   onTaskClick={(workItemId) => setSelectedId(workItemId)}
                   onPersonClick={jumpToAgenda}
@@ -135,18 +130,25 @@ export function Dashboard() {
 
           <section className="space-y-3">
             <SectionHeader
+              accent="violet"
               title="Lavori"
-              subtitle="Tabella e Kanban filtrabili"
+              subtitle="Tabella e kanban filtrabili — clic su una riga per il dettaglio"
               right={
-                <div className="inline-flex rounded-md border border-slate-700 bg-slate-900 p-0.5 text-xs">
+                <div className="inline-flex rounded-lg border border-slate-800 bg-[color:var(--color-surface-1)] p-0.5 text-xs">
                   <button
                     onClick={() => setView('table')}
-                    className={`rounded px-2.5 py-1 transition ${view === 'table' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
-                  >Tabella</button>
+                    aria-pressed={view === 'table'}
+                    className={`rounded-md px-3 py-1.5 font-medium transition ${view === 'table' ? 'bg-slate-700/80 text-slate-100 shadow-inner' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    Tabella
+                  </button>
                   <button
                     onClick={() => setView('kanban')}
-                    className={`rounded px-2.5 py-1 transition ${view === 'kanban' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
-                  >Kanban</button>
+                    aria-pressed={view === 'kanban'}
+                    className={`rounded-md px-3 py-1.5 font-medium transition ${view === 'kanban' ? 'bg-slate-700/80 text-slate-100 shadow-inner' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    Kanban
+                  </button>
                 </div>
               }
             />
@@ -170,6 +172,8 @@ export function Dashboard() {
         <BusinessPartnersView
           onWorkItemClick={(id) => { setSelectedId(id); setTab('dashboard') }}
         />
+      ) : tab === 'disegni' ? (
+        <MachineTypesLibraryView />
       ) : (
         <ActivityLogView />
       )}
@@ -177,12 +181,36 @@ export function Dashboard() {
   )
 }
 
-function SectionHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
+function TabIcon({ path }: { path: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={path} />
+    </svg>
+  )
+}
+
+type Accent = 'sky' | 'violet' | 'emerald' | 'amber'
+const ACCENT_BAR: Record<Accent, string> = {
+  sky: 'bg-gradient-to-b from-sky-400 to-sky-600',
+  violet: 'bg-gradient-to-b from-violet-400 to-violet-600',
+  emerald: 'bg-gradient-to-b from-emerald-400 to-emerald-600',
+  amber: 'bg-gradient-to-b from-amber-400 to-amber-600',
+}
+
+function SectionHeader({
+  title,
+  subtitle,
+  right,
+  accent = 'sky',
+}: { title: string; subtitle?: string; right?: ReactNode; accent?: Accent }) {
   return (
     <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h2 className="text-base font-semibold text-slate-100">{title}</h2>
-        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+      <div className="flex items-start gap-3">
+        <span className={`mt-1 h-7 w-1 rounded-full ${ACCENT_BAR[accent]}`} aria-hidden />
+        <div>
+          <h2 className="text-base font-semibold tracking-tight text-slate-100">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-[11px] text-slate-500">{subtitle}</p>}
+        </div>
       </div>
       {right}
     </div>

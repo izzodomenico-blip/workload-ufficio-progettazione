@@ -20,9 +20,15 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null)
 
 const KIND_CLASS: Record<ToastKind, string> = {
-  success: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
-  error: 'border-red-500/40 bg-red-500/10 text-red-200',
-  info: 'border-sky-500/40 bg-sky-500/10 text-sky-200',
+  success: 'border-emerald-500/45 bg-emerald-500/12 text-emerald-100',
+  error: 'border-red-500/45 bg-red-500/12 text-red-100',
+  info: 'border-sky-500/45 bg-sky-500/12 text-sky-100',
+}
+
+const KIND_ICON_BG: Record<ToastKind, string> = {
+  success: 'bg-emerald-500/30 text-emerald-200',
+  error: 'bg-red-500/30 text-red-200',
+  info: 'bg-sky-500/30 text-sky-200',
 }
 
 const KIND_ICON: Record<ToastKind, string> = {
@@ -61,10 +67,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <button
             key={t.id}
             onClick={() => dismiss(t.id)}
-            className={`pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2 text-left text-sm shadow-lg backdrop-blur-md transition ${KIND_CLASS[t.kind]}`}
+            className={`pointer-events-auto flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm shadow-[0_10px_25px_-12px_rgba(0,0,0,0.65)] backdrop-blur-md transition hover:opacity-95 ${KIND_CLASS[t.kind]}`}
           >
-            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-black/20 text-xs">{KIND_ICON[t.kind]}</span>
-            <span className="flex-1">{t.message}</span>
+            <span className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${KIND_ICON_BG[t.kind]}`}>
+              {KIND_ICON[t.kind]}
+            </span>
+            <span className="flex-1 leading-snug">{t.message}</span>
           </button>
         ))}
       </div>

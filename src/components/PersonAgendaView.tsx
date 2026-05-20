@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
-import type { Absence, Person, Status, Task } from '../types'
+import type { Absence, Person, Status, Task, WorkItem } from '../types'
 import {
   getPersonAgenda,
   type PersonAgenda,
@@ -67,8 +67,16 @@ export function PersonAgendaView({ initialPersonId }: Props) {
 
   if (activePeople.length === 0) {
     return (
-      <div className="panel p-8 text-center text-sm text-slate-400">
-        Nessuna persona attiva. Aggiungi membri al team dalla sezione "Persone".
+      <div className="panel p-10 text-center">
+        <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/60 ring-1 ring-inset ring-slate-700">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+          <div className="text-sm font-medium text-slate-300">Nessuna persona attiva</div>
+          <p className="text-[12px] text-slate-500">Aggiungi membri al team dal pulsante "Persone" in alto.</p>
+        </div>
       </div>
     )
   }
@@ -80,6 +88,7 @@ export function PersonAgendaView({ initialPersonId }: Props) {
           <PeopleSidebar
             people={activePeople}
             tasks={data.tasks}
+            workItems={data.workItems}
             absences={data.absences}
             selectedId={selectedId}
             onSelect={setSelectedId}
@@ -93,7 +102,7 @@ export function PersonAgendaView({ initialPersonId }: Props) {
               onEditTask={handleEditTask}
             />
           ) : (
-            <div className="panel p-8 text-center text-sm text-slate-400">Seleziona una persona dalla lista.</div>
+            <div className="panel p-10 text-center text-sm text-slate-400">Seleziona una persona dalla lista.</div>
           )}
         </main>
       </div>
@@ -124,12 +133,14 @@ const SIDEBAR_LEVEL_DOT: Record<WorkloadLevel, string> = {
 function PeopleSidebar({
   people,
   tasks,
+  workItems,
   absences,
   selectedId,
   onSelect,
 }: {
   people: Person[]
   tasks: Task[]
+  workItems: WorkItem[]
   absences: Absence[]
   selectedId: string | null
   onSelect: (id: string) => void
@@ -141,7 +152,7 @@ function PeopleSidebar({
       </div>
       <ul className="space-y-1">
         {people.map((p) => {
-          const w = computeWorkload(p, tasks, absences)
+          const w = computeWorkload(p, tasks, absences, new Date(), workItems)
           return (
             <li key={p.id}>
               <button
@@ -314,7 +325,7 @@ function HeaderStat({ label, value, tone = 'slate' }: { label: string; value: st
 function PersonKpiStrip({ agenda }: { agenda: PersonAgenda }) {
   const s = agenda.stats
   const tiles: Array<{ label: string; value: number | string; tone: string; hint?: string }> = [
-    { label: 'Task aperti', value: s.openTasks, tone: 'sky' },
+    { label: 'Attività aperte', value: s.openTasks, tone: 'sky' },
     { label: 'In ritardo', value: s.delayedTasks, tone: s.delayedTasks > 0 ? 'red' : 'emerald' },
     { label: 'A rischio', value: s.riskTasks, tone: s.riskTasks > 0 ? 'amber' : 'emerald' },
     { label: 'In attesa', value: s.waitingTasks, tone: s.waitingTasks > 0 ? 'amber' : 'slate' },
@@ -386,25 +397,25 @@ function WeekTasksSection({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">{week.tasks.length} task</div>
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">{week.tasks.length} attività</div>
           <div className="text-[10px] tabular-nums text-slate-500">
             {week.workload.weekHours}h / {week.workload.realCapacityHours}h
           </div>
         </div>
       </header>
       {week.tasks.length === 0 ? (
-        <div className="rounded-md border border-dashed border-slate-700 px-3 py-6 text-center text-[12px] text-slate-500">
-          Nessun task pianificato in questa settimana.
+        <div className="rounded-md border border-dashed border-slate-700/70 bg-slate-900/30 px-3 py-6 text-center text-[12px] text-slate-500">
+          Nessuna attività pianificata in questa settimana.
         </div>
       ) : (
         <ul className="space-y-2">
           {week.tasks.map((wt) => (
             <AgendaTaskRow
-              key={wt.task.id}
+              key={`${wt.activity.kind}-${wt.activity.id}`}
               wt={wt}
               week={week}
               onOpenWorkItem={onOpenWorkItem}
-              onEdit={() => onEditTask(wt.task)}
+              onEdit={wt.task ? () => onEditTask(wt.task!) : undefined}
             />
           ))}
         </ul>
@@ -422,12 +433,15 @@ function AgendaTaskRow({
   wt: WeekAgendaTask
   week: WeekAgenda
   onOpenWorkItem: (workItemId: string) => void
-  onEdit: () => void
+  onEdit?: () => void
 }) {
   const { setTaskStatus } = useData()
   const toast = useToast()
-  const { task, workItem, health, expectedProgress, hoursInWeek, hasAbsenceConflict } = wt
-  const diff = task.progressPercent - expectedProgress
+  const { activity, task, workItem, health, expectedProgress, hoursInWeek, hasAbsenceConflict } = wt
+  const diff = activity.progressPercent - expectedProgress
+  const kindLabel = activity.kind === 'task' ? 'Task' : 'Lavoro'
+  const blockers = task?.blockers ?? workItem?.blockers ?? []
+  const notes = task?.notes ?? (activity.kind === 'workItem' ? workItem?.notes : undefined)
 
   // Borders by health
   const borderClass =
@@ -442,6 +456,13 @@ function AgendaTaskRow({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
+            <span className={`chip text-[10px] ${
+              activity.kind === 'task'
+                ? 'bg-sky-500/10 text-sky-300 ring-sky-500/30'
+                : 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30'
+            }`}>
+              {kindLabel}
+            </span>
             {workItem?.code && (
               <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
                 {workItem.code}
@@ -460,17 +481,19 @@ function AgendaTaskRow({
             className="mt-1 block w-full text-left text-sm font-medium text-slate-100 hover:text-sky-300"
             title="Apri dettaglio lavoro"
           >
-            {task.title}
+            {activity.title}
           </button>
           {workItem && (
             <div className="mt-0.5 truncate text-[11px] text-slate-500">
-              {workItem.title}
+              {activity.kind === 'task' ? workItem.title : 'Lavoro senza task'}
               {workItem.customer && <> · {workItem.customer}</>}
             </div>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <HealthBadge health={health} />
+          {task && (
+            <>
           <StatusSelect
             value={task.status}
             onChange={(s: Status) => {
@@ -486,18 +509,25 @@ function AgendaTaskRow({
           >
             ✎
           </button>
+            </>
+          )}
+          {!task && (
+            <span className="rounded-md bg-slate-800 px-2 py-1 text-[10px] font-medium text-slate-300 ring-1 ring-inset ring-slate-700">
+              {activity.status}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-slate-400 md:grid-cols-3">
         <div>
           <span className="text-slate-500">Inizio:</span>{' '}
-          <span className="text-slate-300">{formatItalianShort(task.startDate)}</span>
+          <span className="text-slate-300">{formatItalianShort(activity.startDate)}</span>
         </div>
         <div>
           <span className="text-slate-500">Scad:</span>{' '}
           <span className={health === 'in ritardo' ? 'text-red-300' : 'text-slate-300'}>
-            {formatItalianShort(task.dueDate)}
+            {formatItalianShort(activity.dueDate)}
           </span>
         </div>
         <div className="tabular-nums">
@@ -506,7 +536,7 @@ function AgendaTaskRow({
         </div>
         <div className="md:col-span-3">
           <span className="text-slate-500">Avanz.:</span>{' '}
-          <span className="tabular-nums text-slate-200">Reale {task.progressPercent}%</span>{' · '}
+          <span className="tabular-nums text-slate-200">Reale {activity.progressPercent}%</span>{' · '}
           <span className="tabular-nums text-amber-300">Atteso {expectedProgress}%</span>{' '}
           <span
             className={`tabular-nums ${
@@ -520,7 +550,7 @@ function AgendaTaskRow({
       </div>
 
       <div className="relative mt-1.5 h-1 overflow-hidden rounded-full bg-slate-800">
-        <div className="h-full bg-sky-500" style={{ width: `${task.progressPercent}%` }} />
+        <div className="h-full bg-sky-500" style={{ width: `${activity.progressPercent}%` }} />
         <div
           className="absolute top-0 h-full w-px bg-amber-300"
           style={{ left: `${expectedProgress}%` }}
@@ -530,20 +560,20 @@ function AgendaTaskRow({
 
       {hasAbsenceConflict && week.absences.length > 0 && (
         <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[11px] text-amber-200">
-          ⚠ Periodo del task interseca un'assenza dell'assegnatario in settimana.
+          ⚠ Periodo dell'attività interseca un'assenza dell'assegnatario in settimana.
         </div>
       )}
 
-      {task.blockers.length > 0 && (
+      {blockers.length > 0 && (
         <ul className="mt-1.5 space-y-0.5 text-[11px] text-amber-300">
-          {task.blockers.map((b, i) => (
+          {blockers.map((b, i) => (
             <li key={i}>⛔ {b}</li>
           ))}
         </ul>
       )}
 
-      {task.notes && (
-        <div className="mt-1.5 whitespace-pre-wrap text-[11px] text-slate-400">{task.notes}</div>
+      {notes && (
+        <div className="mt-1.5 whitespace-pre-wrap text-[11px] text-slate-400">{notes}</div>
       )}
     </li>
   )
@@ -620,6 +650,8 @@ function AbsencesBucket({ title, absences }: { title: string; absences: Absence[
 const TIMELINE_TONE: Record<string, string> = {
   'task-start': 'bg-sky-500',
   'task-due': 'bg-violet-500',
+  'workitem-start': 'bg-emerald-500',
+  'workitem-due': 'bg-amber-500',
   'absence-start': 'bg-amber-500',
   'absence-end': 'bg-amber-400',
 }
@@ -629,6 +661,23 @@ const DOW = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab']
 function fmtTimelineDate(iso: string): string {
   const d = parseISODate(iso)
   return `${DOW[d.getDay()]} ${formatItalianShort(iso)}`
+}
+
+function timelineKindLabel(kind: TimelineEvent['kind']): string {
+  switch (kind) {
+    case 'task-start':
+      return 'inizio'
+    case 'task-due':
+      return 'scad.'
+    case 'workitem-start':
+      return 'inizio lavoro'
+    case 'workitem-due':
+      return 'scad. lavoro'
+    case 'absence-start':
+      return 'ass. inizio'
+    case 'absence-end':
+      return 'ass. fine'
+  }
 }
 
 function TimelineSection({
@@ -647,20 +696,14 @@ function TimelineSection({
         <ol className="mt-3 space-y-1">
           {events.map((ev, i) => (
             <li
-              key={`${ev.kind}-${ev.date}-${ev.task?.id ?? ev.absence?.id ?? i}`}
+              key={`${ev.kind}-${ev.date}-${ev.task?.id ?? ev.workItem?.id ?? ev.absence?.id ?? i}`}
               className="grid grid-cols-[110px_auto_1fr] items-center gap-3 rounded-md px-2 py-1.5 text-[12px] hover:bg-slate-800/40"
             >
               <div className="text-[11px] tabular-nums text-slate-400">{fmtTimelineDate(ev.date)}</div>
               <div className="flex items-center gap-1.5">
                 <span className={`h-1.5 w-1.5 rounded-full ${TIMELINE_TONE[ev.kind]}`} aria-hidden />
                 <span className="text-[10px] uppercase tracking-wide text-slate-500">
-                  {ev.kind === 'task-start'
-                    ? 'inizio'
-                    : ev.kind === 'task-due'
-                      ? 'scad.'
-                      : ev.kind === 'absence-start'
-                        ? 'ass. inizio'
-                        : 'ass. fine'}
+                  {timelineKindLabel(ev.kind)}
                 </span>
               </div>
               <TimelineLabel ev={ev} onOpenWorkItem={onOpenWorkItem} />
@@ -695,6 +738,28 @@ function TimelineLabel({
         >
           {ev.task.title}
         </button>
+        {ev.health && <HealthBadge health={ev.health} />}
+      </div>
+    )
+  }
+  if (ev.workItem) {
+    return (
+      <div className="flex min-w-0 items-center gap-2">
+        {ev.workItem.code && (
+          <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
+            {ev.workItem.code}
+          </span>
+        )}
+        <button
+          onClick={() => onOpenWorkItem(ev.workItem!.id)}
+          className="truncate text-left text-slate-200 hover:text-sky-300"
+          title="Apri dettaglio lavoro"
+        >
+          {ev.workItem.title}
+        </button>
+        <span className="chip bg-emerald-500/10 text-emerald-300 ring-emerald-500/30 text-[10px]">
+          Lavoro
+        </span>
         {ev.health && <HealthBadge health={ev.health} />}
       </div>
     )

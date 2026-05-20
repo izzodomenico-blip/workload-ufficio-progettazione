@@ -2,6 +2,7 @@ import {
   ALL_ABSENCE_TYPES,
   ALL_ACTIVITY_ACTIONS,
   ALL_ACTIVITY_ENTITY_TYPES,
+  ALL_MACHINE_COMPLEXITIES,
   ALL_PRIORITIES,
   ALL_TYPES,
 } from '../types'
@@ -14,6 +15,8 @@ import type {
   AppData,
   BusinessPartner,
   BusinessPartnerType,
+  MachineComplexity,
+  MachineType,
   Notification,
   NotificationEntityType,
   Person,
@@ -37,6 +40,7 @@ export interface BackupCounts {
   activityLog: number
   notifications: number
   businessPartners: number
+  machineTypes: number
 }
 
 export interface BackupInfo {
@@ -84,6 +88,7 @@ const ABSENCE_TYPES = new Set<string>(ALL_ABSENCE_TYPES)
 const ACTIVITY_ACTIONS = new Set<string>(ALL_ACTIVITY_ACTIONS)
 const ACTIVITY_ENTITY_TYPES = new Set<string>(ALL_ACTIVITY_ENTITY_TYPES)
 const BUSINESS_PARTNER_TYPES = new Set<string>(ALL_BUSINESS_PARTNER_TYPES)
+const MACHINE_COMPLEXITIES = new Set<string>(ALL_MACHINE_COMPLEXITIES)
 
 export function createBackupPayload(data: AppData, exportedAt: Date = new Date()): BackupPayload {
   const backupData: AppData = {
@@ -95,6 +100,7 @@ export function createBackupPayload(data: AppData, exportedAt: Date = new Date()
     activityLog: data.activityLog ?? [],
     notifications: data.notifications ?? [],
     businessPartners: data.businessPartners ?? [],
+    machineTypes: data.machineTypes ?? [],
   }
 
   return {
@@ -136,6 +142,7 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   const rawActivityLog = root.activityLog
   const rawNotifications = root.notifications
   const rawBusinessPartners = root.businessPartners
+  const rawMachineTypes = root.machineTypes
 
   if (!Array.isArray(rawPeople)) issues.push('people deve essere un array.')
   if (!Array.isArray(rawWorkItems)) issues.push('workItems deve essere un array.')
@@ -149,6 +156,9 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   }
   if (rawBusinessPartners !== undefined && !Array.isArray(rawBusinessPartners)) {
     issues.push('businessPartners deve essere un array oppure assente.')
+  }
+  if (rawMachineTypes !== undefined && !Array.isArray(rawMachineTypes)) {
+    issues.push('machineTypes deve essere un array oppure assente.')
   }
 
   const people: Person[] = []
@@ -187,6 +197,15 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
     })
   }
 
+  const machineTypes: MachineType[] = []
+  if (Array.isArray(rawMachineTypes)) {
+    rawMachineTypes.forEach((item, index) => {
+      const machineType = normalizeMachineType(item)
+      if (machineType) machineTypes.push(machineType)
+      else issues.push(`machineTypes[${index}] deve avere id, code e name validi.`)
+    })
+  }
+
   if (issues.length > 0) return invalid(issues)
 
   const activityLog = Array.isArray(rawActivityLog)
@@ -198,7 +217,6 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   const businessPartners = Array.isArray(rawBusinessPartners)
     ? rawBusinessPartners.map(normalizeBusinessPartner).filter(isPresent)
     : []
-
   const data = {
     ...root,
     people,
@@ -208,6 +226,7 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
     activityLog,
     notifications,
     businessPartners,
+    machineTypes,
   } as AppData
   const summary = {
     source: source.kind,
@@ -288,6 +307,7 @@ function normalizeBackupInfo(value: unknown): BackupMetadata | undefined {
           activityLog: optionalNumber(counts.activityLog),
           notifications: optionalNumber(counts.notifications),
           businessPartners: optionalNumber(counts.businessPartners),
+          machineTypes: optionalNumber(counts.machineTypes),
         }
       : undefined,
   }
@@ -456,6 +476,38 @@ function normalizeBusinessPartner(value: unknown): BusinessPartner | null {
   }
 }
 
+function normalizeMachineType(value: unknown): MachineType | null {
+  const o = asRecord(value)
+  if (!o) return null
+  if (!isNonEmptyString(o.id) || !isNonEmptyString(o.code) || !isNonEmptyString(o.name)) return null
+  const now = new Date().toISOString()
+  const complexity: MachineComplexity = MACHINE_COMPLEXITIES.has(o.defaultComplexity as string)
+    ? (o.defaultComplexity as MachineComplexity)
+    : 'media'
+  return {
+    id: o.id,
+    code: o.code.trim().toUpperCase(),
+    name: o.name.trim(),
+    family: isNonEmptyString(o.family) ? o.family.trim() : 'Generico',
+    description: isString(o.description) ? o.description : '',
+    defaultImpactWeight: positiveNumber(o.defaultImpactWeight, 1),
+    defaultComplexity: complexity,
+    defaultRequiresLaser: booleanOr(o.defaultRequiresLaser, true),
+    defaultRequiresTubeLaser: booleanOr(o.defaultRequiresTubeLaser, false),
+    defaultRequiresBending: booleanOr(o.defaultRequiresBending, true),
+    defaultRequiresWelding: booleanOr(o.defaultRequiresWelding, true),
+    defaultRequiresAssembly: booleanOr(o.defaultRequiresAssembly, true),
+    defaultRequiresPainting: booleanOr(o.defaultRequiresPainting, false),
+    defaultRequiresTesting: booleanOr(o.defaultRequiresTesting, false),
+    typicalAssemblyCount: nonNegativeInteger(o.typicalAssemblyCount, 1),
+    typicalPartCount: nonNegativeInteger(o.typicalPartCount, 10),
+    active: typeof o.active === 'boolean' ? o.active : true,
+    notes: isString(o.notes) ? o.notes : '',
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
 function normalizeNotification(value: unknown): Notification | null {
   const o = asRecord(value)
   if (!o) return null
@@ -484,7 +536,7 @@ function normalizeNotification(value: unknown): Notification | null {
   } as Notification
 }
 
-function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners'>): BackupCounts {
+function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners' | 'machineTypes'>): BackupCounts {
   return {
     people: data.people.length,
     workItems: data.workItems.length,
@@ -493,6 +545,7 @@ function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'ab
     activityLog: data.activityLog.length,
     notifications: data.notifications.length,
     businessPartners: data.businessPartners.length,
+    machineTypes: data.machineTypes.length,
   }
 }
 
@@ -532,6 +585,18 @@ function optionalNumber(value: unknown): number | undefined {
 
 function numberOrZero(value: unknown): number {
   return isNumber(value) ? value : 0
+}
+
+function positiveNumber(value: unknown, fallback: number): number {
+  return isNumber(value) && value > 0 ? value : fallback
+}
+
+function nonNegativeInteger(value: unknown, fallback: number): number {
+  return isNumber(value) ? Math.max(0, Math.round(value)) : fallback
+}
+
+function booleanOr(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
 }
 
 function normalizePercent(value: unknown): number {

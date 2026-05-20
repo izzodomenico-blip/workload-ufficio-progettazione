@@ -12,7 +12,7 @@ import {
 import { computePlanningMatrix, type PlanningMatrix } from '../utils/planning'
 import type { Absence, AbsenceType, Person, Task, WorkItem } from '../types'
 import { formatItalianShort, workingDaysOverlap } from '../utils/dates'
-import { topTasksForPerson } from '../utils/workload'
+import { topWorkloadActivitiesForPerson } from '../utils/workload'
 
 interface Props {
   open: boolean
@@ -116,6 +116,7 @@ export function WeeklyReportModal({ open, onClose }: Props) {
             <PeopleSection
               workload={current.workload}
               tasks={data.tasks}
+              workItems={data.workItems}
               workItemById={workItemById}
             />
           </div>
@@ -326,10 +327,12 @@ const LEVEL_LABEL: Record<WorkloadLevel, string> = {
 function PeopleSection({
   workload,
   tasks,
+  workItems,
   workItemById,
 }: {
   workload: PersonWorkloadReport[]
   tasks: Task[]
+  workItems: WorkItem[]
   workItemById: Map<string, WorkItem>
 }) {
   if (workload.length === 0) {
@@ -351,6 +354,7 @@ function PeopleSection({
             key={w.person.id}
             wl={w}
             tasks={tasks}
+            workItems={workItems}
             workItemById={workItemById}
             isLast={idx === workload.length - 1}
           />
@@ -363,15 +367,17 @@ function PeopleSection({
 function PersonRow({
   wl,
   tasks,
+  workItems,
   workItemById,
   isLast,
 }: {
   wl: PersonWorkloadReport
   tasks: Task[]
+  workItems: WorkItem[]
   workItemById: Map<string, WorkItem>
   isLast: boolean
 }) {
-  const top = topTasksForPerson(tasks, wl.person.id, 2)
+  const top = topWorkloadActivitiesForPerson(tasks, workItems, wl.person, 2)
   const barWidth = wl.realCapacity > 0 ? Math.min(100, wl.loadPercent) : wl.weekHours > 0 ? 100 : 0
   const overflow = wl.loadPercent > 100 ? Math.min(40, (wl.loadPercent - 100) / 2) : 0
 
@@ -407,8 +413,8 @@ function PersonRow({
         </div>
         {top.length > 0 ? (
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-600">
-            {top.map((t) => {
-              const wi = workItemById.get(t.workItemId)
+            {top.map((activity) => {
+              const wi = activity.workItem ?? workItemById.get(activity.workItemId)
               const phase = wi?.technicalPhase
               const commPrio = wi?.commercialPriority
               const releaseSoon =
@@ -416,12 +422,17 @@ function PersonRow({
                 !wi.actualProductionReleaseDate &&
                 isWithinDays(wi.plannedProductionReleaseDate, 21)
               return (
-                <span key={t.id} className="inline-flex min-w-0 items-center gap-1">
+                <span key={`${activity.kind}-${activity.id}`} className="inline-flex min-w-0 items-center gap-1">
+                  <span className={`rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide ${
+                    activity.kind === 'task' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {activity.kind === 'task' ? 'Task' : 'Lavoro'}
+                  </span>
                   <span className="text-slate-300">▸</span>
                   {wi?.code && <span className="font-medium text-slate-700">{wi.code}</span>}
                   {wi?.code && <span className="text-slate-300">·</span>}
-                  <span className="truncate text-slate-600">{t.title}</span>
-                  <span className="text-slate-400">({formatItalianShort(t.dueDate)})</span>
+                  <span className="truncate text-slate-600">{activity.title}</span>
+                  <span className="text-slate-400">({formatItalianShort(activity.dueDate)})</span>
                   {phase && (
                     <span className="rounded bg-indigo-100 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-indigo-700">
                       {phase}

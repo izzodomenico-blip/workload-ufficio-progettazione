@@ -1,4 +1,5 @@
 import type { Absence, AppData, BusinessPartner, Person, Task, WorkItem } from '../types'
+import { DEFAULT_MACHINE_TYPES } from './machineTypes'
 import { addDays, formatISODate, startOfWeek } from '../utils/dates'
 
 const monday = startOfWeek(new Date())
@@ -447,6 +448,7 @@ export const demoData: AppData = {
   activityLog: [],
   notifications: [],
   businessPartners,
+  machineTypes: DEFAULT_MACHINE_TYPES,
 }
 
 export function freshDemoData(): AppData {

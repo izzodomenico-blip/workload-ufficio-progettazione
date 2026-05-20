@@ -10,6 +10,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const ROOT_DIR = path.resolve(__dirname, '..')
 const DIST_DIR = path.join(ROOT_DIR, 'dist')
+const DIST_INDEX = path.join(DIST_DIR, 'index.html')
 const PORT = Number(process.env.PORT || 3000)
 const HOST = process.env.HOST || '0.0.0.0'
 
@@ -23,32 +24,61 @@ const app = express()
 app.disable('x-powered-by')
 app.use(express.json({ limit: '25mb' }))
 app.use('/api', createApiRouter())
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Endpoint API non trovato.' })
+})
 
-if (fs.existsSync(DIST_DIR)) {
-  app.use(express.static(DIST_DIR))
-  app.use((req, res, next) => {
-    if (req.method !== 'GET' || req.path.startsWith('/api')) {
-      next()
-      return
-    }
-    res.sendFile(path.join(DIST_DIR, 'index.html'))
-  })
-} else {
-  app.get('/', (_req, res) => {
-    res.type('text/plain').send('Backend attivo. Esegui npm run build per servire anche il frontend da questo server.')
-  })
-}
+app.use(express.static(DIST_DIR))
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) return next()
+  if (!fs.existsSync(DIST_INDEX)) {
+    res
+      .status(503)
+      .type('text/plain')
+      .send('Backend attivo. Esegui npm run build per servire anche il frontend da questo server.')
+    return
+  }
+  res.sendFile(DIST_INDEX)
+})
+
+const servers = []
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`Workload server attivo su http://${HOST}:${PORT}`)
   console.log(`Database SQLite: ${DB_PATH}`)
 })
+servers.push(server)
+
+if (HOST === '0.0.0.0' && process.env.WORKLOAD_DISABLE_IPV6_LOCALHOST !== '1') {
+  const localhostServer = app.listen(PORT, '::1', () => {
+    console.log(`Workload server attivo anche su http://localhost:${PORT}`)
+  })
+  localhostServer.on('error', (error) => {
+    if (error?.code === 'EADDRINUSE') {
+      console.warn(`Porta IPv6 localhost già occupata su ${PORT}: http://localhost:${PORT} potrebbe rispondere da un altro processo.`)
+      return
+    }
+    console.error('Errore listener IPv6 localhost:', error)
+  })
+  servers.push(localhostServer)
+}
 
 function shutdown() {
-  server.close(() => {
-    closeDb()
-    process.exit(0)
-  })
+  let pending = servers.length
+  const done = () => {
+    pending--
+    if (pending <= 0) {
+      closeDb()
+      process.exit(0)
+    }
+  }
+  for (const activeServer of servers) {
+    if (!activeServer.listening) {
+      done()
+      continue
+    }
+    activeServer.close(done)
+  }
 }
 
 process.on('SIGINT', shutdown)

@@ -14,6 +14,14 @@ import {
   scheduleAutoBackup,
 } from '../backupService.js'
 import { parseAnagraficheXml } from '../services/anagraficheImport.js'
+import {
+  getAdminStatus,
+  hasBaselineChanges,
+  setAdminPassword,
+  verifyAdminPassword,
+} from '../services/adminAuth.js'
+
+const ADMIN_PASSWORD_HEADER = 'x-workload-admin-password'
 
 export function createApiRouter() {
   const router = Router()
@@ -29,6 +37,16 @@ export function createApiRouter() {
   router.put('/app-data', (req, res, next) => {
     try {
       const data = extractAppData(req.body)
+      const currentPeople = getCollection('people')
+      if (hasBaselineChanges(currentPeople, data.people)) {
+        const provided = req.get(ADMIN_PASSWORD_HEADER)
+        if (!verifyAdminPassword(provided)) {
+          const err = new Error('Carico base protetto: password admin richiesta o errata.')
+          err.statusCode = 403
+          err.detail = 'baseline-load-protected'
+          throw err
+        }
+      }
       const reason = mutationReason(req, 'put-app-data')
       const isNormalCommit = req.get('x-workload-mutation-kind') === 'normal'
       if (isNormalCommit) {
@@ -42,7 +60,35 @@ export function createApiRouter() {
       if (backup) recordAutomaticBackupActivity(backup.reason, new Date(backup.createdAt))
       res.json(saved)
     } catch (error) {
-      next(badRequest(error))
+      next(error.statusCode ? error : badRequest(error))
+    }
+  })
+
+  router.get('/admin/status', (_req, res) => {
+    const status = getAdminStatus()
+    res.json({ protected: status.protected })
+  })
+
+  router.post('/admin/verify-password', (req, res, next) => {
+    try {
+      const body = req.body ?? {}
+      const ok = verifyAdminPassword(typeof body.password === 'string' ? body.password : undefined)
+      res.json({ ok, protected: getAdminStatus().protected })
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  router.post('/admin/set-password', (req, res, next) => {
+    try {
+      const body = req.body ?? {}
+      const result = setAdminPassword({
+        currentPassword: typeof body.currentPassword === 'string' ? body.currentPassword : undefined,
+        newPassword: typeof body.newPassword === 'string' ? body.newPassword : '',
+      })
+      res.json(result)
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
@@ -53,6 +99,7 @@ export function createApiRouter() {
   registerCollectionRoutes(router, {
     apiName: 'people',
     collection: 'people',
+    guard: peopleBaselineGuard,
   })
   registerCollectionRoutes(router, {
     apiName: 'work-items',
@@ -69,6 +116,11 @@ export function createApiRouter() {
   registerCollectionRoutes(router, {
     apiName: 'business-partners',
     collection: 'businessPartners',
+  })
+  registerCollectionRoutes(router, {
+    apiName: 'machine-types',
+    collection: 'machineTypes',
+    allowDelete: false,
   })
 
   router.put('/business-partners/:id/activate', (req, res, next) => {
@@ -177,18 +229,19 @@ export function createApiRouter() {
   return router
 }
 
-function registerCollectionRoutes(router, { apiName, collection }) {
+function registerCollectionRoutes(router, { apiName, collection, guard, allowDelete = true }) {
   router.get(`/${apiName}`, (_req, res) => {
     res.json(getCollection(collection))
   })
 
   router.post(`/${apiName}`, (req, res, next) => {
     try {
+      if (guard) guard({ req, current: null, incoming: req.body })
       const saved = upsertEntity(collection, req.body)
       scheduleAutoBackup(`${collection}-created`)
       res.status(201).json(saved)
     } catch (error) {
-      next(badRequest(error))
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
@@ -199,24 +252,48 @@ function registerCollectionRoutes(router, { apiName, collection }) {
         res.status(404).json({ error: 'Elemento non trovato.' })
         return
       }
-      const saved = upsertEntity(collection, { ...current, ...req.body, id: req.params.id })
+      const incoming = { ...current, ...req.body, id: req.params.id }
+      if (guard) guard({ req, current, incoming })
+      const saved = upsertEntity(collection, incoming)
       scheduleAutoBackup(`${collection}-updated`)
       res.json(saved)
     } catch (error) {
-      next(badRequest(error))
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
-  router.delete(`/${apiName}/:id`, (req, res, next) => {
-    try {
-      if (collection === 'workItems') createPreMutationBackup('delete-work-item')
-      deleteEntity(collection, req.params.id)
-      if (collection !== 'workItems') scheduleAutoBackup(`${collection}-deleted`)
-      res.status(204).end()
-    } catch (error) {
-      next(error)
-    }
-  })
+  if (allowDelete) {
+    router.delete(`/${apiName}/:id`, (req, res, next) => {
+      try {
+        if (collection === 'workItems') createPreMutationBackup('delete-work-item')
+        deleteEntity(collection, req.params.id)
+        if (collection !== 'workItems') scheduleAutoBackup(`${collection}-deleted`)
+        res.status(204).end()
+      } catch (error) {
+        next(error)
+      }
+    })
+  }
+}
+
+function peopleBaselineGuard({ req, current, incoming }) {
+  const before = normalizeBaseline(current?.baselineLoadPercent)
+  const after = normalizeBaseline(incoming?.baselineLoadPercent)
+  if (before === after) return
+  const provided = req.get(ADMIN_PASSWORD_HEADER)
+  if (!verifyAdminPassword(provided)) {
+    const err = new Error('Carico base protetto: password admin richiesta o errata.')
+    err.statusCode = 403
+    err.detail = 'baseline-load-protected'
+    throw err
+  }
+}
+
+function normalizeBaseline(v) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return 0
+  if (v < 0) return 0
+  if (v > 100) return 100
+  return v
 }
 
 function mutationReason(req, fallback) {

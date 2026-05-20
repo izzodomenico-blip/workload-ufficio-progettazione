@@ -50,18 +50,18 @@ export function WorkloadKanban({ data, items, onSelect }: Props) {
         {COLUMNS.map((col) => {
           const colItems = grouped.get(col.id) ?? []
           return (
-            <div key={col.id} className="flex min-h-[140px] flex-col rounded-lg border border-slate-800 bg-slate-900/40">
-              <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
+            <div key={col.id} className="flex min-h-[160px] flex-col rounded-lg border border-slate-800 bg-[color:var(--color-surface-1)]/60">
+              <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2.5">
                 <div className="flex items-center gap-2">
                   <span className={`inline-block h-2 w-2 rounded-full ${col.accent}`} />
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">{col.title}</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">{col.title}</span>
                 </div>
-                <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] tabular-nums text-slate-400">{colItems.length}</span>
+                <span className="rounded-full bg-slate-800/80 px-2 py-0.5 text-[10px] tabular-nums text-slate-300 ring-1 ring-inset ring-slate-700/60">{colItems.length}</span>
               </div>
               <div className="space-y-2 p-2 scroll-thin overflow-y-auto max-h-[60vh]">
                 {colItems.length === 0 && (
-                  <div className="rounded-md border border-dashed border-slate-800 px-2 py-3 text-center text-[11px] text-slate-600">
-                    nessun elemento
+                  <div className="rounded-md border border-dashed border-slate-800 px-3 py-4 text-center text-[11px] text-slate-600">
+                    Nessun elemento
                   </div>
                 )}
                 {colItems.map((w) => {
@@ -70,7 +70,7 @@ export function WorkloadKanban({ data, items, onSelect }: Props) {
                     <div
                       key={w.id}
                       onClick={() => onSelect(w.id)}
-                      className={`block w-full cursor-pointer rounded-md border bg-slate-900 p-2.5 text-left transition hover:border-slate-600 hover:bg-slate-800 ${
+                      className={`group block w-full cursor-pointer rounded-md border bg-slate-900/80 p-2.5 text-left transition hover:border-sky-500/40 hover:bg-slate-800 ${
                         overdue ? 'border-red-500/40' : 'border-slate-800'
                       }`}
                     >

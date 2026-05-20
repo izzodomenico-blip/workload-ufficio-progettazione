@@ -305,7 +305,7 @@ export function WorkItemFormModal({ open, onClose, mode, workItem, onCreated }: 
         <FormField
           label="Ore stimate"
           error={errors.estimatedHours}
-          hint="Le ore residue vengono calcolate da stima e avanzamento."
+          hint="Se non vengono creati task, queste ore saranno usate per calcolare il carico del lavoro sulle persone assegnate."
         >
           <input
             type="number"

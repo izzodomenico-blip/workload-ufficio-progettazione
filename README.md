@@ -1,7 +1,8 @@
 # Workload - Ufficio Progettazione Meccanica
 
 Web app locale per gestire carico di lavoro, commesse, studi, attività interne,
-task, persone, assenze, pianificazione e report dell'ufficio progettazione.
+task, persone, assenze, pianificazione, anagrafiche, libreria Registro Disegni
+e report dell'ufficio progettazione.
 
 La versione attuale è **v1.1**: frontend React/Vite + backend Node.js/Express +
 database SQLite locale condiviso.
@@ -125,6 +126,7 @@ Backup da interfaccia:
 
 - **Strumenti > Backup dati > Scarica backup JSON** esporta tutti i dati in JSON.
 - Il file contiene `backupInfo` e `data`.
+- Il JSON include anche `businessPartners` e `machineTypes`.
 - L'export registra un evento nello storico.
 
 Backup da terminale:
@@ -215,6 +217,7 @@ Compatibilità mantenuta:
 - JSON senza `absences`;
 - JSON senza `activityLog`;
 - JSON senza `notifications`;
+- JSON senza `machineTypes`;
 - stati legacy rimappati agli stati attuali.
 
 ## Report e notifiche
@@ -352,6 +355,49 @@ documenti riservati:
 I backup precedenti senza `businessPartners` continuano a funzionare: l'app
 inizializza l'array a vuoto.
 
+## Libreria Registro Disegni
+
+La vista **Libreria disegni** contiene le tipologie di disegno/macchina derivate
+dal Registro Disegni aziendale INNO.TEC, ad esempio `I.RM - Rulliere
+motorizzate`, `I.TS - Tendostrutture`, `I.MP - Manipolatore` e gli standard
+`S.SC` / `S.TS`.
+
+La libreria serve come base dati interna per le fasi successive legate
+all'**Output verso officina**. In questo step non calcola ancora carichi
+officina e non modifica il workload dell'ufficio tecnico.
+
+Ogni tipologia ha:
+
+- codice registro e nome;
+- famiglia logica;
+- peso base relativo;
+- complessita default (`bassa`, `media`, `alta`, `speciale`);
+- processi indicativi: laser, laser tubo, piegatura, saldatura, montaggio,
+  verniciatura, collaudo;
+- numero tipico di complessivi e particolari;
+- note e stato `active`.
+
+I coefficienti e i conteggi sono **valori indicativi modificabili**. Servono per
+precompilare e uniformare i dati futuri, non sono consuntivi e non devono essere
+letti come ore officina.
+
+### Come modificare una tipologia
+
+1. Apri il tab **Libreria disegni**.
+2. Cerca per codice o nome, oppure filtra per famiglia/stato.
+3. Clicca **Modifica** sulla riga desiderata.
+4. Aggiorna peso base, complessita, complessivi, particolari, processi o note.
+5. Salva: l'app registra l'evento nello storico modifiche e salva nel database.
+
+### Attivare o disattivare
+
+Usa **Disattiva** o **Riattiva** dalla tabella. La tipologia non viene cancellata
+fisicamente: cambia solo `active`, cosi resta nei backup e nello storico.
+
+I backup `.db` e `.json` includono sempre la tabella/collezione
+`machine_types` / `data.machineTypes`. I backup vecchi senza `machineTypes`
+restano importabili e inizializzano la libreria come array vuoto.
+
 ## Sicurezza minima
 
 Questa versione non ha login ed è pensata per una rete locale aziendale fidata.
@@ -400,6 +446,10 @@ DELETE /api/business-partners/:id            ← soft delete (active=false)
 
 POST   /api/business-partners/parse-xml      ← body { xml, filename } → records[]
 
+GET    /api/machine-types
+POST   /api/machine-types
+PUT    /api/machine-types/:id                <- active=false per disattivare
+
 GET /api/activity-log
 
 GET /api/notifications
@@ -432,6 +482,7 @@ server/              backend Express + SQLite
 server/migrations/   schema SQL
 data/workload.db     database locale condiviso
 backups/             backup generati da npm run backup
+backups/auto/        backup automatici server
 dist/                frontend compilato servito da Express
 ```
 

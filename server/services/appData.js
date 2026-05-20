@@ -24,6 +24,7 @@ const VALID_TYPES = new Set(['commessa', 'studio', 'interno'])
 const VALID_PRIORITIES = new Set(['bassa', 'media', 'alta', 'critica'])
 const VALID_ABSENCE_TYPES = new Set(['ferie', 'permesso', 'malattia', 'trasferta', 'altro'])
 const VALID_BUSINESS_PARTNER_TYPES = new Set(['cliente', 'fornitore', 'personale', 'altro'])
+const VALID_MACHINE_COMPLEXITIES = new Set(['bassa', 'media', 'alta', 'speciale'])
 const VALID_ACTIVITY_ACTIONS = new Set([
   'created',
   'updated',
@@ -35,7 +36,7 @@ const VALID_ACTIVITY_ACTIONS = new Set([
   'imported',
   'reset',
 ])
-const VALID_ACTIVITY_ENTITY_TYPES = new Set(['workItem', 'task', 'person', 'absence', 'system'])
+const VALID_ACTIVITY_ENTITY_TYPES = new Set(['workItem', 'task', 'person', 'absence', 'machineType', 'system'])
 
 export const EMPTY_APP_DATA = {
   people: [],
@@ -45,6 +46,7 @@ export const EMPTY_APP_DATA = {
   activityLog: [],
   notifications: [],
   businessPartners: [],
+  machineTypes: [],
 }
 
 export function extractAppData(payload) {
@@ -72,6 +74,9 @@ export function normalizeAppData(input) {
   if (root.businessPartners !== undefined && !Array.isArray(root.businessPartners)) {
     throw new Error('businessPartners deve essere un array oppure assente.')
   }
+  if (root.machineTypes !== undefined && !Array.isArray(root.machineTypes)) {
+    throw new Error('machineTypes deve essere un array oppure assente.')
+  }
 
   return {
     people: root.people.map((item, index) => normalizePerson(item, index)),
@@ -81,6 +86,7 @@ export function normalizeAppData(input) {
     activityLog: (root.activityLog ?? []).map(normalizeActivityLogEntry).filter(Boolean),
     notifications: (root.notifications ?? []).map(normalizeNotification).filter(Boolean),
     businessPartners: (root.businessPartners ?? []).map(normalizeBusinessPartner).filter(Boolean),
+    machineTypes: (root.machineTypes ?? []).map(normalizeMachineType).filter(Boolean),
   }
 }
 
@@ -93,6 +99,7 @@ export function countAppData(data) {
     activityLog: data.activityLog.length,
     notifications: data.notifications.length,
     businessPartners: data.businessPartners.length,
+    machineTypes: data.machineTypes.length,
   }
 }
 
@@ -129,6 +136,9 @@ function normalizePerson(item, index) {
     weeklyCapacityHours: o.weeklyCapacityHours,
     skills: stringArray(o.skills),
     active: typeof o.active === 'boolean' ? o.active : true,
+    baselineLoadPercent: isNumber(o.baselineLoadPercent)
+      ? Math.max(0, Math.min(100, o.baselineLoadPercent))
+      : undefined,
   }
 }
 
@@ -236,6 +246,35 @@ function normalizeBusinessPartner(item) {
   }
 }
 
+function normalizeMachineType(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id) || !isNonEmptyString(o.code) || !isNonEmptyString(o.name)) return null
+  const now = new Date().toISOString()
+  return {
+    ...o,
+    id: o.id,
+    code: o.code.trim().toUpperCase(),
+    name: o.name.trim(),
+    family: isNonEmptyString(o.family) ? o.family.trim() : 'Generico',
+    description: isString(o.description) ? o.description : '',
+    defaultImpactWeight: positiveNumber(o.defaultImpactWeight, 1),
+    defaultComplexity: VALID_MACHINE_COMPLEXITIES.has(o.defaultComplexity) ? o.defaultComplexity : 'media',
+    defaultRequiresLaser: toBoolean(o.defaultRequiresLaser, true),
+    defaultRequiresTubeLaser: toBoolean(o.defaultRequiresTubeLaser, false),
+    defaultRequiresBending: toBoolean(o.defaultRequiresBending, true),
+    defaultRequiresWelding: toBoolean(o.defaultRequiresWelding, true),
+    defaultRequiresAssembly: toBoolean(o.defaultRequiresAssembly, true),
+    defaultRequiresPainting: toBoolean(o.defaultRequiresPainting, false),
+    defaultRequiresTesting: toBoolean(o.defaultRequiresTesting, false),
+    typicalAssemblyCount: nonNegativeInteger(o.typicalAssemblyCount, 1),
+    typicalPartCount: nonNegativeInteger(o.typicalPartCount, 10),
+    active: typeof o.active === 'boolean' ? o.active : true,
+    notes: isString(o.notes) ? o.notes : '',
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
 function normalizeNotification(item) {
   const o = asObject(item)
   if (!o || !isNonEmptyString(o.id) || !isNonEmptyString(o.timestamp)) return null
@@ -281,6 +320,20 @@ function isNumber(value) {
 
 function numberOrZero(value) {
   return isNumber(value) ? value : 0
+}
+
+function positiveNumber(value, fallback) {
+  if (!isNumber(value)) return fallback
+  return value > 0 ? value : fallback
+}
+
+function nonNegativeInteger(value, fallback) {
+  if (!isNumber(value)) return fallback
+  return Math.max(0, Math.round(value))
+}
+
+function toBoolean(value, fallback) {
+  return typeof value === 'boolean' ? value : fallback
 }
 
 function normalizePercent(value) {
