@@ -3,7 +3,13 @@ import type { ReactNode } from 'react'
 import type { Absence, AppData, BusinessPartner, MachineType, Person, Status, WorkshopOutput } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
-import { fetchAppData, saveAppData as saveAppDataToApi } from '../services/apiClient'
+import {
+  createMachineTypeRecord,
+  DataConflictError,
+  fetchAppData,
+  saveAppData as saveAppDataToApi,
+  updateMachineTypeRecord,
+} from '../services/apiClient'
 import { useToast } from './ToastProvider'
 import {
   createBackupPayload,
@@ -164,7 +170,24 @@ const DataContext = createContext<DataContextValue | null>(null)
 export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(() => loadFromStorage() ?? freshDemoData())
   const dataRef = useRef(data)
+  const serverReadyRef = useRef(false)
+  const serverRevisionRef = useRef<number | null>(null)
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const toast = useToast()
+
+  const applyRemoteData = useCallback((remoteData: AppData, revision: number) => {
+    serverReadyRef.current = true
+    serverRevisionRef.current = revision
+    dataRef.current = remoteData
+    setData(remoteData)
+    saveToStorage(remoteData)
+  }, [])
+
+  const restoreLocalData = useCallback((snapshot: AppData) => {
+    dataRef.current = snapshot
+    setData(snapshot)
+    saveToStorage(snapshot)
+  }, [])
 
   useEffect(() => {
     dataRef.current = data
@@ -174,36 +197,64 @@ export function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     fetchAppData()
-      .then((remoteData) => {
+      .then((response) => {
         if (cancelled) return
-        dataRef.current = remoteData
-        setData(remoteData)
-        saveToStorage(remoteData)
+        const remoteData = response.data
+        applyRemoteData(remoteData, response.revision)
       })
       .catch((err) => {
         if (cancelled) return
+        serverReadyRef.current = false
+        serverRevisionRef.current = null
         console.error('Impossibile caricare i dati dal backend', err)
-        toast.error('Backend non raggiungibile: uso temporaneo della cache locale.')
+        toast.error('Backend condiviso non raggiungibile: salvataggio bloccato finche non viene ricaricato dal server.')
       })
     return () => {
       cancelled = true
     }
-  }, [toast])
+  }, [applyRemoteData, restoreLocalData, toast])
 
   const commitData = useCallback((next: AppData, options: CommitOptions = {}) => {
+    if (!serverReadyRef.current || serverRevisionRef.current === null) {
+      toast.error('Salvataggio bloccato: i dati condivisi del server non sono ancora caricati. Ricarica la pagina dal link del server.')
+      return
+    }
     const previous = dataRef.current
     dataRef.current = next
     setData(next)
     saveToStorage(next)
-    void saveAppDataToApi(next, options).catch((err) => {
-      // Rollback dello stato locale se il backend rifiuta (es. password mancante)
-      dataRef.current = previous
-      setData(previous)
-      saveToStorage(previous)
-      console.error('Salvataggio su database fallito', err)
-      toast.error(`Salvataggio database fallito: ${err instanceof Error ? err.message : 'errore sconosciuto'}`)
-    })
-  }, [toast])
+    saveQueueRef.current = saveQueueRef.current
+      .then(async () => {
+        const currentRevision = serverRevisionRef.current
+        if (currentRevision === null) throw new Error('Revisione dati server non disponibile.')
+        const response = await saveAppDataToApi(next, {
+          ...options,
+          dataRevision: currentRevision,
+        })
+        applyRemoteData(response.data, response.revision)
+      })
+      .catch(async (err) => {
+        if (err instanceof DataConflictError) {
+          try {
+            const response = await fetchAppData()
+            applyRemoteData(response.data, response.revision)
+          } catch (reloadError) {
+            serverReadyRef.current = false
+            serverRevisionRef.current = null
+            console.error('Ricarica dati condivisi fallita dopo conflitto', reloadError)
+          }
+          console.warn('Salvataggio rifiutato per revisione dati non aggiornata', err)
+          toast.error('Salvataggio bloccato: i dati condivisi erano cambiati. Ho ricaricato il database server, ripeti la modifica se serve.')
+          return
+        }
+        // Rollback dello stato locale se il backend rifiuta (es. password mancante)
+        dataRef.current = previous
+        setData(previous)
+        saveToStorage(previous)
+        console.error('Salvataggio su database fallito', err)
+        toast.error(`Salvataggio database fallito: ${err instanceof Error ? err.message : 'errore sconosciuto'}`)
+      })
+  }, [applyRemoteData, restoreLocalData, toast])
 
   const createWorkItem = useCallback((input: CreateWorkItemInput): string => {
     const result = svcCreateWorkItem(dataRef.current, input)
@@ -422,17 +473,53 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const createMachineType = useCallback((input: CreateMachineTypeInput): string => {
     const result = svcCreateMachineType(dataRef.current, input)
-    commitData(result.data)
+    const previous = dataRef.current
+    dataRef.current = result.data
+    setData(result.data)
+    saveToStorage(result.data)
+    void persistMachineTypeChange(
+      () => createMachineTypeRecord(result.machineType),
+      previous,
+      restoreLocalData,
+      applyRemoteData,
+      toast,
+    )
     return result.id
-  }, [commitData])
+  }, [applyRemoteData, restoreLocalData, toast])
 
   const updateMachineType = useCallback((id: string, patch: UpdateMachineTypeInput) => {
-    commitData(svcUpdateMachineType(dataRef.current, id, patch))
-  }, [commitData])
+    const previous = dataRef.current
+    const nextData = svcUpdateMachineType(dataRef.current, id, patch)
+    const machineType = nextData.machineTypes.find((item) => item.id === id)
+    if (!machineType) return
+    dataRef.current = nextData
+    setData(nextData)
+    saveToStorage(nextData)
+    void persistMachineTypeChange(
+      () => updateMachineTypeRecord(id, machineType),
+      previous,
+      restoreLocalData,
+      applyRemoteData,
+      toast,
+    )
+  }, [applyRemoteData, toast])
 
   const setMachineTypeActive = useCallback((id: string, active: boolean) => {
-    commitData(svcSetMachineTypeActive(dataRef.current, id, active))
-  }, [commitData])
+    const previous = dataRef.current
+    const nextData = svcSetMachineTypeActive(dataRef.current, id, active)
+    const machineType = nextData.machineTypes.find((item) => item.id === id)
+    if (!machineType) return
+    dataRef.current = nextData
+    setData(nextData)
+    saveToStorage(nextData)
+    void persistMachineTypeChange(
+      () => updateMachineTypeRecord(id, machineType),
+      previous,
+      restoreLocalData,
+      applyRemoteData,
+      toast,
+    )
+  }, [applyRemoteData, toast])
 
   const createWorkshopOutput = useCallback((workItemId: string, input: CreateWorkshopOutputInput): string => {
     const result = svcCreateWorkshopOutput(dataRef.current, workItemId, input)
@@ -453,14 +540,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [commitData])
 
   const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
+    const safeNext = mergeImportWithSharedCollections(next, dataRef.current)
     const description = [
-      `${next.workItems.length} lavori`,
-      `${next.tasks.length} task`,
-      `${next.absences.length} assenze`,
-      `${next.activityLog.length} eventi storico`,
-      `${next.notifications.length} notifiche`,
-      `${next.machineTypes.length} tipologie disegno`,
-      `${next.workshopOutputs.length} output officina`,
+      `${safeNext.workItems.length} lavori`,
+      `${safeNext.tasks.length} task`,
+      `${safeNext.absences.length} assenze`,
+      `${safeNext.activityLog.length} eventi storico`,
+      `${safeNext.notifications.length} notifiche`,
+      `${safeNext.machineTypes.length} tipologie disegno`,
+      `${safeNext.workshopOutputs.length} output officina`,
       options.fileName ? `file: ${options.fileName}` : '',
       options.exportedAt ? `esportato: ${options.exportedAt}` : '',
       options.version ? `versione: ${options.version}` : '',
@@ -468,7 +556,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     commitData(
       appendActivityLog(
-        next,
+        safeNext,
         createActivityLogEntry({
           entityType: 'system',
           entityId: 'import',
@@ -583,4 +671,41 @@ export function useData(): DataContextValue {
   const ctx = useContext(DataContext)
   if (!ctx) throw new Error('useData() richiede <DataProvider>')
   return ctx
+}
+
+function mergeImportWithSharedCollections(next: AppData, current: AppData): AppData {
+  const importedWorkItemIds = new Set(next.workItems.map((item) => item.id))
+  return {
+    ...next,
+    businessPartners: next.businessPartners.length > 0 ? next.businessPartners : current.businessPartners,
+    machineTypes: next.machineTypes.length > 0 ? next.machineTypes : current.machineTypes,
+    workshopOutputs: next.workshopOutputs.length > 0
+      ? next.workshopOutputs
+      : current.workshopOutputs.filter((output) => importedWorkItemIds.has(output.workItemId)),
+  }
+}
+
+async function persistMachineTypeChange(
+  saveRecord: () => Promise<MachineType>,
+  previous: AppData,
+  restoreLocalData: (snapshot: AppData) => void,
+  applyRemoteData: (remoteData: AppData, revision: number) => void,
+  toast: ReturnType<typeof useToast>,
+) {
+  let recordSaved = false
+  try {
+    await saveRecord()
+    recordSaved = true
+    const response = await fetchAppData()
+    applyRemoteData(response.data, response.revision)
+  } catch (err) {
+    if (recordSaved) {
+      console.error('Tipologia salvata, ma ricarica dati condivisi fallita', err)
+      toast.error('Tipologia salvata nel database, ma ricarica non riuscita: aggiorna la pagina.')
+      return
+    }
+    restoreLocalData(previous)
+    console.error('Salvataggio tipologia disegno fallito', err)
+    toast.error(`Salvataggio tipologia fallito: ${err instanceof Error ? err.message : 'errore sconosciuto'}`)
+  }
 }

@@ -53,25 +53,16 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
   const personById = useMemo(() => new Map(data.people.map((p) => [p.id, p])), [data.people])
   const owner = personById.get(item.ownerId)
   const tasks = useMemo(() => data.tasks.filter((t) => t.workItemId === item.id), [data.tasks, item.id])
-  const hasTaskDetails = tasks.length > 0
-
+  // I totali sono SEMPRE quelli del lavoro: il carico è guidato dalle ore del
+  // lavoro, i task sono solo un dettaglio facoltativo e non incidono.
   const totals = useMemo(() => {
-    if (tasks.length === 0) {
-      const residual = Math.max(0, item.estimatedHours * (1 - item.progressPercent / 100))
-      return {
-        est: item.estimatedHours,
-        residual: Math.round(residual * 10) / 10,
-        avgProgress: item.progressPercent,
-      }
+    const residual = Math.max(0, item.estimatedHours * (1 - item.progressPercent / 100))
+    return {
+      est: item.estimatedHours,
+      residual: Math.round(residual * 10) / 10,
+      avgProgress: item.progressPercent,
     }
-    const est = tasks.reduce((s, t) => s + t.estimatedHours, 0)
-    const residual = tasks.reduce(
-      (s, t) => s + Math.max(0, t.estimatedHours * (1 - t.progressPercent / 100)),
-      0,
-    )
-    const avgProgress = tasks.length === 0 ? 0 : Math.round(tasks.reduce((s, t) => s + t.progressPercent, 0) / tasks.length)
-    return { est, residual: Math.round(residual * 10) / 10, avgProgress }
-  }, [tasks, item.estimatedHours, item.progressPercent])
+  }, [item.estimatedHours, item.progressPercent])
 
   const recentLog = useMemo(() => getRecentForWorkItem(data, item.id, 5), [data, item.id])
 
@@ -228,16 +219,16 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
                   <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                 </svg>
               </div>
-              <div className="text-sm font-medium text-slate-300">Lavoro monitorato a livello generale</div>
+              <div className="text-sm font-medium text-slate-300">Il lavoro è già sufficiente</div>
               <p className="mt-1 text-[12px] text-slate-500">
-                Aggiungi task se vuoi dettagliare le attività. <br />
-                Carico calcolato dalle ore generali del lavoro.
+                Il carico è calcolato sulle ore del lavoro. <br />
+                Aggiungi task solo se vuoi dettagliare dinamiche interne: sono facoltativi e non cambiano il carico.
               </p>
             </div>
           ) : (
             <>
-              <p className="mb-2 rounded-md border border-sky-500/25 bg-sky-500/8 px-3 py-2 text-[12px] text-sky-100">
-                Sono presenti task: il carico viene calcolato dai task, non dalle ore generali del lavoro.
+              <p className="mb-2 rounded-md border border-slate-700/70 bg-slate-900/40 px-3 py-2 text-[12px] text-slate-300">
+                I task sono un dettaglio del lavoro: <span className="text-slate-200">non incidono sul carico</span>, che resta calcolato sulle ore del lavoro.
               </p>
               <ul className="space-y-2">
                 {tasks.map((t) => (
@@ -255,11 +246,11 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
           )}
         </Section>
 
-        <Section title={hasTaskDetails ? 'Totali (da task)' : 'Totali (dal lavoro)'}>
+        <Section title="Totali del lavoro">
           <div className="grid grid-cols-3 gap-3">
             <Stat label="Ore stimate" value={`${totals.est}h`} />
             <Stat label="Ore residue" value={`${totals.residual}h`} />
-            <Stat label="Avanzamento medio" value={`${totals.avgProgress}%`} />
+            <Stat label="Avanzamento" value={`${totals.avgProgress}%`} />
           </div>
         </Section>
 

@@ -79,30 +79,32 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav
-          role="tablist"
-          aria-label="Sezione principale"
-          className="tabs-track overflow-x-auto scroll-thin"
-        >
-          {TABS.map((t) => {
-            const active = tab === t.id
-            return (
-              <button
-                key={t.id}
-                role="tab"
-                aria-selected={active}
-                onClick={() => setTab(t.id)}
-                title={t.hint}
-                className={`tab-item ${active ? 'tab-item-active' : 'hover:text-slate-200 hover:bg-slate-800/40'}`}
-              >
-                <TabIcon path={t.icon} />
-                {t.label}
-              </button>
-            )
-          })}
-        </nav>
-        <ImportExportPanel />
+      <div className="sticky top-[var(--app-header-h)] z-20 -mx-5 border-b border-slate-800/60 bg-[color:var(--color-bg)]/85 px-5 pb-3 pt-2 backdrop-blur-xl shadow-[0_10px_24px_-18px_rgba(0,0,0,0.85)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav
+            role="tablist"
+            aria-label="Sezione principale"
+            className="tabs-track overflow-x-auto scroll-thin"
+          >
+            {TABS.map((t) => {
+              const active = tab === t.id
+              return (
+                <button
+                  key={t.id}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(t.id)}
+                  title={t.hint}
+                  className={`tab-item ${active ? 'tab-item-active' : 'hover:text-slate-200 hover:bg-slate-800/40'}`}
+                >
+                  <TabIcon path={t.icon} />
+                  {t.label}
+                </button>
+              )
+            })}
+          </nav>
+          <ImportExportPanel />
+        </div>
       </div>
 
       {tab === 'dashboard' ? (

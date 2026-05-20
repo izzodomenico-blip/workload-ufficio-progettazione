@@ -1,10 +1,17 @@
-import type { AppData } from '../types'
+import type { AppData, MachineType } from '../types'
 
 export interface SaveAppDataOptions {
   risky?: boolean
   reason?: string
+  dataRevision?: number | null
   /** Password admin per autorizzare modifiche a campi protetti (es. baselineLoadPercent) */
   adminPassword?: string
+}
+
+export interface AppDataResponse {
+  data: AppData
+  revision: number
+  lastMutationAt: string | null
 }
 
 export interface BackupStatus {
@@ -36,6 +43,7 @@ export interface AdminSetPasswordResult {
 }
 
 export const ADMIN_BASELINE_PROTECTED_CODE = 'baseline-load-protected'
+export const DATA_CONFLICT_CODES = new Set(['missing-data-revision', 'stale-data-revision'])
 
 export class AdminProtectedError extends Error {
   readonly status: number
@@ -48,7 +56,23 @@ export class AdminProtectedError extends Error {
   }
 }
 
+export class DataConflictError extends Error {
+  readonly status: number
+  readonly detail?: string
+  constructor(message: string, status: number, detail?: string) {
+    super(message)
+    this.name = 'DataConflictError'
+    this.status = status
+    this.detail = detail
+  }
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const { body } = await requestWithResponse<T>(url, options)
+  return body
+}
+
+async function requestWithResponse<T>(url: string, options?: RequestInit): Promise<{ body: T; response: Response }> {
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -69,32 +93,61 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     if (response.status === 403 && detail === ADMIN_BASELINE_PROTECTED_CODE) {
       throw new AdminProtectedError(message, response.status, detail)
     }
+    if (response.status === 409 && detail && DATA_CONFLICT_CODES.has(detail)) {
+      throw new DataConflictError(message, response.status, detail)
+    }
     throw new Error(message)
   }
-  return response.json() as Promise<T>
+  const body = await response.json() as T
+  return { body, response }
 }
 
-export async function fetchAppData(): Promise<AppData> {
-  const data = await request<Partial<AppData>>('/api/app-data')
-  return withAppDataDefaults(data)
+export async function fetchAppData(): Promise<AppDataResponse> {
+  const { body, response } = await requestWithResponse<Partial<AppData>>('/api/app-data')
+  return {
+    data: withAppDataDefaults(body),
+    revision: readDataRevision(response),
+    lastMutationAt: response.headers.get('x-workload-last-mutation-at'),
+  }
 }
 
-export async function saveAppData(data: AppData, options: SaveAppDataOptions = {}): Promise<AppData> {
+export async function saveAppData(data: AppData, options: SaveAppDataOptions = {}): Promise<AppDataResponse> {
   const headers: Record<string, string> = {
     'x-workload-mutation-kind': options.risky ? 'risky' : 'normal',
   }
   if (options.reason) headers['x-workload-mutation-reason'] = options.reason
+  if (options.dataRevision !== undefined && options.dataRevision !== null) {
+    headers['x-workload-data-revision'] = String(options.dataRevision)
+  }
   if (options.adminPassword) headers['x-workload-admin-password'] = options.adminPassword
-  const saved = await request<Partial<AppData>>('/api/app-data', {
+  const { body, response } = await requestWithResponse<Partial<AppData>>('/api/app-data', {
     method: 'PUT',
     headers,
     body: JSON.stringify(data),
   })
-  return withAppDataDefaults(saved)
+  return {
+    data: withAppDataDefaults(body),
+    revision: readDataRevision(response),
+    lastMutationAt: response.headers.get('x-workload-last-mutation-at'),
+  }
 }
 
 export function fetchBackupStatus(): Promise<BackupStatus> {
   return request<BackupStatus>('/api/backup/status')
+}
+
+export async function createMachineTypeRecord(machineType: MachineType): Promise<MachineType> {
+  return request<MachineType>('/api/machine-types', {
+    method: 'POST',
+    body: JSON.stringify(machineType),
+  })
+}
+
+export async function updateMachineTypeRecord(id: string, machineType: MachineType): Promise<MachineType> {
+  return request<MachineType>(`/api/machine-types/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(machineType),
+  })
 }
 
 export function fetchAdminStatus(): Promise<AdminStatus> {
@@ -127,4 +180,10 @@ function withAppDataDefaults(data: Partial<AppData>): AppData {
     machineTypes: Array.isArray(data.machineTypes) ? data.machineTypes : [],
     workshopOutputs: Array.isArray(data.workshopOutputs) ? data.workshopOutputs : [],
   }
+}
+
+function readDataRevision(response: Response): number {
+  const raw = response.headers.get('x-workload-data-revision')
+  const value = raw ? Number(raw) : 0
+  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0
 }

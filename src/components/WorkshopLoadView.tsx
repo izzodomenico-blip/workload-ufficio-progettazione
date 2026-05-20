@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ALL_WORKSHOP_OUTPUT_STATUSES } from '../types'
-import type { WorkshopOutputStatus } from '../types'
+import type { WorkshopOutput, WorkshopOutputStatus } from '../types'
 import { useData } from '../state/DataProvider'
 import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
 import { WorkshopReportModal } from './WorkshopReportModal'
@@ -650,7 +650,7 @@ function FlowRow({ item, onWorkItem }: { item: WorkshopFlowItem; onWorkItem: (id
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">{item.output.assemblyCount}</td>
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">{item.output.estimatedPartCount}</td>
       <td className="px-3 py-2.5">
-        <ProcessBadges processes={item.processes} />
+        <ProcessBadges processes={item.processes} output={item.output} />
       </td>
       <td className="px-3 py-2.5 text-right">
         <div className="flex items-center justify-end gap-1.5">
@@ -693,17 +693,24 @@ function StatusBadge({ status, released }: { status: WorkshopOutputStatus; relea
   )
 }
 
-function ProcessBadges({ processes }: { processes: WorkshopProcessKey[] }) {
+function ProcessBadges({ processes, output }: { processes: WorkshopProcessKey[]; output?: WorkshopOutput }) {
   if (processes.length === 0) return <span className="text-[11px] text-slate-600">—</span>
   return (
     <div className="flex max-w-[220px] flex-wrap gap-1">
       {processes.map((p) => (
         <span key={p} className={`chip-sm ${PROCESS_BADGE[p]}`} title={PROCESS_LABEL.get(p)}>
-          {PROCESS_SHORT.get(p)}
+          {PROCESS_SHORT.get(p)}{output ? ` ${processWeightPercent(output, p)}%` : ''}
         </span>
       ))}
     </div>
   )
+}
+
+function processWeightPercent(output: WorkshopOutput, processKey: WorkshopProcessKey): number {
+  const process = WORKSHOP_PROCESSES.find((item) => item.key === processKey)
+  if (!process) return 0
+  const value = output[process.weight]
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0
 }
 
 // ===== Shared bits =====

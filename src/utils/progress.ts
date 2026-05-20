@@ -92,25 +92,24 @@ function aggregateHealth(healths: HealthStatus[]): HealthStatus {
   return 'ok'
 }
 
+/**
+ * Salute del lavoro calcolata SEMPRE dal lavoro stesso (stato, date, avanzamento).
+ * I task non incidono: sono un dettaglio facoltativo. Il parametro `_tasks` resta
+ * per compatibilità con le firme dei chiamanti ma viene ignorato.
+ */
 export function getWorkItemHealth(
   workItem: WorkItem,
-  tasks: Task[],
+  _tasks: Task[],
   today: string = todayISO(),
 ): HealthStatus {
-  const itemTasks = tasks.filter((t) => t.workItemId === workItem.id)
-
-  if (itemTasks.length === 0) {
-    return healthFromEntity(
-      mapLegacyStatus(workItem.status),
-      workItem.startDate,
-      workItem.dueDate,
-      workItem.progressPercent,
-      today,
-      false,
-    )
-  }
-
-  return aggregateHealth(itemTasks.map((t) => getTaskHealth(t, today, false)))
+  return healthFromEntity(
+    mapLegacyStatus(workItem.status),
+    workItem.startDate,
+    workItem.dueDate,
+    workItem.progressPercent,
+    today,
+    false,
+  )
 }
 
 /** Salute work-item con assenze valutate per ogni task. */

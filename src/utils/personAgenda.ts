@@ -10,7 +10,7 @@ import {
 import {
   computeWorkload,
   getWorkloadActivitiesForPerson,
-  getWorkItemIdsWithTasks,
+  workItemResponsibleIds,
   type WorkloadActivity,
   type WorkloadResult,
 } from './workload'
@@ -204,7 +204,7 @@ export function getPersonAbsencesSummary(
 
 function computePersonStats(
   person: Person,
-  tasks: Task[],
+  _tasks: Task[],
   workItems: WorkItem[],
   current: WeekAgenda,
   todayISO: string,
@@ -215,24 +215,11 @@ function computePersonStats(
   let waitingTasks = 0
   let completedTasks = 0
 
-  for (const t of tasks) {
-    if (t.assigneeId !== person.id) continue
-    if (t.status === 'Completato') {
-      completedTasks++
-      continue
-    }
-    if (!isOpen(t.status)) continue
-    openTasks++
-    if (t.status === 'In attesa') waitingTasks++
-    const h = getTaskHealth(t, todayISO)
-    if (h === 'in ritardo') delayedTasks++
-    else if (h === 'a rischio') riskTasks++
-  }
-
-  const workItemIdsWithTasks = getWorkItemIdsWithTasks(tasks)
+  // Statistiche guidate dai LAVORI (coerenti col carico). I task non vengono
+  // conteggiati: sono un dettaglio facoltativo del lavoro.
   for (const w of workItems) {
-    if (workItemIdsWithTasks.has(w.id)) continue
-    if (!w.assigneeIds.includes(person.id)) continue
+    const responsible = workItemResponsibleIds(w)
+    if (!responsible.includes(person.id)) continue
     if (w.status === 'Completato') {
       completedTasks++
       continue

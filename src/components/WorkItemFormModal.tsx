@@ -14,6 +14,13 @@ import { AssigneesPicker } from './AssigneesPicker'
 import { WorkshopOutputsFormSection } from './WorkshopOutputsFormSection'
 import type { WorkshopOutputDraft } from '../services/workshopOutputsService'
 
+/**
+ * Carico di default (in ore) per un nuovo lavoro. È modificabile liberamente nel
+ * form: è ciò che determina il workload sulle persone assegnate. I task non
+ * incidono. 40h ≈ una settimana lavorativa piena.
+ */
+const DEFAULT_EFFORT_HOURS = 40
+
 interface FormValues {
   type: WorkItemType
   code: string
@@ -58,7 +65,7 @@ function emptyValues(defaultOwnerId: string): FormValues {
     assigneeIds: [],
     startDate: today,
     dueDate: today,
-    estimatedHours: 0,
+    estimatedHours: DEFAULT_EFFORT_HOURS,
     progressPercent: 0,
     acquisitionProbability: 50,
     blockers: [],
@@ -311,18 +318,22 @@ export function WorkItemFormModal({ open, onClose, mode, workItem, onCreated }: 
         </FormField>
 
         <FormField
-          label="Ore stimate"
+          label="Carico stimato del lavoro (ore)"
           error={errors.estimatedHours}
-          hint="Se non vengono creati task, queste ore saranno usate per calcolare il carico del lavoro sulle persone assegnate."
+          hint="Ore libere. Determina il carico sulle persone assegnate, distribuito dalla data odierna fino alla consegna. I task non incidono sul carico."
         >
-          <input
-            type="number"
-            min={0}
-            step={1}
-            className="input-base"
-            value={values.estimatedHours}
-            onChange={(e) => set('estimatedHours', Number(e.target.value))}
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              className="input-base"
+              value={values.estimatedHours}
+              onChange={(e) => set('estimatedHours', Number(e.target.value))}
+            />
+            <span className="text-sm text-slate-400">h</span>
+          </div>
         </FormField>
 
         <FormField

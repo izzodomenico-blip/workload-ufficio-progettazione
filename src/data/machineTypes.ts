@@ -16,6 +16,13 @@ interface MachineTypeSeed {
   defaultRequiresAssembly?: boolean
   defaultRequiresPainting?: boolean
   defaultRequiresTesting?: boolean
+  defaultLaserWeightPercent?: number
+  defaultTubeLaserWeightPercent?: number
+  defaultBendingWeightPercent?: number
+  defaultWeldingWeightPercent?: number
+  defaultAssemblyWeightPercent?: number
+  defaultPaintingWeightPercent?: number
+  defaultTestingWeightPercent?: number
   typicalAssemblyCount?: number
   typicalPartCount?: number
   notes?: string
@@ -34,6 +41,16 @@ const BASE_DEFAULTS = {
   typicalAssemblyCount: 1,
   typicalPartCount: 10,
 }
+
+const PROCESS_FIELDS = [
+  { flag: 'defaultRequiresLaser', weight: 'defaultLaserWeightPercent' },
+  { flag: 'defaultRequiresTubeLaser', weight: 'defaultTubeLaserWeightPercent' },
+  { flag: 'defaultRequiresBending', weight: 'defaultBendingWeightPercent' },
+  { flag: 'defaultRequiresWelding', weight: 'defaultWeldingWeightPercent' },
+  { flag: 'defaultRequiresAssembly', weight: 'defaultAssemblyWeightPercent' },
+  { flag: 'defaultRequiresPainting', weight: 'defaultPaintingWeightPercent' },
+  { flag: 'defaultRequiresTesting', weight: 'defaultTestingWeightPercent' },
+] as const
 
 const SEEDS: MachineTypeSeed[] = [
   { code: 'I.AM', name: 'Automotore', family: 'Manipolazione' },
@@ -58,15 +75,15 @@ const SEEDS: MachineTypeSeed[] = [
   { code: 'I.IT', name: 'Impianto di trasporto', family: 'Impianti', defaultImpactWeight: 2, defaultComplexity: 'alta', typicalAssemblyCount: 5, typicalPartCount: 80, defaultRequiresTesting: true },
   { code: 'I.LO', name: 'Predisposizione impianti', family: 'Impianti', defaultImpactWeight: 0.8, defaultComplexity: 'bassa', typicalPartCount: 8 },
   { code: 'I.MO', name: 'Modifiche varie', family: 'Generico', defaultImpactWeight: 0.8, defaultComplexity: 'bassa', typicalPartCount: 8 },
-  { code: 'I.MP', name: 'Manipolatore', family: 'Manipolazione', defaultImpactWeight: 2, defaultComplexity: 'alta', typicalAssemblyCount: 4, typicalPartCount: 70, defaultRequiresTesting: true },
+  { code: 'I.MP', name: 'Manipolatore', family: 'Manipolazione', defaultImpactWeight: 2, defaultComplexity: 'alta', typicalAssemblyCount: 4, typicalPartCount: 70, defaultRequiresTesting: true, defaultLaserWeightPercent: 10, defaultBendingWeightPercent: 10, defaultWeldingWeightPercent: 20, defaultAssemblyWeightPercent: 40, defaultTestingWeightPercent: 20 },
   { code: 'I.PA', name: 'Piano a sfere', family: 'Trasportatori', defaultImpactWeight: 0.9, defaultComplexity: 'bassa', typicalPartCount: 12 },
   { code: 'I.PG', name: 'Pignoni in genere', family: 'Generico', defaultImpactWeight: 0.5, defaultComplexity: 'bassa', typicalPartCount: 5, defaultRequiresAssembly: false },
-  { code: 'I.PS', name: 'Piattaforma di sollevamento', family: 'Sollevamento', defaultImpactWeight: 2.5, defaultComplexity: 'speciale', typicalAssemblyCount: 5, typicalPartCount: 90, defaultRequiresTesting: true },
+  { code: 'I.PS', name: 'Piattaforma di sollevamento', family: 'Sollevamento', defaultImpactWeight: 2.5, defaultComplexity: 'speciale', typicalAssemblyCount: 5, typicalPartCount: 90, defaultRequiresTesting: true, defaultLaserWeightPercent: 10, defaultBendingWeightPercent: 10, defaultWeldingWeightPercent: 25, defaultAssemblyWeightPercent: 35, defaultTestingWeightPercent: 20 },
   { code: 'I.PT', name: 'Piede di sostegno trasportatore', family: 'Trasportatori', defaultImpactWeight: 0.7, defaultComplexity: 'bassa', typicalPartCount: 8 },
   { code: 'I.RB', name: 'Ribaltatori', family: 'Manipolazione', defaultImpactWeight: 1.6, defaultComplexity: 'alta', typicalAssemblyCount: 2, typicalPartCount: 35, defaultRequiresTesting: true },
-  { code: 'I.RF', name: 'Rulliere folli', family: 'Rulliere', defaultImpactWeight: 1, defaultComplexity: 'media', typicalAssemblyCount: 1, typicalPartCount: 10 },
-  { code: 'I.RM', name: 'Rulliere motorizzate', family: 'Rulliere', defaultImpactWeight: 1.2, defaultComplexity: 'media', typicalAssemblyCount: 1, typicalPartCount: 15 },
-  { code: 'I.RP', name: 'Ripari antinfortunistici', family: 'Ripari / Sicurezza', defaultImpactWeight: 0.8, defaultComplexity: 'bassa', typicalAssemblyCount: 1, typicalPartCount: 12 },
+  { code: 'I.RF', name: 'Rulliere folli', family: 'Rulliere', defaultImpactWeight: 1, defaultComplexity: 'media', typicalAssemblyCount: 1, typicalPartCount: 10, defaultLaserWeightPercent: 25, defaultBendingWeightPercent: 25, defaultWeldingWeightPercent: 25, defaultAssemblyWeightPercent: 25 },
+  { code: 'I.RM', name: 'Rulliere motorizzate', family: 'Rulliere', defaultImpactWeight: 1.2, defaultComplexity: 'media', typicalAssemblyCount: 1, typicalPartCount: 15, defaultLaserWeightPercent: 20, defaultBendingWeightPercent: 20, defaultWeldingWeightPercent: 30, defaultAssemblyWeightPercent: 30 },
+  { code: 'I.RP', name: 'Ripari antinfortunistici', family: 'Ripari / Sicurezza', defaultImpactWeight: 0.8, defaultComplexity: 'bassa', typicalAssemblyCount: 1, typicalPartCount: 12, defaultLaserWeightPercent: 30, defaultBendingWeightPercent: 25, defaultWeldingWeightPercent: 25, defaultAssemblyWeightPercent: 20 },
   { code: 'I.SC', name: 'Scaffalatura', family: 'Tendostrutture / Strutture', defaultImpactWeight: 1.2, typicalAssemblyCount: 2, typicalPartCount: 25 },
   { code: 'I.SD', name: 'Standard design', family: 'Standard', defaultImpactWeight: 0.7, defaultComplexity: 'bassa', typicalPartCount: 8 },
   { code: 'I.SF', name: 'Schemi fondazioni', family: 'Generico', defaultImpactWeight: 0.6, defaultComplexity: 'bassa', defaultRequiresWelding: false, defaultRequiresAssembly: false },
@@ -76,20 +93,20 @@ const SEEDS: MachineTypeSeed[] = [
   { code: 'I.SS', name: 'Slitta speciale', family: 'Manipolazione', defaultImpactWeight: 1.4, defaultComplexity: 'alta', typicalAssemblyCount: 2, typicalPartCount: 30, defaultRequiresTesting: true },
   { code: 'I.TA', name: 'Trasportatori aerei', family: 'Trasportatori', defaultImpactWeight: 1.6, defaultComplexity: 'alta', typicalAssemblyCount: 3, typicalPartCount: 50 },
   { code: 'I.TB', name: 'Trasbordatore', family: 'Trasportatori', defaultImpactWeight: 1.8, defaultComplexity: 'alta', typicalAssemblyCount: 3, typicalPartCount: 55, defaultRequiresTesting: true },
-  { code: 'I.TC', name: 'Trasportatore a catena', family: 'Trasportatori', defaultImpactWeight: 1.5, defaultComplexity: 'alta', typicalAssemblyCount: 2, typicalPartCount: 40 },
+  { code: 'I.TC', name: 'Trasportatore a catena', family: 'Trasportatori', defaultImpactWeight: 1.5, defaultComplexity: 'alta', typicalAssemblyCount: 2, typicalPartCount: 40, defaultLaserWeightPercent: 15, defaultBendingWeightPercent: 10, defaultWeldingWeightPercent: 30, defaultAssemblyWeightPercent: 45 },
   { code: 'I.TF', name: 'Trasferitori', family: 'Trasportatori', defaultImpactWeight: 1.4, defaultComplexity: 'alta', typicalAssemblyCount: 2, typicalPartCount: 35, defaultRequiresTesting: true },
   { code: 'I.TG', name: 'Trasportatore a cinghia', family: 'Trasportatori', defaultImpactWeight: 1.2, defaultComplexity: 'media', typicalAssemblyCount: 2, typicalPartCount: 25 },
   { code: 'I.TL', name: 'Trasportatori a coclea', family: 'Trasportatori', defaultImpactWeight: 1.3, defaultComplexity: 'media', typicalAssemblyCount: 2, typicalPartCount: 25 },
   { code: 'I.TM', name: 'Tunnel di riscaldamento', family: 'Impianti', defaultImpactWeight: 1.6, defaultComplexity: 'alta', typicalAssemblyCount: 2, typicalPartCount: 40, defaultRequiresTesting: true },
   { code: 'I.TN', name: 'Trasportatore a nastro', family: 'Trasportatori', defaultImpactWeight: 1.2, defaultComplexity: 'media', typicalAssemblyCount: 2, typicalPartCount: 24 },
-  { code: 'I.TR', name: 'Trasportatore a rulli', family: 'Trasportatori', defaultImpactWeight: 1.3, defaultComplexity: 'media', typicalAssemblyCount: 2, typicalPartCount: 25 },
-  { code: 'I.TS', name: 'Tendostrutture', family: 'Tendostrutture / Strutture', defaultImpactWeight: 2.2, defaultComplexity: 'alta', defaultRequiresTubeLaser: true, typicalAssemblyCount: 8, typicalPartCount: 120 },
-  { code: 'I.TT', name: 'Trasportatore a tapparelle', family: 'Trasportatori', defaultImpactWeight: 1.8, defaultComplexity: 'alta', typicalAssemblyCount: 3, typicalPartCount: 50 },
+  { code: 'I.TR', name: 'Trasportatore a rulli', family: 'Trasportatori', defaultImpactWeight: 1.3, defaultComplexity: 'media', typicalAssemblyCount: 2, typicalPartCount: 25, defaultLaserWeightPercent: 20, defaultBendingWeightPercent: 15, defaultWeldingWeightPercent: 25, defaultAssemblyWeightPercent: 40 },
+  { code: 'I.TS', name: 'Tendostrutture', family: 'Tendostrutture / Strutture', defaultImpactWeight: 2.2, defaultComplexity: 'alta', defaultRequiresTubeLaser: true, typicalAssemblyCount: 8, typicalPartCount: 120, defaultLaserWeightPercent: 15, defaultTubeLaserWeightPercent: 25, defaultBendingWeightPercent: 10, defaultWeldingWeightPercent: 25, defaultAssemblyWeightPercent: 25 },
+  { code: 'I.TT', name: 'Trasportatore a tapparelle', family: 'Trasportatori', defaultImpactWeight: 1.8, defaultComplexity: 'alta', typicalAssemblyCount: 3, typicalPartCount: 50, defaultLaserWeightPercent: 15, defaultBendingWeightPercent: 15, defaultWeldingWeightPercent: 25, defaultAssemblyWeightPercent: 45 },
   { code: 'I.TZ', name: 'Trasportatore a tazze', family: 'Trasportatori', defaultImpactWeight: 1.5, defaultComplexity: 'alta', typicalAssemblyCount: 2, typicalPartCount: 40, defaultRequiresTesting: true },
   { code: 'I.UR', name: 'Unita rotante automatica', family: 'Manipolazione', defaultImpactWeight: 1.6, defaultComplexity: 'alta', typicalAssemblyCount: 2, typicalPartCount: 35, defaultRequiresTesting: true },
   { code: 'I.VV', name: 'Vibrovagliatore', family: 'Impianti', defaultImpactWeight: 1.4, defaultComplexity: 'alta', typicalAssemblyCount: 2, typicalPartCount: 30, defaultRequiresTesting: true },
   { code: 'S.SC', name: 'Standard - Scaffalature', family: 'Standard', defaultImpactWeight: 1, defaultComplexity: 'media', typicalAssemblyCount: 2, typicalPartCount: 25 },
-  { code: 'S.TS', name: 'Standard - tendostrutture', family: 'Standard', defaultImpactWeight: 1.8, defaultComplexity: 'media', defaultRequiresTubeLaser: true, typicalAssemblyCount: 5, typicalPartCount: 80 },
+  { code: 'S.TS', name: 'Standard - tendostrutture', family: 'Standard', defaultImpactWeight: 1.8, defaultComplexity: 'media', defaultRequiresTubeLaser: true, typicalAssemblyCount: 5, typicalPartCount: 80, defaultLaserWeightPercent: 10, defaultTubeLaserWeightPercent: 25, defaultBendingWeightPercent: 10, defaultWeldingWeightPercent: 25, defaultAssemblyWeightPercent: 30 },
 ]
 
 function idFromCode(code: string): string {
@@ -98,6 +115,7 @@ function idFromCode(code: string): string {
 
 function toMachineType(seed: MachineTypeSeed): MachineType {
   const merged = { ...BASE_DEFAULTS, ...seed }
+  const processWeights = buildProcessWeights(merged)
   return {
     id: idFromCode(seed.code),
     code: seed.code,
@@ -113,6 +131,7 @@ function toMachineType(seed: MachineTypeSeed): MachineType {
     defaultRequiresAssembly: merged.defaultRequiresAssembly,
     defaultRequiresPainting: merged.defaultRequiresPainting,
     defaultRequiresTesting: merged.defaultRequiresTesting,
+    ...processWeights,
     typicalAssemblyCount: merged.typicalAssemblyCount,
     typicalPartCount: merged.typicalPartCount,
     active: true,
@@ -122,5 +141,31 @@ function toMachineType(seed: MachineTypeSeed): MachineType {
   }
 }
 
-export const DEFAULT_MACHINE_TYPES: MachineType[] = SEEDS.map(toMachineType)
+function buildProcessWeights(seed: Record<string, unknown>) {
+  const enabled = PROCESS_FIELDS.filter((process) => Boolean(seed[process.flag]))
+  const fallback = enabled.length > 0 ? Math.round(100 / enabled.length) : 0
+  return Object.fromEntries(
+    PROCESS_FIELDS.map((process) => {
+      const value = Boolean(seed[process.flag])
+        ? normalizeWeight(seed[process.weight], fallback)
+        : 0
+      return [process.weight, value]
+    }),
+  ) as Pick<
+    MachineType,
+    | 'defaultLaserWeightPercent'
+    | 'defaultTubeLaserWeightPercent'
+    | 'defaultBendingWeightPercent'
+    | 'defaultWeldingWeightPercent'
+    | 'defaultAssemblyWeightPercent'
+    | 'defaultPaintingWeightPercent'
+    | 'defaultTestingWeightPercent'
+  >
+}
 
+function normalizeWeight(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.max(0, Math.min(100, Math.round(value)))
+}
+
+export const DEFAULT_MACHINE_TYPES: MachineType[] = SEEDS.map(toMachineType)

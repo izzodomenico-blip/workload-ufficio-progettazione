@@ -32,6 +32,13 @@ const EMPTY_OUTPUT: WorkshopOutputDraft = {
   requiresAssembly: true,
   requiresPainting: false,
   requiresTesting: false,
+  laserWeightPercent: 25,
+  tubeLaserWeightPercent: 0,
+  bendingWeightPercent: 25,
+  weldingWeightPercent: 25,
+  assemblyWeightPercent: 25,
+  paintingWeightPercent: 0,
+  testingWeightPercent: 0,
   plannedReleaseDate: '',
   actualReleaseDate: '',
   impactScore: 0,
@@ -40,13 +47,13 @@ const EMPTY_OUTPUT: WorkshopOutputDraft = {
 }
 
 const PROCESS_FIELDS = [
-  ['requiresLaser', 'Laser piano'],
-  ['requiresTubeLaser', 'Laser tubo'],
-  ['requiresBending', 'Piega'],
-  ['requiresWelding', 'Saldatura/carpenteria'],
-  ['requiresAssembly', 'Montaggio'],
-  ['requiresPainting', 'Verniciatura/trattamento'],
-  ['requiresTesting', 'Collaudo'],
+  { key: 'requiresLaser', weight: 'laserWeightPercent', label: 'Laser piano' },
+  { key: 'requiresTubeLaser', weight: 'tubeLaserWeightPercent', label: 'Laser tubo' },
+  { key: 'requiresBending', weight: 'bendingWeightPercent', label: 'Piega' },
+  { key: 'requiresWelding', weight: 'weldingWeightPercent', label: 'Saldatura/carpenteria' },
+  { key: 'requiresAssembly', weight: 'assemblyWeightPercent', label: 'Montaggio' },
+  { key: 'requiresPainting', weight: 'paintingWeightPercent', label: 'Verniciatura/trattamento' },
+  { key: 'requiresTesting', weight: 'testingWeightPercent', label: 'Collaudo' },
 ] as const
 
 const STATUS_LABEL: Record<WorkshopOutputStatus, string> = {
@@ -120,6 +127,13 @@ export function WorkshopOutputFormModal({
       requiresAssembly: machineType.defaultRequiresAssembly,
       requiresPainting: machineType.defaultRequiresPainting,
       requiresTesting: machineType.defaultRequiresTesting,
+      laserWeightPercent: machineType.defaultLaserWeightPercent,
+      tubeLaserWeightPercent: machineType.defaultTubeLaserWeightPercent,
+      bendingWeightPercent: machineType.defaultBendingWeightPercent,
+      weldingWeightPercent: machineType.defaultWeldingWeightPercent,
+      assemblyWeightPercent: machineType.defaultAssemblyWeightPercent,
+      paintingWeightPercent: machineType.defaultPaintingWeightPercent,
+      testingWeightPercent: machineType.defaultTestingWeightPercent,
       plannedReleaseDate: values.plannedReleaseDate || defaultPlannedReleaseDate,
       status: values.status || 'previsto',
     }
@@ -265,18 +279,41 @@ export function WorkshopOutputFormModal({
             <div className="md:col-span-2">
               <div className="mb-2 section-label">Processi</div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {PROCESS_FIELDS.map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm text-slate-200">
+                {PROCESS_FIELDS.map((process) => (
+                  <div key={process.key} className="grid grid-cols-[1fr_82px] items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm text-slate-200">
+                    <label className="flex min-w-0 items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(values[process.key])}
+                        onChange={(event) => {
+                          const checked = event.target.checked
+                          setValues((current) => recalculate({
+                            ...current,
+                            [process.key]: checked,
+                            [process.weight]: checked && current[process.weight] <= 0 ? 20 : current[process.weight],
+                          }, machineTypes))
+                        }}
+                        className="h-4 w-4 rounded border-slate-700 bg-slate-900"
+                      />
+                      <span className="truncate">{process.label}</span>
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={Boolean(values[key])}
-                      onChange={(event) => set(key, event.target.checked)}
-                      className="h-4 w-4 rounded border-slate-700 bg-slate-900"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={5}
+                      disabled={!values[process.key]}
+                      value={values[process.weight]}
+                      onChange={(event) => set(process.weight, Number(event.target.value))}
+                      className="input-base h-8 px-2 text-right text-xs disabled:opacity-45"
+                      aria-label={`Incidenza ${process.label}`}
                     />
-                    {label}
-                  </label>
+                  </div>
                 ))}
               </div>
+              <p className="mt-2 text-[11px] text-slate-500">
+                Le percentuali sono incidenze relative del processo per questo output; non devono sommare per forza a 100.
+              </p>
             </div>
             <FormField label="Stato">
               <select
@@ -325,10 +362,17 @@ export function workshopProcessLabels(output: Pick<
   | 'requiresAssembly'
   | 'requiresPainting'
   | 'requiresTesting'
+  | 'laserWeightPercent'
+  | 'tubeLaserWeightPercent'
+  | 'bendingWeightPercent'
+  | 'weldingWeightPercent'
+  | 'assemblyWeightPercent'
+  | 'paintingWeightPercent'
+  | 'testingWeightPercent'
 >): string[] {
   return PROCESS_FIELDS
-    .filter(([key]) => Boolean(output[key]))
-    .map(([, label]) => label)
+    .filter((process) => Boolean(output[process.key]))
+    .map((process) => `${process.label} ${output[process.weight]}%`)
 }
 
 export function impactLevelClass(level: ReturnType<typeof getWorkshopImpactLevel>): string {
@@ -343,12 +387,26 @@ function recalculate(output: WorkshopOutputDraft, machineTypes: MachineType[]): 
     item.id === output.machineTypeId ||
     item.code.toUpperCase() === output.machineTypeCode.toUpperCase()
   ))
-  return {
+  const normalized = {
     ...output,
     quantity: Number.isFinite(output.quantity) ? Math.max(0.1, output.quantity) : 1,
     assemblyCount: Number.isFinite(output.assemblyCount) ? Math.max(0, Math.round(output.assemblyCount)) : 0,
     estimatedPartCount: Number.isFinite(output.estimatedPartCount) ? Math.max(0, Math.round(output.estimatedPartCount)) : 0,
-    impactScore: calculateWorkshopImpact(output, machineType),
+    laserWeightPercent: clampPercent(output.laserWeightPercent),
+    tubeLaserWeightPercent: clampPercent(output.tubeLaserWeightPercent),
+    bendingWeightPercent: clampPercent(output.bendingWeightPercent),
+    weldingWeightPercent: clampPercent(output.weldingWeightPercent),
+    assemblyWeightPercent: clampPercent(output.assemblyWeightPercent),
+    paintingWeightPercent: clampPercent(output.paintingWeightPercent),
+    testingWeightPercent: clampPercent(output.testingWeightPercent),
+  }
+  return {
+    ...normalized,
+    impactScore: calculateWorkshopImpact(normalized, machineType),
   }
 }
 
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, Math.round(value)))
+}

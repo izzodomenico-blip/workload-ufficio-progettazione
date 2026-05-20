@@ -38,6 +38,12 @@ html, body, #root {
   height: 100%;
 }
 
+:root {
+  /* Altezza dell'header sticky: usata per ancorare la barra di navigazione
+     che resta visibile durante lo scroll, subito sotto l'header. */
+  --app-header-h: 65px;
+}
+
 body {
   background:
     radial-gradient(1200px 800px at 10% -10%, #14224d 0%, transparent 55%),

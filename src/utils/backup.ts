@@ -29,11 +29,61 @@ import type {
   WorkshopOutputStatus,
 } from '../types'
 import { ALL_BUSINESS_PARTNER_TYPES } from '../types'
+import { DEFAULT_MACHINE_TYPES } from '../data/machineTypes'
 import { mapLegacyStatus } from './progress'
 
 export const BACKUP_APP_NAME = 'workload-ufficio-progettazione'
 export const BACKUP_VERSION = 'v1.1-sqlite-local'
 export const LAST_BACKUP_STORAGE_KEY = 'workload-ufficio-progettazione:lastBackupAt'
+
+const DEFAULT_MACHINE_TYPES_BY_CODE = new Map(
+  DEFAULT_MACHINE_TYPES.map((item) => [item.code.toUpperCase(), item]),
+)
+
+const PROCESS_FIELDS = [
+  {
+    machineFlag: 'defaultRequiresLaser',
+    machineWeight: 'defaultLaserWeightPercent',
+    outputFlag: 'requiresLaser',
+    outputWeight: 'laserWeightPercent',
+  },
+  {
+    machineFlag: 'defaultRequiresTubeLaser',
+    machineWeight: 'defaultTubeLaserWeightPercent',
+    outputFlag: 'requiresTubeLaser',
+    outputWeight: 'tubeLaserWeightPercent',
+  },
+  {
+    machineFlag: 'defaultRequiresBending',
+    machineWeight: 'defaultBendingWeightPercent',
+    outputFlag: 'requiresBending',
+    outputWeight: 'bendingWeightPercent',
+  },
+  {
+    machineFlag: 'defaultRequiresWelding',
+    machineWeight: 'defaultWeldingWeightPercent',
+    outputFlag: 'requiresWelding',
+    outputWeight: 'weldingWeightPercent',
+  },
+  {
+    machineFlag: 'defaultRequiresAssembly',
+    machineWeight: 'defaultAssemblyWeightPercent',
+    outputFlag: 'requiresAssembly',
+    outputWeight: 'assemblyWeightPercent',
+  },
+  {
+    machineFlag: 'defaultRequiresPainting',
+    machineWeight: 'defaultPaintingWeightPercent',
+    outputFlag: 'requiresPainting',
+    outputWeight: 'paintingWeightPercent',
+  },
+  {
+    machineFlag: 'defaultRequiresTesting',
+    machineWeight: 'defaultTestingWeightPercent',
+    outputFlag: 'requiresTesting',
+    outputWeight: 'testingWeightPercent',
+  },
+] as const
 
 export interface BackupCounts {
   people: number
@@ -502,24 +552,30 @@ function normalizeMachineType(value: unknown): MachineType | null {
   if (!o) return null
   if (!isNonEmptyString(o.id) || !isNonEmptyString(o.code) || !isNonEmptyString(o.name)) return null
   const now = new Date().toISOString()
+  const code = o.code.trim().toUpperCase()
+  const defaults = DEFAULT_MACHINE_TYPES_BY_CODE.get(code)
   const complexity: MachineComplexity = MACHINE_COMPLEXITIES.has(o.defaultComplexity as string)
     ? (o.defaultComplexity as MachineComplexity)
     : 'media'
+  const processFlags = {
+    defaultRequiresLaser: booleanOr(o.defaultRequiresLaser, defaults?.defaultRequiresLaser ?? true),
+    defaultRequiresTubeLaser: booleanOr(o.defaultRequiresTubeLaser, defaults?.defaultRequiresTubeLaser ?? false),
+    defaultRequiresBending: booleanOr(o.defaultRequiresBending, defaults?.defaultRequiresBending ?? true),
+    defaultRequiresWelding: booleanOr(o.defaultRequiresWelding, defaults?.defaultRequiresWelding ?? true),
+    defaultRequiresAssembly: booleanOr(o.defaultRequiresAssembly, defaults?.defaultRequiresAssembly ?? true),
+    defaultRequiresPainting: booleanOr(o.defaultRequiresPainting, defaults?.defaultRequiresPainting ?? false),
+    defaultRequiresTesting: booleanOr(o.defaultRequiresTesting, defaults?.defaultRequiresTesting ?? false),
+  }
   return {
     id: o.id,
-    code: o.code.trim().toUpperCase(),
+    code,
     name: o.name.trim(),
     family: isNonEmptyString(o.family) ? o.family.trim() : 'Generico',
     description: isString(o.description) ? o.description : '',
     defaultImpactWeight: positiveNumber(o.defaultImpactWeight, 1),
     defaultComplexity: complexity,
-    defaultRequiresLaser: booleanOr(o.defaultRequiresLaser, true),
-    defaultRequiresTubeLaser: booleanOr(o.defaultRequiresTubeLaser, false),
-    defaultRequiresBending: booleanOr(o.defaultRequiresBending, true),
-    defaultRequiresWelding: booleanOr(o.defaultRequiresWelding, true),
-    defaultRequiresAssembly: booleanOr(o.defaultRequiresAssembly, true),
-    defaultRequiresPainting: booleanOr(o.defaultRequiresPainting, false),
-    defaultRequiresTesting: booleanOr(o.defaultRequiresTesting, false),
+    ...processFlags,
+    ...machineProcessWeights(o, defaults, processFlags),
     typicalAssemblyCount: nonNegativeInteger(o.typicalAssemblyCount, 1),
     typicalPartCount: nonNegativeInteger(o.typicalPartCount, 10),
     active: typeof o.active === 'boolean' ? o.active : true,
@@ -535,30 +591,36 @@ function normalizeWorkshopOutput(value: unknown): WorkshopOutput | null {
   if (!isNonEmptyString(o.id) || !isNonEmptyString(o.workItemId)) return null
   if (!isNonEmptyString(o.machineTypeCode) || !isNonEmptyString(o.machineTypeName)) return null
   const now = new Date().toISOString()
+  const machineTypeCode = o.machineTypeCode.trim().toUpperCase()
+  const defaults = DEFAULT_MACHINE_TYPES_BY_CODE.get(machineTypeCode)
   const complexity: MachineComplexity = MACHINE_COMPLEXITIES.has(o.complexity as string)
     ? (o.complexity as MachineComplexity)
     : 'media'
   const status: WorkshopOutputStatus = WORKSHOP_OUTPUT_STATUSES.has(o.status as string)
     ? (o.status as WorkshopOutputStatus)
     : 'previsto'
+  const processFlags = {
+    requiresLaser: booleanOr(o.requiresLaser, defaults?.defaultRequiresLaser ?? false),
+    requiresTubeLaser: booleanOr(o.requiresTubeLaser, defaults?.defaultRequiresTubeLaser ?? false),
+    requiresBending: booleanOr(o.requiresBending, defaults?.defaultRequiresBending ?? false),
+    requiresWelding: booleanOr(o.requiresWelding, defaults?.defaultRequiresWelding ?? false),
+    requiresAssembly: booleanOr(o.requiresAssembly, defaults?.defaultRequiresAssembly ?? false),
+    requiresPainting: booleanOr(o.requiresPainting, defaults?.defaultRequiresPainting ?? false),
+    requiresTesting: booleanOr(o.requiresTesting, defaults?.defaultRequiresTesting ?? false),
+  }
   return {
     id: o.id,
     workItemId: o.workItemId,
     machineTypeId: isString(o.machineTypeId) ? o.machineTypeId : '',
-    machineTypeCode: o.machineTypeCode.trim().toUpperCase(),
+    machineTypeCode,
     machineTypeName: o.machineTypeName.trim(),
     description: isString(o.description) ? o.description : '',
     quantity: positiveNumber(o.quantity, 1),
     complexity,
     assemblyCount: nonNegativeInteger(o.assemblyCount, 0),
     estimatedPartCount: nonNegativeInteger(o.estimatedPartCount, 0),
-    requiresLaser: booleanOr(o.requiresLaser, false),
-    requiresTubeLaser: booleanOr(o.requiresTubeLaser, false),
-    requiresBending: booleanOr(o.requiresBending, false),
-    requiresWelding: booleanOr(o.requiresWelding, false),
-    requiresAssembly: booleanOr(o.requiresAssembly, false),
-    requiresPainting: booleanOr(o.requiresPainting, false),
-    requiresTesting: booleanOr(o.requiresTesting, false),
+    ...processFlags,
+    ...outputProcessWeights(o, defaults, processFlags),
     plannedReleaseDate: isString(o.plannedReleaseDate) ? o.plannedReleaseDate : '',
     actualReleaseDate: isString(o.actualReleaseDate) ? o.actualReleaseDate : '',
     impactScore: isNumber(o.impactScore) ? Math.max(0, Math.round(o.impactScore * 10) / 10) : 0,
@@ -609,6 +671,81 @@ function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'ab
     machineTypes: data.machineTypes.length,
     workshopOutputs: data.workshopOutputs.length,
   }
+}
+
+function machineProcessWeights(
+  raw: Record<string, unknown>,
+  defaults: MachineType | undefined,
+  flags: Record<string, boolean>,
+): Pick<
+  MachineType,
+  | 'defaultLaserWeightPercent'
+  | 'defaultTubeLaserWeightPercent'
+  | 'defaultBendingWeightPercent'
+  | 'defaultWeldingWeightPercent'
+  | 'defaultAssemblyWeightPercent'
+  | 'defaultPaintingWeightPercent'
+  | 'defaultTestingWeightPercent'
+> {
+  const enabled = PROCESS_FIELDS.filter((process) => flags[process.machineFlag])
+  const fallback = enabled.length > 0 ? Math.round(100 / enabled.length) : 0
+  return Object.fromEntries(
+    PROCESS_FIELDS.map((process) => {
+      const value = flags[process.machineFlag]
+        ? percentOr(raw[process.machineWeight], defaults?.[process.machineWeight] ?? fallback)
+        : 0
+      return [process.machineWeight, value]
+    }),
+  ) as Pick<
+    MachineType,
+    | 'defaultLaserWeightPercent'
+    | 'defaultTubeLaserWeightPercent'
+    | 'defaultBendingWeightPercent'
+    | 'defaultWeldingWeightPercent'
+    | 'defaultAssemblyWeightPercent'
+    | 'defaultPaintingWeightPercent'
+    | 'defaultTestingWeightPercent'
+  >
+}
+
+function outputProcessWeights(
+  raw: Record<string, unknown>,
+  defaults: MachineType | undefined,
+  flags: Record<string, boolean>,
+): Pick<
+  WorkshopOutput,
+  | 'laserWeightPercent'
+  | 'tubeLaserWeightPercent'
+  | 'bendingWeightPercent'
+  | 'weldingWeightPercent'
+  | 'assemblyWeightPercent'
+  | 'paintingWeightPercent'
+  | 'testingWeightPercent'
+> {
+  const enabled = PROCESS_FIELDS.filter((process) => flags[process.outputFlag])
+  const fallback = enabled.length > 0 ? Math.round(100 / enabled.length) : 0
+  return Object.fromEntries(
+    PROCESS_FIELDS.map((process) => {
+      const value = flags[process.outputFlag]
+        ? percentOr(raw[process.outputWeight], defaults?.[process.machineWeight] ?? fallback)
+        : 0
+      return [process.outputWeight, value]
+    }),
+  ) as Pick<
+    WorkshopOutput,
+    | 'laserWeightPercent'
+    | 'tubeLaserWeightPercent'
+    | 'bendingWeightPercent'
+    | 'weldingWeightPercent'
+    | 'assemblyWeightPercent'
+    | 'paintingWeightPercent'
+    | 'testingWeightPercent'
+  >
+}
+
+function percentOr(value: unknown, fallback: number): number {
+  if (!isNumber(value)) return Math.max(0, Math.min(100, Math.round(fallback)))
+  return Math.max(0, Math.min(100, Math.round(value)))
 }
 
 function invalid(issues: string[]): BackupValidationResult {

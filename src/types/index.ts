@@ -273,6 +273,13 @@ export interface MachineType {
   defaultRequiresAssembly: boolean
   defaultRequiresPainting: boolean
   defaultRequiresTesting: boolean
+  defaultLaserWeightPercent: number
+  defaultTubeLaserWeightPercent: number
+  defaultBendingWeightPercent: number
+  defaultWeldingWeightPercent: number
+  defaultAssemblyWeightPercent: number
+  defaultPaintingWeightPercent: number
+  defaultTestingWeightPercent: number
   typicalAssemblyCount: number
   typicalPartCount: number
   active: boolean
@@ -318,6 +325,13 @@ export interface WorkshopOutput {
   requiresAssembly: boolean
   requiresPainting: boolean
   requiresTesting: boolean
+  laserWeightPercent: number
+  tubeLaserWeightPercent: number
+  bendingWeightPercent: number
+  weldingWeightPercent: number
+  assemblyWeightPercent: number
+  paintingWeightPercent: number
+  testingWeightPercent: number
   plannedReleaseDate: string
   actualReleaseDate: string
   impactScore: number

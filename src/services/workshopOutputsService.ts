@@ -10,6 +10,16 @@ export type WorkshopOutputDraft =
 export type CreateWorkshopOutputInput = Omit<WorkshopOutputDraft, 'id' | 'workItemId' | 'createdAt' | 'updatedAt'>
 export type UpdateWorkshopOutputInput = Partial<CreateWorkshopOutputInput>
 
+const PROCESS_FIELDS = [
+  { flag: 'requiresLaser', weight: 'laserWeightPercent', key: 'laser' },
+  { flag: 'requiresTubeLaser', weight: 'tubeLaserWeightPercent', key: 'tube' },
+  { flag: 'requiresBending', weight: 'bendingWeightPercent', key: 'bend' },
+  { flag: 'requiresWelding', weight: 'weldingWeightPercent', key: 'weld' },
+  { flag: 'requiresAssembly', weight: 'assemblyWeightPercent', key: 'assembly' },
+  { flag: 'requiresPainting', weight: 'paintingWeightPercent', key: 'painting' },
+  { flag: 'requiresTesting', weight: 'testingWeightPercent', key: 'testing' },
+] as const
+
 function nowISO(): string {
   return new Date().toISOString()
 }
@@ -46,6 +56,7 @@ function normalizeDraft(
     requiresAssembly: Boolean(draft.requiresAssembly),
     requiresPainting: Boolean(draft.requiresPainting),
     requiresTesting: Boolean(draft.requiresTesting),
+    ...cleanProcessWeights(draft),
     plannedReleaseDate: draft.plannedReleaseDate ?? '',
     actualReleaseDate: draft.actualReleaseDate ?? '',
     impactScore: 0,
@@ -68,6 +79,31 @@ function cleanNumber(value: number, fallback: number, min: number): number {
 function cleanInteger(value: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback
   return Math.max(0, Math.round(value))
+}
+
+function cleanPercent(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function cleanProcessWeights(draft: WorkshopOutputDraft) {
+  const active = PROCESS_FIELDS.filter((process) => Boolean(draft[process.flag]))
+  const fallback = active.length > 0 ? Math.round(100 / active.length) : 0
+  return Object.fromEntries(
+    PROCESS_FIELDS.map((process) => [
+      process.weight,
+      draft[process.flag] ? cleanPercent(draft[process.weight], fallback) : 0,
+    ]),
+  ) as Pick<
+    WorkshopOutput,
+    | 'laserWeightPercent'
+    | 'tubeLaserWeightPercent'
+    | 'bendingWeightPercent'
+    | 'weldingWeightPercent'
+    | 'assemblyWeightPercent'
+    | 'paintingWeightPercent'
+    | 'testingWeightPercent'
+  >
 }
 
 function sortOutputs(outputs: WorkshopOutput[]): WorkshopOutput[] {
@@ -102,15 +138,10 @@ function describeChange(before: WorkshopOutput, after: WorkshopOutput): string {
 }
 
 function processKey(output: WorkshopOutput): string {
-  return [
-    output.requiresLaser ? 'laser' : '',
-    output.requiresTubeLaser ? 'tube' : '',
-    output.requiresBending ? 'bend' : '',
-    output.requiresWelding ? 'weld' : '',
-    output.requiresAssembly ? 'assembly' : '',
-    output.requiresPainting ? 'painting' : '',
-    output.requiresTesting ? 'testing' : '',
-  ].filter(Boolean).join(',')
+  return PROCESS_FIELDS
+    .filter((process) => output[process.flag])
+    .map((process) => `${process.key}:${output[process.weight]}%`)
+    .join(',')
 }
 
 function isSameOutput(before: WorkshopOutput, after: WorkshopOutput): boolean {
@@ -257,4 +288,3 @@ export function replaceWorkshopOutputsForWorkItem(
     workshopOutputs: sortOutputs([...nextData.workshopOutputs, ...nextOutputs]),
   }
 }
-

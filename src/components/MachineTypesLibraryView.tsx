@@ -20,15 +20,24 @@ type ProcessKey =
   | 'defaultRequiresAssembly'
   | 'defaultRequiresPainting'
   | 'defaultRequiresTesting'
+type ProcessWeightKey =
+  | 'defaultLaserWeightPercent'
+  | 'defaultTubeLaserWeightPercent'
+  | 'defaultBendingWeightPercent'
+  | 'defaultWeldingWeightPercent'
+  | 'defaultAssemblyWeightPercent'
+  | 'defaultPaintingWeightPercent'
+  | 'defaultTestingWeightPercent'
+type NumericMachineTypeField = 'defaultImpactWeight' | 'typicalAssemblyCount' | 'typicalPartCount' | ProcessWeightKey
 
-const PROCESS_FIELDS: Array<{ key: ProcessKey; label: string }> = [
-  { key: 'defaultRequiresLaser', label: 'Laser' },
-  { key: 'defaultRequiresTubeLaser', label: 'Laser tubo' },
-  { key: 'defaultRequiresBending', label: 'Piegatura' },
-  { key: 'defaultRequiresWelding', label: 'Saldatura' },
-  { key: 'defaultRequiresAssembly', label: 'Montaggio' },
-  { key: 'defaultRequiresPainting', label: 'Verniciatura' },
-  { key: 'defaultRequiresTesting', label: 'Collaudo' },
+const PROCESS_FIELDS: Array<{ key: ProcessKey; weight: ProcessWeightKey; label: string }> = [
+  { key: 'defaultRequiresLaser', weight: 'defaultLaserWeightPercent', label: 'Laser' },
+  { key: 'defaultRequiresTubeLaser', weight: 'defaultTubeLaserWeightPercent', label: 'Laser tubo' },
+  { key: 'defaultRequiresBending', weight: 'defaultBendingWeightPercent', label: 'Piegatura' },
+  { key: 'defaultRequiresWelding', weight: 'defaultWeldingWeightPercent', label: 'Saldatura' },
+  { key: 'defaultRequiresAssembly', weight: 'defaultAssemblyWeightPercent', label: 'Montaggio' },
+  { key: 'defaultRequiresPainting', weight: 'defaultPaintingWeightPercent', label: 'Verniciatura' },
+  { key: 'defaultRequiresTesting', weight: 'defaultTestingWeightPercent', label: 'Collaudo' },
 ]
 
 const EMPTY_FORM: CreateMachineTypeInput = {
@@ -45,6 +54,13 @@ const EMPTY_FORM: CreateMachineTypeInput = {
   defaultRequiresAssembly: true,
   defaultRequiresPainting: false,
   defaultRequiresTesting: false,
+  defaultLaserWeightPercent: 25,
+  defaultTubeLaserWeightPercent: 0,
+  defaultBendingWeightPercent: 25,
+  defaultWeldingWeightPercent: 25,
+  defaultAssemblyWeightPercent: 25,
+  defaultPaintingWeightPercent: 0,
+  defaultTestingWeightPercent: 0,
   typicalAssemblyCount: 1,
   typicalPartCount: 10,
   active: true,
@@ -119,7 +135,7 @@ export function MachineTypesLibraryView() {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
-  function handleNumberField(key: 'defaultImpactWeight' | 'typicalAssemblyCount' | 'typicalPartCount') {
+  function handleNumberField(key: NumericMachineTypeField) {
     return (event: ChangeEvent<HTMLInputElement>) => {
       const value = Number(event.target.value)
       updateField(key, Number.isFinite(value) ? value : 0)
@@ -149,6 +165,7 @@ export function MachineTypesLibraryView() {
       description: form.description.trim(),
       notes: form.notes.trim(),
       defaultImpactWeight: Math.max(0.1, form.defaultImpactWeight),
+      ...normalizeFormProcessWeights(form),
       typicalAssemblyCount: Math.max(0, Math.round(form.typicalAssemblyCount)),
       typicalPartCount: Math.max(0, Math.round(form.typicalPartCount)),
     }
@@ -343,7 +360,7 @@ function MachineTypeModal({
   onClose: () => void
   onSave: () => void
   onFieldChange: <K extends keyof CreateMachineTypeInput>(key: K, value: CreateMachineTypeInput[K]) => void
-  onNumberField: (key: 'defaultImpactWeight' | 'typicalAssemblyCount' | 'typicalPartCount') => (event: ChangeEvent<HTMLInputElement>) => void
+  onNumberField: (key: NumericMachineTypeField) => (event: ChangeEvent<HTMLInputElement>) => void
 }) {
   return (
     <Modal
@@ -448,19 +465,39 @@ function MachineTypeModal({
         </Field>
         <div className="md:col-span-2">
           <div className="mb-2 section-label">Processi default</div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {PROCESS_FIELDS.map((process) => (
-              <label key={process.key} className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm text-slate-200">
+              <div key={process.key} className="grid grid-cols-[1fr_82px] items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm text-slate-200">
+                <label className="flex min-w-0 items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form[process.key])}
+                    onChange={(event) => {
+                      const checked = event.target.checked
+                      onFieldChange(process.key, checked)
+                      if (checked && form[process.weight] <= 0) onFieldChange(process.weight, 20)
+                    }}
+                    className="h-4 w-4 rounded border-slate-700 bg-slate-900"
+                  />
+                  <span className="truncate">{process.label}</span>
+                </label>
                 <input
-                  type="checkbox"
-                  checked={Boolean(form[process.key])}
-                  onChange={(event) => onFieldChange(process.key, event.target.checked)}
-                  className="h-4 w-4 rounded border-slate-700 bg-slate-900"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={5}
+                  disabled={!form[process.key]}
+                  value={form[process.weight]}
+                  onChange={onNumberField(process.weight)}
+                  className="input-base h-8 px-2 text-right text-xs disabled:opacity-45"
+                  aria-label={`Incidenza ${process.label}`}
                 />
-                {process.label}
-              </label>
+              </div>
             ))}
           </div>
+          <p className="mt-2 text-[11px] text-slate-500">
+            Le percentuali pesano il singolo processo dentro quella tipologia macchina. Sono default indicativi e restano modificabili sul singolo output officina.
+          </p>
         </div>
         <Field label="Note" className="md:col-span-2">
           <textarea
@@ -517,7 +554,7 @@ function KpiCard({
 function ProcessBadges({ item }: { item: MachineType }) {
   const labels = PROCESS_FIELDS
     .filter((process) => item[process.key])
-    .map((process) => process.label)
+    .map((process) => `${process.label} ${item[process.weight]}%`)
 
   if (labels.length === 0) return <span className="text-xs text-slate-500">Nessuno</span>
 
@@ -528,6 +565,40 @@ function ProcessBadges({ item }: { item: MachineType }) {
       ))}
     </div>
   )
+}
+
+function normalizeFormProcessWeights(form: CreateMachineTypeInput): Pick<
+  MachineType,
+  | 'defaultLaserWeightPercent'
+  | 'defaultTubeLaserWeightPercent'
+  | 'defaultBendingWeightPercent'
+  | 'defaultWeldingWeightPercent'
+  | 'defaultAssemblyWeightPercent'
+  | 'defaultPaintingWeightPercent'
+  | 'defaultTestingWeightPercent'
+> {
+  const active = PROCESS_FIELDS.filter((process) => form[process.key])
+  const fallback = active.length > 0 ? Math.round(100 / active.length) : 0
+  return Object.fromEntries(
+    PROCESS_FIELDS.map((process) => [
+      process.weight,
+      form[process.key] ? clampPercent(form[process.weight], fallback) : 0,
+    ]),
+  ) as Pick<
+    MachineType,
+    | 'defaultLaserWeightPercent'
+    | 'defaultTubeLaserWeightPercent'
+    | 'defaultBendingWeightPercent'
+    | 'defaultWeldingWeightPercent'
+    | 'defaultAssemblyWeightPercent'
+    | 'defaultPaintingWeightPercent'
+    | 'defaultTestingWeightPercent'
+  >
+}
+
+function clampPercent(value: number, fallback = 0): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.max(0, Math.min(100, Math.round(value)))
 }
 
 function complexityBadgeClass(complexity: MachineComplexity): string {
@@ -560,6 +631,13 @@ function toForm(machineType: MachineType): CreateMachineTypeInput {
     defaultRequiresAssembly: machineType.defaultRequiresAssembly,
     defaultRequiresPainting: machineType.defaultRequiresPainting,
     defaultRequiresTesting: machineType.defaultRequiresTesting,
+    defaultLaserWeightPercent: machineType.defaultLaserWeightPercent,
+    defaultTubeLaserWeightPercent: machineType.defaultTubeLaserWeightPercent,
+    defaultBendingWeightPercent: machineType.defaultBendingWeightPercent,
+    defaultWeldingWeightPercent: machineType.defaultWeldingWeightPercent,
+    defaultAssemblyWeightPercent: machineType.defaultAssemblyWeightPercent,
+    defaultPaintingWeightPercent: machineType.defaultPaintingWeightPercent,
+    defaultTestingWeightPercent: machineType.defaultTestingWeightPercent,
     typicalAssemblyCount: machineType.typicalAssemblyCount,
     typicalPartCount: machineType.typicalPartCount,
     active: machineType.active,

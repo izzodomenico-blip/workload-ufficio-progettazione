@@ -14,7 +14,7 @@ import {
   startOfWeek,
   todayISO,
 } from './dates'
-import { getWorkshopImpactLevel, type WorkshopImpactLevel } from './workshopImpact'
+import { calculateWorkshopImpact, getWorkshopImpactLevel, type WorkshopImpactLevel } from './workshopImpact'
 
 // ===== Processi =====
 
@@ -26,15 +26,23 @@ export type WorkshopProcessKey =
   | 'requiresAssembly'
   | 'requiresPainting'
   | 'requiresTesting'
+export type WorkshopProcessWeightKey =
+  | 'laserWeightPercent'
+  | 'tubeLaserWeightPercent'
+  | 'bendingWeightPercent'
+  | 'weldingWeightPercent'
+  | 'assemblyWeightPercent'
+  | 'paintingWeightPercent'
+  | 'testingWeightPercent'
 
-export const WORKSHOP_PROCESSES: Array<{ key: WorkshopProcessKey; label: string; short: string }> = [
-  { key: 'requiresLaser', label: 'Laser piano', short: 'Laser' },
-  { key: 'requiresTubeLaser', label: 'Laser tubo', short: 'Tubo' },
-  { key: 'requiresBending', label: 'Piega', short: 'Piega' },
-  { key: 'requiresWelding', label: 'Saldatura', short: 'Saldat.' },
-  { key: 'requiresAssembly', label: 'Montaggio', short: 'Mont.' },
-  { key: 'requiresPainting', label: 'Verniciatura', short: 'Vern.' },
-  { key: 'requiresTesting', label: 'Collaudo', short: 'Coll.' },
+export const WORKSHOP_PROCESSES: Array<{ key: WorkshopProcessKey; weight: WorkshopProcessWeightKey; label: string; short: string }> = [
+  { key: 'requiresLaser', weight: 'laserWeightPercent', label: 'Laser piano', short: 'Laser' },
+  { key: 'requiresTubeLaser', weight: 'tubeLaserWeightPercent', label: 'Laser tubo', short: 'Tubo' },
+  { key: 'requiresBending', weight: 'bendingWeightPercent', label: 'Piega', short: 'Piega' },
+  { key: 'requiresWelding', weight: 'weldingWeightPercent', label: 'Saldatura', short: 'Saldat.' },
+  { key: 'requiresAssembly', weight: 'assemblyWeightPercent', label: 'Montaggio', short: 'Mont.' },
+  { key: 'requiresPainting', weight: 'paintingWeightPercent', label: 'Verniciatura', short: 'Vern.' },
+  { key: 'requiresTesting', weight: 'testingWeightPercent', label: 'Collaudo', short: 'Coll.' },
 ]
 
 export const WORKSHOP_STATUS_LABELS: Record<WorkshopOutputStatus, string> = {
@@ -89,6 +97,10 @@ export function buildWorkshopFlow(data: AppData): WorkshopFlowItem[] {
       machineTypeById.get(output.machineTypeId) ??
       machineTypeByCode.get(output.machineTypeCode.toUpperCase())
     const { date, source } = resolveWorkshopDate(output, workItem)
+    const effectiveOutput: WorkshopOutput = {
+      ...output,
+      impactScore: calculateWorkshopImpact(output, machineType),
+    }
     const assignees = workItem
       ? workItem.assigneeIds.map((id) => personById.get(id)?.name).filter((n): n is string => Boolean(n))
       : []
@@ -97,15 +109,15 @@ export function buildWorkshopFlow(data: AppData): WorkshopFlowItem[] {
       if (owner) assignees.push(owner.name)
     }
     return {
-      output,
+      output: effectiveOutput,
       workItem,
       machineType,
       workshopDate: date,
       workshopDateSource: source,
-      level: getWorkshopImpactLevel(output.impactScore),
+      level: getWorkshopImpactLevel(effectiveOutput.impactScore),
       customerName: workItem?.customerPartnerName || workItem?.customer || '—',
       assignees,
-      processes: WORKSHOP_PROCESSES.filter((p) => output[p.key]).map((p) => p.key),
+      processes: WORKSHOP_PROCESSES.filter((p) => effectiveOutput[p.key]).map((p) => p.key),
     }
   })
 }
@@ -346,7 +358,7 @@ export function buildProcessLoad(items: WorkshopFlowItem[]): WorkshopProcessLoad
     for (const item of matching) {
       totalQuantity += item.output.quantity
       totalParts += item.output.estimatedPartCount
-      totalImpact += item.output.impactScore
+      totalImpact += processImpact(item.output, process)
       if (item.workItem) workItemIds.add(item.workItem.id)
     }
     return {
@@ -359,6 +371,12 @@ export function buildProcessLoad(items: WorkshopFlowItem[]): WorkshopProcessLoad
       workItemCount: workItemIds.size,
     }
   })
+}
+
+export function processImpact(output: WorkshopOutput, process: { key: WorkshopProcessKey; weight: WorkshopProcessWeightKey }): number {
+  if (!output[process.key]) return 0
+  const weight = Number.isFinite(output[process.weight]) ? output[process.weight] : 100
+  return output.impactScore * Math.max(0, Math.min(100, weight)) / 100
 }
 
 // ===== Vista per tipologia macchina =====

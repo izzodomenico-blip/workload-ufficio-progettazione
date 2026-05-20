@@ -7,6 +7,25 @@ output verso officina e report dell'ufficio progettazione.
 La versione attuale è **v1.1**: frontend React/Vite + backend Node.js/Express +
 database SQLite locale condiviso.
 
+## Come si calcola il carico (workload)
+
+Il carico di ogni persona è guidato **dai lavori**, non dai task:
+
+- Ogni lavoro ha un **carico stimato** dichiarato nella tendina "Carico stimato
+  del lavoro" (in ore) e una **data di consegna**.
+- Le ore vengono distribuite dalla data odierna fino alla consegna e ripartite
+  tra gli **assegnatari** del lavoro. Se un lavoro non ha assegnatari, il carico
+  ricade sull'**owner**.
+- Quindi **basta salvare il lavoro** con carico e consegna per vederlo nel
+  workload e nella pianificazione: non serve creare task.
+- I **task sono solo dettagli descrittivi**, utili per annotare dinamiche
+  interne di un lavoro. **Non hanno peso**: non cambiano il carico né la salute
+  del lavoro.
+
+La salute del lavoro (OK / a rischio / in ritardo) è calcolata sempre dal lavoro
+stesso (stato, date, avanzamento), confrontando l'avanzamento reale con quello
+atteso in base ai giorni lavorativi fino alla consegna.
+
 ## Cosa cambia in v1.1
 
 La vecchia versione salvava i dati nel `localStorage` del singolo browser. Questo
@@ -20,6 +39,26 @@ data/workload.db
 
 Tutti gli utenti della stessa rete aziendale aprono lo stesso link del PC/server
 che ospita l'app e leggono/scrivono gli stessi dati.
+
+### Sicurezza salvataggi condivisi
+
+Il frontend usa il database SQLite come fonte dati principale. La cache
+`localStorage` resta solo di appoggio locale, ma non puo salvare modifiche
+finche non ha caricato i dati dal backend (gate `serverReady`).
+
+L'integrita dei dati condivisi e garantita da una **rete di sicurezza lato
+server**: ogni `PUT /api/app-data` che non include una collezione (es.
+`machineTypes`) NON azzera quella collezione, ma conserva i valori gia presenti
+nel database. Cosi un payload parziale o un frontend con un bug non possono
+svuotare commesse, libreria disegni o output officina.
+
+I salvataggi **non vengono mai bloccati** per disallineamento: l'app resta
+sempre utilizzabile da tutti. Gli header `x-workload-data-revision` e
+`x-workload-last-mutation-at` vengono comunque inviati come informazione (utili
+per diagnostica e per futuri controlli di concorrenza), ma non rifiutano la
+scrittura. In caso di modifica contemporanea sullo stesso elemento da due PC
+vale l'ultima scrittura; dopo ogni salvataggio l'app ricarica i dati condivisi
+dal database.
 
 ## Installazione
 
@@ -119,6 +158,10 @@ http://IP_DEL_PC_SERVER:3000
 
 Se il PC server è spento, in sospensione o il processo `npm run start` non è
 attivo, l'app non sarà raggiungibile dagli altri PC.
+
+Nota importante: non usare link `localhost` sui PC dei colleghi. Per loro
+`localhost` indica il proprio PC, non il server aziendale. Tutti devono usare lo
+stesso IP del PC che sta eseguendo `npm run start`.
 
 ## Backup
 
@@ -221,6 +264,10 @@ Compatibilità mantenuta:
 - JSON senza `machineTypes`;
 - JSON senza `workshopOutputs`;
 - stati legacy rimappati agli stati attuali.
+
+Protezione moduli nuovi: se un vecchio backup non contiene `businessPartners`,
+`machineTypes` o `workshopOutputs`, l'import non azzera automaticamente le
+tabelle condivise gia presenti sul server.
 
 ## Report e notifiche
 
@@ -364,9 +411,8 @@ dal Registro Disegni aziendale INNO.TEC, ad esempio `I.RM - Rulliere
 motorizzate`, `I.TS - Tendostrutture`, `I.MP - Manipolatore` e gli standard
 `S.SC` / `S.TS`.
 
-La libreria serve come base dati interna per le fasi successive legate
-all'**Output verso officina**. In questo step non calcola ancora carichi
-officina e non modifica il workload dell'ufficio tecnico.
+La libreria serve come base dati interna per gli **Output verso officina** e per
+la dashboard **Carico officina**. Non modifica il workload dell'ufficio tecnico.
 
 Ogni tipologia ha:
 
@@ -376,20 +422,33 @@ Ogni tipologia ha:
 - complessita default (`bassa`, `media`, `alta`, `speciale`);
 - processi indicativi: laser, laser tubo, piegatura, saldatura, montaggio,
   verniciatura, collaudo;
+- percentuale di incidenza per ogni processo default della tipologia;
 - numero tipico di complessivi e particolari;
 - note e stato `active`.
 
-I coefficienti e i conteggi sono **valori indicativi modificabili**. Servono per
-precompilare e uniformare i dati futuri, non sono consuntivi e non devono essere
-letti come ore officina.
+I coefficienti, i conteggi e le percentuali processo sono **valori indicativi
+modificabili**. Servono per precompilare e uniformare i dati futuri, non sono
+consuntivi e non devono essere letti come ore officina.
+
+Le percentuali processo permettono di pesare meglio una macchina specifica: una
+`I.RM - Rulliera motorizzata`, ad esempio, puo avere laser, piegatura,
+saldatura e montaggio attivi, ma con incidenze diverse tra loro. Queste
+percentuali vengono copiate sull'output officina e possono essere ritoccate per
+la singola commessa.
 
 ### Come modificare una tipologia
 
 1. Apri il tab **Libreria disegni**.
 2. Cerca per codice o nome, oppure filtra per famiglia/stato.
 3. Clicca **Modifica** sulla riga desiderata.
-4. Aggiorna peso base, complessita, complessivi, particolari, processi o note.
-5. Salva: l'app registra l'evento nello storico modifiche e salva nel database.
+4. Aggiorna peso base, complessita, complessivi, particolari, processi,
+   percentuali processo o note.
+5. Salva: l'app usa le API dedicate `/api/machine-types`, registra l'evento
+   nello storico modifiche e salva nella tabella SQLite `machine_types`.
+
+Le modifiche alla libreria non passano piu dal salvataggio globale dell'intero
+`AppData`: questo evita che un conflitto su lavori/task o una cache browser
+vecchia impediscano il salvataggio della tipologia.
 
 ### Attivare o disattivare
 
@@ -398,7 +457,7 @@ fisicamente: cambia solo `active`, cosi resta nei backup e nello storico.
 
 I backup `.db` e `.json` includono sempre la tabella/collezione
 `machine_types` / `data.machineTypes`. I backup vecchi senza `machineTypes`
-restano importabili e inizializzano la libreria come array vuoto.
+restano importabili e non cancellano la libreria gia presente sul server.
 
 ## Output verso officina
 
@@ -423,6 +482,12 @@ modificarli sulla singola commessa senza cambiare la libreria.
 
 ### Indice impatto officina
 
+I processi non sono piu solo flag si/no: ogni processo ha anche una percentuale
+di incidenza. La percentuale arriva dalla Libreria disegni e puo essere
+modificata sul singolo output, cosi una rulliera motorizzata puo pesare
+diversamente laser, piegatura, saldatura e montaggio rispetto a una
+tendostruttura o a un manipolatore.
+
 Ogni output ha un `impactScore` calcolato automaticamente. L'indice non
 rappresenta ore, ma un peso relativo per aiutare la produzione a pianificare il
 carico futuro.
@@ -433,6 +498,7 @@ La formula usa:
 - peso base della tipologia (`defaultImpactWeight`);
 - fattore complessità;
 - processi richiesti;
+- percentuali di incidenza dei processi richiesti;
 - numero complessivi;
 - numero particolari stimati.
 
@@ -445,7 +511,7 @@ Livelli indicativi:
 
 Gli output sono salvati in `workshop_outputs` e nei backup JSON come
 `data.workshopOutputs`. I backup precedenti senza `workshopOutputs` restano
-importabili e inizializzano l'array a vuoto.
+importabili e non cancellano automaticamente gli output gia presenti sul server.
 
 ## Dashboard Carico officina
 
@@ -509,6 +575,11 @@ tubo, piega, saldatura, montaggio, verniciatura, collaudo). Per ognuno: numero
 output, quantità, particolari, indice impatto totale, commesse coinvolte. Una
 barra confronta visivamente il peso dei processi tra loro. Serve a vedere subito
 dove si concentra il carico (es. laser tubo o saldatura).
+
+Da questa versione l'indice per processo e pesato con la percentuale di
+incidenza salvata sull'output: se un output ha impatto 20 e saldatura 30%, al
+processo saldatura viene attribuita quota 6. Questo rende la lettura piu vicina
+alla realta della singola macchina senza trasformare l'indice in ore.
 
 ### Come leggere il carico per tipologia
 
@@ -661,6 +732,11 @@ GET /api/backup/status
 Il frontend usa soprattutto `GET /api/app-data` e `PUT /api/app-data`, così le
 funzioni esistenti restano coerenti con activity log e notifiche.
 
+`GET /api/app-data` restituisce anche l'header `x-workload-data-revision`.
+`PUT /api/app-data` deve rimandare la stessa revisione: se non corrisponde, il
+server risponde `409` e protegge il database da sovrascritture basate su dati
+vecchi.
+
 ## Script npm
 
 ```powershell
@@ -691,5 +767,6 @@ dist/                frontend compilato servito da Express
 - Nessun cloud obbligatorio.
 - Nessuna sincronizzazione realtime push: gli altri utenti vedono i dati dal
   database al caricamento/refresh della pagina.
-- Nessuna gestione conflitti avanzata se due utenti modificano gli stessi dati
-  nello stesso istante.
+- Gestione conflitti base con revisione server: un browser vecchio non puo
+  sovrascrivere il database, ma non c'e ancora collaborazione realtime campo per
+  campo.

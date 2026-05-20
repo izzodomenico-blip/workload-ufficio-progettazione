@@ -65,7 +65,8 @@ export function isDatabaseEmpty(db = getDb()) {
 }
 
 export function getAppData(db = getDb()) {
-  return {
+  ensureMachineTypesPresent(db)
+  return normalizeAppData({
     people: readJsonRows(db, TABLES.people),
     workItems: readJsonRows(db, TABLES.workItems),
     tasks: readJsonRows(db, TABLES.tasks),
@@ -75,29 +76,34 @@ export function getAppData(db = getDb()) {
     businessPartners: readJsonRows(db, TABLES.businessPartners, 'name COLLATE NOCASE ASC'),
     machineTypes: readJsonRows(db, TABLES.machineTypes, 'code COLLATE NOCASE ASC'),
     workshopOutputs: readJsonRows(db, TABLES.workshopOutputs, 'planned_release_date ASC, rowid ASC'),
-  }
+  })
 }
 
 export function saveAppData(data, db = getDb()) {
   const normalized = normalizeAppData(data)
+  const safeData = {
+    ...normalized,
+    machineTypes: preserveExistingMachineTypesIfEmpty(db, normalized.machineTypes),
+  }
   const now = new Date().toISOString()
   db.exec('BEGIN IMMEDIATE TRANSACTION;')
   try {
-    replaceTable(db, TABLES.people, normalized.people, now)
-    replaceTable(db, TABLES.workItems, normalized.workItems, now)
-    replaceTable(db, TABLES.tasks, normalized.tasks, now)
-    replaceTable(db, TABLES.absences, normalized.absences, now)
-    replaceActivityLog(db, normalized.activityLog, now)
-    replaceNotifications(db, normalized.notifications, now)
-    replaceBusinessPartners(db, normalized.businessPartners, now)
-    replaceMachineTypes(db, normalized.machineTypes, now)
-    replaceWorkshopOutputs(db, normalized.workshopOutputs, now)
+    replaceTable(db, TABLES.people, safeData.people, now)
+    replaceTable(db, TABLES.workItems, safeData.workItems, now)
+    replaceTable(db, TABLES.tasks, safeData.tasks, now)
+    replaceTable(db, TABLES.absences, safeData.absences, now)
+    replaceActivityLog(db, safeData.activityLog, now)
+    replaceNotifications(db, safeData.notifications, now)
+    replaceBusinessPartners(db, safeData.businessPartners, now)
+    replaceMachineTypes(db, safeData.machineTypes, now)
+    replaceWorkshopOutputs(db, safeData.workshopOutputs, now)
+    bumpDataRevision(db, now)
     db.exec('COMMIT;')
   } catch (error) {
     db.exec('ROLLBACK;')
     throw error
   }
-  return normalized
+  return safeData
 }
 
 export function savePeople(people, db = getDb()) {
@@ -106,6 +112,7 @@ export function savePeople(people, db = getDb()) {
   db.exec('BEGIN IMMEDIATE TRANSACTION;')
   try {
     replaceTable(db, TABLES.people, normalized.people, now)
+    bumpDataRevision(db, now)
     db.exec('COMMIT;')
   } catch (error) {
     db.exec('ROLLBACK;')
@@ -156,9 +163,38 @@ export function closeDb() {
   dbInstance = null
 }
 
+export function getDataRevision(db = getDb()) {
+  const row = db.prepare('SELECT value FROM meta WHERE key = ?').get('dataRevision')
+  const value = row ? Number(row.value) : 0
+  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0
+}
+
+export function getLastMutationAt(db = getDb()) {
+  const row = db.prepare('SELECT value FROM meta WHERE key = ?').get('lastMutationAt')
+  return typeof row?.value === 'string' ? row.value : null
+}
+
+function bumpDataRevision(db, now) {
+  const nextRevision = getDataRevision(db) + 1
+  db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('dataRevision', String(nextRevision))
+  db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('lastMutationAt', now)
+  return nextRevision
+}
+
 function readJsonRows(db, table, orderBy = 'rowid ASC') {
   const stmt = db.prepare(`SELECT data FROM ${table} ORDER BY ${orderBy}`)
   return stmt.all().map((row) => JSON.parse(row.data))
+}
+
+function ensureMachineTypesPresent(db) {
+  const row = db.prepare('SELECT COUNT(*) AS count FROM machine_types').get()
+  if (Number(row.count) === 0) seedDefaultMachineTypes(db)
+}
+
+function preserveExistingMachineTypesIfEmpty(db, incomingRows) {
+  if (incomingRows.length > 0) return incomingRows
+  const current = readJsonRows(db, TABLES.machineTypes, 'code COLLATE NOCASE ASC')
+  return current.length > 0 ? normalizeAppData({ ...EMPTY_APP_DATA, machineTypes: current }).machineTypes : incomingRows
 }
 
 function replaceTable(db, table, rows, now) {

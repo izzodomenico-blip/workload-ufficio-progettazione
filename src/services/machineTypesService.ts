@@ -5,6 +5,16 @@ import { uid } from '../utils/format'
 export type CreateMachineTypeInput = Omit<MachineType, 'id' | 'createdAt' | 'updatedAt'>
 export type UpdateMachineTypeInput = Partial<Omit<MachineType, 'id' | 'createdAt' | 'updatedAt'>>
 
+const PROCESS_FIELDS = [
+  { flag: 'defaultRequiresLaser', weight: 'defaultLaserWeightPercent', label: 'laser' },
+  { flag: 'defaultRequiresTubeLaser', weight: 'defaultTubeLaserWeightPercent', label: 'tubeLaser' },
+  { flag: 'defaultRequiresBending', weight: 'defaultBendingWeightPercent', label: 'bending' },
+  { flag: 'defaultRequiresWelding', weight: 'defaultWeldingWeightPercent', label: 'welding' },
+  { flag: 'defaultRequiresAssembly', weight: 'defaultAssemblyWeightPercent', label: 'assembly' },
+  { flag: 'defaultRequiresPainting', weight: 'defaultPaintingWeightPercent', label: 'painting' },
+  { flag: 'defaultRequiresTesting', weight: 'defaultTestingWeightPercent', label: 'testing' },
+] as const
+
 function nowISO(): string {
   return new Date().toISOString()
 }
@@ -27,6 +37,31 @@ function cleanInteger(value: number | undefined, fallback: number): number {
   return Math.round(cleanNumber(value, fallback))
 }
 
+function cleanPercent(value: number | undefined, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function cleanProcessWeights(input: CreateMachineTypeInput) {
+  const active = PROCESS_FIELDS.filter((process) => Boolean(input[process.flag]))
+  const fallback = active.length > 0 ? Math.round(100 / active.length) : 0
+  return Object.fromEntries(
+    PROCESS_FIELDS.map((process) => [
+      process.weight,
+      input[process.flag] ? cleanPercent(input[process.weight], fallback) : 0,
+    ]),
+  ) as Pick<
+    MachineType,
+    | 'defaultLaserWeightPercent'
+    | 'defaultTubeLaserWeightPercent'
+    | 'defaultBendingWeightPercent'
+    | 'defaultWeldingWeightPercent'
+    | 'defaultAssemblyWeightPercent'
+    | 'defaultPaintingWeightPercent'
+    | 'defaultTestingWeightPercent'
+  >
+}
+
 function normalizeInput(input: CreateMachineTypeInput): CreateMachineTypeInput {
   return {
     ...input,
@@ -35,6 +70,7 @@ function normalizeInput(input: CreateMachineTypeInput): CreateMachineTypeInput {
     family: cleanString(input.family, 'Generico'),
     description: cleanString(input.description),
     defaultImpactWeight: cleanNumber(input.defaultImpactWeight, 1, 0.1),
+    ...cleanProcessWeights(input),
     typicalAssemblyCount: cleanInteger(input.typicalAssemblyCount, 1),
     typicalPartCount: cleanInteger(input.typicalPartCount, 10),
     active: input.active !== false,
@@ -68,15 +104,9 @@ function describeChange(before: MachineType, after: MachineType): string {
 }
 
 function processKeys(machineType: MachineType): string[] {
-  return [
-    machineType.defaultRequiresLaser ? 'laser' : '',
-    machineType.defaultRequiresTubeLaser ? 'tubeLaser' : '',
-    machineType.defaultRequiresBending ? 'bending' : '',
-    machineType.defaultRequiresWelding ? 'welding' : '',
-    machineType.defaultRequiresAssembly ? 'assembly' : '',
-    machineType.defaultRequiresPainting ? 'painting' : '',
-    machineType.defaultRequiresTesting ? 'testing' : '',
-  ].filter(Boolean)
+  return PROCESS_FIELDS
+    .filter((process) => machineType[process.flag])
+    .map((process) => `${process.label}:${machineType[process.weight]}%`)
 }
 
 export function createMachineType(
@@ -144,4 +174,3 @@ export function updateMachineType(
 export function setMachineTypeActive(data: AppData, id: string, active: boolean): AppData {
   return updateMachineType(data, id, { active })
 }
-

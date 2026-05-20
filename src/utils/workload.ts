@@ -133,53 +133,32 @@ export function hoursAssignedInWeek(
   return remainingHours * (overlap / remainingDays)
 }
 
-export function getWorkItemIdsWithTasks(tasks: Task[]): Set<string> {
-  return new Set(tasks.map((task) => task.workItemId))
-}
-
-export function getStandaloneWorkItems(workItems: WorkItem[], tasks: Task[]): WorkItem[] {
-  const workItemIdsWithTasks = getWorkItemIdsWithTasks(tasks)
-  return workItems.filter((item) => !workItemIdsWithTasks.has(item.id))
-}
-
+/**
+ * Attività che concorrono al carico di una persona in una settimana.
+ *
+ * Il carico è guidato dai **LAVORI** (ore stimate + assegnatari), non dai task.
+ * I task sono un dettaglio facoltativo del lavoro e NON incidono sul carico
+ * percentuale: servono solo a descrivere dinamiche interne. Per questo qui si
+ * considerano esclusivamente i `workItems`.
+ *
+ * Distribuzione: le ore del lavoro si dividono tra gli assegnatari. Se il lavoro
+ * non ha assegnatari, il carico ricade sull'owner (responsabile) del lavoro.
+ */
 export function getWorkloadActivitiesForPerson(
   person: Person,
-  tasks: Task[],
+  _tasks: Task[],
   workItems: WorkItem[] = [],
   weekStart: Date = startOfWeek(new Date()),
   weekEnd: Date = endOfWeek(weekStart),
   today: Date = new Date(),
 ): WorkloadActivity[] {
   const activities: WorkloadActivity[] = []
-  const workItemById = new Map(workItems.map((item) => [item.id, item]))
 
-  for (const task of tasks) {
-    if (task.assigneeId !== person.id) continue
-    if (!isCountableForLoad(task)) continue
-    const hoursInWeek = hoursAssignedInWeek(task, weekStart, weekEnd, today)
-    if (hoursInWeek <= 0) continue
-    const remainingHours = Math.max(0, task.estimatedHours * (1 - task.progressPercent / 100))
-    activities.push({
-      kind: 'task',
-      id: task.id,
-      workItemId: task.workItemId,
-      title: task.title,
-      status: task.status,
-      startDate: task.startDate,
-      dueDate: task.dueDate,
-      estimatedHours: task.estimatedHours,
-      progressPercent: task.progressPercent,
-      hoursInWeek: Math.round(hoursInWeek * 10) / 10,
-      remainingHours: Math.round(remainingHours * 10) / 10,
-      task,
-      workItem: workItemById.get(task.workItemId),
-    })
-  }
-
-  for (const item of getStandaloneWorkItems(workItems, tasks)) {
+  for (const item of workItems) {
     if (!isCountableForLoad(item)) continue
-    if (!item.assigneeIds.includes(person.id)) continue
-    const assigneeCount = Math.max(1, item.assigneeIds.length)
+    const responsible = workItemResponsibleIds(item)
+    if (!responsible.includes(person.id)) continue
+    const assigneeCount = Math.max(1, responsible.length)
     const perPersonItem = {
       ...item,
       estimatedHours: item.estimatedHours / assigneeCount,
@@ -208,6 +187,16 @@ export function getWorkloadActivitiesForPerson(
     if (due !== 0) return due
     return b.remainingHours - a.remainingHours
   })
+}
+
+/**
+ * Persone su cui ricade il carico di un lavoro: gli assegnatari, oppure l'owner
+ * se non ci sono assegnatari. Garantisce che ogni lavoro con ore atterri sempre
+ * su qualcuno.
+ */
+export function workItemResponsibleIds(item: Pick<WorkItem, 'assigneeIds' | 'ownerId'>): string[] {
+  if (item.assigneeIds.length > 0) return item.assigneeIds
+  return item.ownerId ? [item.ownerId] : []
 }
 
 function personHasActivitiesDuringAbsences(

@@ -146,7 +146,7 @@ function PeopleSidebar({
   onSelect: (id: string) => void
 }) {
   return (
-    <div className="panel sticky top-[64px] max-h-[calc(100vh-90px)] overflow-y-auto scroll-thin p-2">
+    <div className="panel sticky top-[132px] max-h-[calc(100vh-150px)] overflow-y-auto scroll-thin p-2">
       <div className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
         Persone attive · {people.length}
       </div>
