@@ -138,6 +138,7 @@ export type ActivityLogEntityType =
   | 'machineType'
   | 'workshopOutput'
   | 'workshopWorker'
+  | 'workshopAssignment'
   | 'system'
 
 export interface ActivityLogEntry {
@@ -172,6 +173,7 @@ export const ALL_ACTIVITY_ENTITY_TYPES: ActivityLogEntityType[] = [
   'machineType',
   'workshopOutput',
   'workshopWorker',
+  'workshopAssignment',
   'system',
 ]
 
@@ -418,6 +420,45 @@ export interface WorkshopWorker {
   updatedAt: string
 }
 
+// === Pianificazione operativa officina ===
+
+export type WorkshopAssignmentProcess = WorkshopWorkerSkill
+
+export type WorkshopAssignmentStatus =
+  | 'pianificato'
+  | 'in_lavorazione'
+  | 'completato'
+  | 'sospeso'
+
+export const ALL_WORKSHOP_ASSIGNMENT_STATUSES: WorkshopAssignmentStatus[] = [
+  'pianificato',
+  'in_lavorazione',
+  'completato',
+  'sospeso',
+]
+
+export const WORKSHOP_ASSIGNMENT_STATUS_LABELS: Record<WorkshopAssignmentStatus, string> = {
+  pianificato: 'Pianificato',
+  in_lavorazione: 'In lavorazione',
+  completato: 'Completato',
+  sospeso: 'Sospeso',
+}
+
+export interface WorkshopAssignment {
+  id: string
+  workshopOutputId: string
+  workItemId: string
+  workerId: string
+  process: WorkshopAssignmentProcess
+  plannedDate: string
+  plannedWeek: string
+  loadPoints: number
+  status: WorkshopAssignmentStatus
+  notes: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AppData {
   people: Person[]
   workItems: WorkItem[]
@@ -429,6 +470,7 @@ export interface AppData {
   machineTypes: MachineType[]
   workshopOutputs: WorkshopOutput[]
   workshopWorkers: WorkshopWorker[]
+  workshopAssignments: WorkshopAssignment[]
 }
 
 export interface Filters {

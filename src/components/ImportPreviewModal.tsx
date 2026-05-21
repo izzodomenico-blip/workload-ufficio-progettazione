@@ -28,6 +28,7 @@ export function ImportPreviewModal({
     ['Tipologie disegno', summary.counts.machineTypes],
     ['Output officina', summary.counts.workshopOutputs],
     ['Operai officina', summary.counts.workshopWorkers],
+    ['Assegnazioni officina', summary.counts.workshopAssignments],
   ] as const
 
   return (

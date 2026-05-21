@@ -48,9 +48,9 @@ finche non ha caricato i dati dal backend (gate `serverReady`).
 
 L'integrita dei dati condivisi e garantita da una **rete di sicurezza lato
 server**: ogni `PUT /api/app-data` che non include una collezione (es.
-`machineTypes`) NON azzera quella collezione, ma conserva i valori gia presenti
+`machineTypes` o `workshopAssignments`) NON azzera quella collezione, ma conserva i valori gia presenti
 nel database. Cosi un payload parziale o un frontend con un bug non possono
-svuotare commesse, libreria disegni o output officina.
+svuotare commesse, libreria disegni, output officina o pianificazione operai.
 
 I salvataggi **non vengono mai bloccati** per disallineamento: l'app resta
 sempre utilizzabile da tutti. Gli header `x-workload-data-revision` e
@@ -172,6 +172,7 @@ Backup da interfaccia:
 - Il JSON include anche `businessPartners` e `machineTypes`.
 - Il JSON include anche `workshopOutputs`.
 - Il JSON include anche `workshopWorkers`.
+- Il JSON include anche `workshopAssignments`.
 - L'export registra un evento nello storico.
 
 Backup da terminale:
@@ -265,10 +266,11 @@ Compatibilità mantenuta:
 - JSON senza `machineTypes`;
 - JSON senza `workshopOutputs`;
 - JSON senza `workshopWorkers`;
+- JSON senza `workshopAssignments`;
 - stati legacy rimappati agli stati attuali.
 
 Protezione moduli nuovi: se un vecchio backup non contiene `businessPartners`,
-`machineTypes`, `workshopOutputs` o `workshopWorkers`, l'import non azzera
+`machineTypes`, `workshopOutputs`, `workshopWorkers` o `workshopAssignments`, l'import non azzera
 automaticamente le tabelle condivise gia presenti sul server.
 
 ## Report e notifiche
@@ -591,6 +593,95 @@ personali. Per questo:
 La tabella SQLite e `workshop_workers`; nei backup JSON la collezione e
 `data.workshopWorkers`. I backup vecchi senza `workshopWorkers` restano
 importabili.
+
+## Pianificazione officina
+
+La vista **Pianificazione officina** collega gli output verso officina agli
+operai disponibili. Si apre dal tab principale **Pianificazione officina**,
+vicino a **Operai officina** e **Carico officina**.
+
+La pianificazione usa solo punti relativi:
+
+- `impactScore` misura il peso relativo dell'output;
+- `loadPoints` misura il peso relativo assegnato a un operaio per un processo;
+- `dailyCapacityPoints` e `weeklyCapacityPoints` misurano la capacita relativa
+  dell'operaio.
+
+Questi valori **non sono ore** e non vanno letti come tempi di lavorazione.
+Servono a confrontare saturazione, disponibilita e sovraccarichi.
+
+### Output da assegnare
+
+La sezione **Output da assegnare** mostra gli output non sospesi che richiedono
+processi e non sono ancora coperti da assegnazioni. Ogni card mostra commessa,
+cliente, tipologia, descrizione, quantita, impactScore, data prevista e badge
+dei processi richiesti:
+
+- grigio: processo non assegnato;
+- giallo: processo assegnato solo parzialmente;
+- verde: processo coperto.
+
+Il pulsante **Assegna** apre la modale operativa. **Vedi commessa** apre il
+dettaglio del lavoro collegato.
+
+### Modale Assegna
+
+La modale **Assegna output officina** crea o aggiorna le assegnazioni per ogni
+processo richiesto dall'output. Per ogni riga puoi scegliere operaio, data,
+punti carico, stato e note.
+
+Gli operai compatibili sono quelli attivi con la skill del processo, ad esempio:
+`laser_piano` per Laser piano, `piegatrice` per Piegatrice, `saldatura` per
+Saldatura e `montaggio` per Montaggio. E possibile scegliere anche un operaio
+non abilitato: l'app mostra un warning, ma lascia al direttore produzione la
+decisione.
+
+### Calcolo dei loadPoints
+
+Il valore suggerito distribuisce l'`impactScore` dell'output sui processi
+richiesti e applica un peso relativo per processo:
+
+- Laser piano `1.0`;
+- Laser tubi `1.2`;
+- Piegatrice `0.9`;
+- Saldatura `1.3`;
+- Montaggio `1.2`;
+- Verniciatura `0.8`;
+- Collaudo `0.7`;
+- altri processi `1.0` salvo Magazzino `0.7`.
+
+Formula: `impactScore / numero processi richiesti * peso processo`, arrotondato
+a 1 decimale. Il valore resta modificabile manualmente sulla singola
+assegnazione.
+
+### Barre giornaliere e settimanali
+
+**Occupazione giornaliera** confronta i punti assegnati nel giorno selezionato
+con `dailyCapacityPoints` dell'operaio. Cliccando un operaio si vedono le sue
+assegnazioni del giorno.
+
+**Occupazione settimanale** confronta i punti della settimana selezionata con
+`weeklyCapacityPoints` e mostra le barre Lun-Ven. Cliccando una barra giorno
+cambia il giorno selezionato nella vista giornaliera.
+
+Livelli:
+
+- `0-60%`: disponibile;
+- `60-85%`: normale;
+- `85-100%`: pieno;
+- `>100%`: sovraccarico.
+
+### Backup pianificazione officina
+
+Le assegnazioni sono salvate nella tabella SQLite `workshop_assignments` e nei
+backup JSON come `data.workshopAssignments`. I backup vecchi senza
+`workshopAssignments` restano importabili e inizializzano la collezione a vuoto,
+senza cancellare le assegnazioni gia presenti quando l'import e parziale.
+
+### Limiti
+
+Il modello e volutamente relativo: non sostituisce un MES o una schedulazione a
+tempo finito. I pesi processo e le capacita vanno tarati con l'uso reale.
 
 ## Dashboard Carico officina
 

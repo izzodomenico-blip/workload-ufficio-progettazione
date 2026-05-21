@@ -49,6 +49,12 @@ const VALID_WORKSHOP_WORKER_SKILLS = new Set([
   'manutenzione',
   'altro',
 ])
+const VALID_WORKSHOP_ASSIGNMENT_STATUSES = new Set([
+  'pianificato',
+  'in_lavorazione',
+  'completato',
+  'sospeso',
+])
 
 const DEFAULT_MACHINE_TYPES_BY_CODE = new Map(
   getDefaultMachineTypes().map((item) => [item.code.toUpperCase(), item]),
@@ -117,6 +123,7 @@ const VALID_ACTIVITY_ENTITY_TYPES = new Set([
   'machineType',
   'workshopOutput',
   'workshopWorker',
+  'workshopAssignment',
   'system',
 ])
 
@@ -131,6 +138,7 @@ export const EMPTY_APP_DATA = {
   machineTypes: [],
   workshopOutputs: [],
   workshopWorkers: [],
+  workshopAssignments: [],
 }
 
 export function extractAppData(payload) {
@@ -167,6 +175,9 @@ export function normalizeAppData(input) {
   if (root.workshopWorkers !== undefined && !Array.isArray(root.workshopWorkers)) {
     throw new Error('workshopWorkers deve essere un array oppure assente.')
   }
+  if (root.workshopAssignments !== undefined && !Array.isArray(root.workshopAssignments)) {
+    throw new Error('workshopAssignments deve essere un array oppure assente.')
+  }
 
   return {
     people: root.people.map((item, index) => normalizePerson(item, index)),
@@ -179,6 +190,7 @@ export function normalizeAppData(input) {
     machineTypes: (root.machineTypes ?? []).map(normalizeMachineType).filter(Boolean),
     workshopOutputs: (root.workshopOutputs ?? []).map(normalizeWorkshopOutput).filter(Boolean),
     workshopWorkers: (root.workshopWorkers ?? []).map(normalizeWorkshopWorker).filter(Boolean),
+    workshopAssignments: (root.workshopAssignments ?? []).map(normalizeWorkshopAssignment).filter(Boolean),
   }
 }
 
@@ -194,6 +206,7 @@ export function countAppData(data) {
     machineTypes: data.machineTypes.length,
     workshopOutputs: data.workshopOutputs.length,
     workshopWorkers: data.workshopWorkers.length,
+    workshopAssignments: data.workshopAssignments.length,
   }
 }
 
@@ -460,6 +473,30 @@ function normalizeWorkshopWorker(item) {
   }
 }
 
+function normalizeWorkshopAssignment(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id)) return null
+  if (!isNonEmptyString(o.workshopOutputId) || !isNonEmptyString(o.workItemId) || !isNonEmptyString(o.workerId)) return null
+  if (!isString(o.process) || !VALID_WORKSHOP_WORKER_SKILLS.has(o.process)) return null
+  if (!isNonEmptyString(o.plannedDate)) return null
+  const now = new Date().toISOString()
+  return {
+    ...o,
+    id: o.id,
+    workshopOutputId: o.workshopOutputId,
+    workItemId: o.workItemId,
+    workerId: o.workerId,
+    process: o.process,
+    plannedDate: o.plannedDate,
+    plannedWeek: isNonEmptyString(o.plannedWeek) ? o.plannedWeek : startOfWeekISO(o.plannedDate),
+    loadPoints: positiveNumber(o.loadPoints, 0.1),
+    status: VALID_WORKSHOP_ASSIGNMENT_STATUSES.has(o.status) ? o.status : 'pianificato',
+    notes: isString(o.notes) ? o.notes : '',
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
 function normalizeNotification(item) {
   const o = asObject(item)
   if (!o || !isNonEmptyString(o.id) || !isNonEmptyString(o.timestamp)) return null
@@ -569,6 +606,19 @@ function stringMap(value) {
       .filter(([, v]) => v !== undefined && v !== null && String(v).trim().length > 0)
       .map(([k, v]) => [k, String(v).trim()]),
   )
+}
+
+function startOfWeekISO(iso) {
+  const [year, month, day] = String(iso).split('-').map(Number)
+  const date = new Date(year, (month || 1) - 1, day || 1)
+  date.setHours(0, 0, 0, 0)
+  const dow = (date.getDay() + 6) % 7
+  date.setDate(date.getDate() - dow)
+  return [
+    date.getFullYear(),
+    pad2(date.getMonth() + 1),
+    pad2(date.getDate()),
+  ].join('-')
 }
 
 function pad2(value) {

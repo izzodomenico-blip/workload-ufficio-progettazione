@@ -27,6 +27,7 @@ const TABLES = {
   machineTypes: 'machine_types',
   workshopOutputs: 'workshop_outputs',
   workshopWorkers: 'workshop_workers',
+  workshopAssignments: 'workshop_assignments',
 }
 
 let dbInstance = null
@@ -78,6 +79,7 @@ export function getAppData(db = getDb()) {
     machineTypes: readJsonRows(db, TABLES.machineTypes, 'code COLLATE NOCASE ASC'),
     workshopOutputs: readJsonRows(db, TABLES.workshopOutputs, 'planned_release_date ASC, rowid ASC'),
     workshopWorkers: readJsonRows(db, TABLES.workshopWorkers, 'display_name COLLATE NOCASE ASC'),
+    workshopAssignments: readJsonRows(db, TABLES.workshopAssignments, 'planned_date ASC, rowid ASC'),
   })
 }
 
@@ -100,6 +102,7 @@ export function saveAppData(data, db = getDb()) {
     replaceMachineTypes(db, safeData.machineTypes, now)
     replaceWorkshopOutputs(db, safeData.workshopOutputs, now)
     replaceWorkshopWorkers(db, safeData.workshopWorkers, now)
+    replaceWorkshopAssignments(db, safeData.workshopAssignments, now)
     bumpDataRevision(db, now)
     db.exec('COMMIT;')
   } catch (error) {
@@ -155,6 +158,12 @@ export function deleteEntity(collection, id, db = getDb()) {
       ...nextData,
       tasks: nextData.tasks.filter((task) => task.workItemId !== id),
       workshopOutputs: nextData.workshopOutputs.filter((output) => output.workItemId !== id),
+      workshopAssignments: nextData.workshopAssignments.filter((assignment) => assignment.workItemId !== id),
+    }
+  } else if (collection === 'workshopOutputs') {
+    nextData = {
+      ...nextData,
+      workshopAssignments: nextData.workshopAssignments.filter((assignment) => assignment.workshopOutputId !== id),
     }
   }
   saveAppData(nextData, db)
@@ -306,6 +315,30 @@ function replaceWorkshopWorkers(db, rows, now) {
       row.department || null,
       row.primarySkill || null,
       row.active ? 1 : 0,
+      JSON.stringify(row),
+      now,
+    )
+  }
+}
+
+function replaceWorkshopAssignments(db, rows, now) {
+  db.prepare('DELETE FROM workshop_assignments').run()
+  const insert = db.prepare(`
+    INSERT INTO workshop_assignments
+      (id, workshop_output_id, work_item_id, worker_id, process, planned_date, planned_week, status, load_points, data, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  for (const row of rows) {
+    insert.run(
+      row.id,
+      row.workshopOutputId,
+      row.workItemId,
+      row.workerId,
+      row.process,
+      row.plannedDate,
+      row.plannedWeek,
+      row.status,
+      row.loadPoints,
       JSON.stringify(row),
       now,
     )

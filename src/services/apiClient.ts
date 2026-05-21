@@ -180,6 +180,7 @@ function withAppDataDefaults(data: Partial<AppData>): AppData {
     machineTypes: Array.isArray(data.machineTypes) ? data.machineTypes : [],
     workshopOutputs: Array.isArray(data.workshopOutputs) ? data.workshopOutputs : [],
     workshopWorkers: Array.isArray(data.workshopWorkers) ? data.workshopWorkers : [],
+    workshopAssignments: Array.isArray(data.workshopAssignments) ? data.workshopAssignments : [],
   }
 }
 

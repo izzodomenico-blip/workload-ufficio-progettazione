@@ -181,6 +181,7 @@ const ENTITY_LABEL: Record<ActivityLogEntityType, string> = {
   machineType: 'Tipologie disegno',
   workshopOutput: 'Output officina',
   workshopWorker: 'Operai officina',
+  workshopAssignment: 'Assegnazioni officina',
   system: 'Sistema',
 }
 
@@ -274,6 +275,7 @@ const ENTITY_DOT: Record<ActivityLogEntityType, string> = {
   machineType: 'bg-cyan-400',
   workshopOutput: 'bg-orange-400',
   workshopWorker: 'bg-lime-400',
+  workshopAssignment: 'bg-fuchsia-400',
   system: 'bg-slate-400',
 }
 

@@ -5,6 +5,7 @@ import {
   ALL_MACHINE_COMPLEXITIES,
   ALL_PRIORITIES,
   ALL_TYPES,
+  ALL_WORKSHOP_ASSIGNMENT_STATUSES,
   ALL_WORKSHOP_OUTPUT_STATUSES,
   ALL_WORKSHOP_WORKER_SKILLS,
 } from '../types'
@@ -26,6 +27,8 @@ import type {
   Task,
   WorkItem,
   WorkItemType,
+  WorkshopAssignment,
+  WorkshopAssignmentStatus,
   WorkshopOutput,
   WorkshopOutputStatus,
   WorkshopWorker,
@@ -99,6 +102,7 @@ export interface BackupCounts {
   machineTypes: number
   workshopOutputs: number
   workshopWorkers: number
+  workshopAssignments: number
 }
 
 export interface BackupInfo {
@@ -149,6 +153,7 @@ const BUSINESS_PARTNER_TYPES = new Set<string>(ALL_BUSINESS_PARTNER_TYPES)
 const MACHINE_COMPLEXITIES = new Set<string>(ALL_MACHINE_COMPLEXITIES)
 const WORKSHOP_OUTPUT_STATUSES = new Set<string>(ALL_WORKSHOP_OUTPUT_STATUSES)
 const WORKSHOP_WORKER_SKILLS = new Set<string>(ALL_WORKSHOP_WORKER_SKILLS)
+const WORKSHOP_ASSIGNMENT_STATUSES = new Set<string>(ALL_WORKSHOP_ASSIGNMENT_STATUSES)
 
 export function createBackupPayload(data: AppData, exportedAt: Date = new Date()): BackupPayload {
   const backupData: AppData = {
@@ -163,6 +168,7 @@ export function createBackupPayload(data: AppData, exportedAt: Date = new Date()
     machineTypes: data.machineTypes ?? [],
     workshopOutputs: data.workshopOutputs ?? [],
     workshopWorkers: data.workshopWorkers ?? [],
+    workshopAssignments: data.workshopAssignments ?? [],
   }
 
   return {
@@ -207,6 +213,7 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   const rawMachineTypes = root.machineTypes
   const rawWorkshopOutputs = root.workshopOutputs
   const rawWorkshopWorkers = root.workshopWorkers
+  const rawWorkshopAssignments = root.workshopAssignments
 
   if (!Array.isArray(rawPeople)) issues.push('people deve essere un array.')
   if (!Array.isArray(rawWorkItems)) issues.push('workItems deve essere un array.')
@@ -229,6 +236,9 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   }
   if (rawWorkshopWorkers !== undefined && !Array.isArray(rawWorkshopWorkers)) {
     issues.push('workshopWorkers deve essere un array oppure assente.')
+  }
+  if (rawWorkshopAssignments !== undefined && !Array.isArray(rawWorkshopAssignments)) {
+    issues.push('workshopAssignments deve essere un array oppure assente.')
   }
 
   const people: Person[] = []
@@ -294,6 +304,15 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
     })
   }
 
+  const workshopAssignments: WorkshopAssignment[] = []
+  if (Array.isArray(rawWorkshopAssignments)) {
+    rawWorkshopAssignments.forEach((item, index) => {
+      const assignment = normalizeWorkshopAssignment(item)
+      if (assignment) workshopAssignments.push(assignment)
+      else issues.push(`workshopAssignments[${index}] deve avere output, operaio, processo, data e punti validi.`)
+    })
+  }
+
   if (issues.length > 0) return invalid(issues)
 
   const activityLog = Array.isArray(rawActivityLog)
@@ -317,6 +336,7 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
     machineTypes,
     workshopOutputs,
     workshopWorkers,
+    workshopAssignments,
   } as AppData
   const summary = {
     source: source.kind,
@@ -400,6 +420,7 @@ function normalizeBackupInfo(value: unknown): BackupMetadata | undefined {
           machineTypes: optionalNumber(counts.machineTypes),
           workshopOutputs: optionalNumber(counts.workshopOutputs),
           workshopWorkers: optionalNumber(counts.workshopWorkers),
+          workshopAssignments: optionalNumber(counts.workshopAssignments),
         }
       : undefined,
   }
@@ -697,6 +718,32 @@ function normalizeWorkshopWorker(value: unknown): WorkshopWorker | null {
   }
 }
 
+function normalizeWorkshopAssignment(value: unknown): WorkshopAssignment | null {
+  const o = asRecord(value)
+  if (!o) return null
+  if (!isNonEmptyString(o.id) || !isNonEmptyString(o.workshopOutputId) || !isNonEmptyString(o.workItemId)) return null
+  if (!isNonEmptyString(o.workerId) || !isNonEmptyString(o.plannedDate)) return null
+  if (!isString(o.process) || !WORKSHOP_WORKER_SKILLS.has(o.process)) return null
+  const now = new Date().toISOString()
+  const status: WorkshopAssignmentStatus = WORKSHOP_ASSIGNMENT_STATUSES.has(o.status as string)
+    ? (o.status as WorkshopAssignmentStatus)
+    : 'pianificato'
+  return {
+    id: o.id,
+    workshopOutputId: o.workshopOutputId,
+    workItemId: o.workItemId,
+    workerId: o.workerId,
+    process: o.process as WorkshopAssignment['process'],
+    plannedDate: o.plannedDate,
+    plannedWeek: isNonEmptyString(o.plannedWeek) ? o.plannedWeek : startOfWeekISO(o.plannedDate),
+    loadPoints: positiveNumber(o.loadPoints, 0.1),
+    status,
+    notes: isString(o.notes) ? o.notes : '',
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
 function normalizeNotification(value: unknown): Notification | null {
   const o = asRecord(value)
   if (!o) return null
@@ -725,7 +772,7 @@ function normalizeNotification(value: unknown): Notification | null {
   } as Notification
 }
 
-function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners' | 'machineTypes' | 'workshopOutputs' | 'workshopWorkers'>): BackupCounts {
+function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners' | 'machineTypes' | 'workshopOutputs' | 'workshopWorkers' | 'workshopAssignments'>): BackupCounts {
   return {
     people: data.people.length,
     workItems: data.workItems.length,
@@ -737,6 +784,7 @@ function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'ab
     machineTypes: data.machineTypes.length,
     workshopOutputs: data.workshopOutputs.length,
     workshopWorkers: data.workshopWorkers.length,
+    workshopAssignments: data.workshopAssignments.length,
   }
 }
 
@@ -881,6 +929,15 @@ function stringMap(value: unknown): Record<string, string> | undefined {
     .filter(([, v]) => v !== undefined && v !== null && String(v).trim().length > 0)
     .map(([k, v]) => [k, String(v).trim()] as const)
   return entries.length > 0 ? Object.fromEntries(entries) : undefined
+}
+
+function startOfWeekISO(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number)
+  const date = new Date(year, (month ?? 1) - 1, day ?? 1)
+  date.setHours(0, 0, 0, 0)
+  const dow = (date.getDay() + 6) % 7
+  date.setDate(date.getDate() - dow)
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
 }
 
 function normalizePriority(value: unknown): Priority {

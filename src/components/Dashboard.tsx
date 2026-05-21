@@ -16,10 +16,11 @@ import { ActivityLogView } from './ActivityLogView'
 import { BusinessPartnersView } from './BusinessPartnersView'
 import { MachineTypesLibraryView } from './MachineTypesLibraryView'
 import { WorkshopLoadView } from './WorkshopLoadView'
+import { WorkshopPlanningView } from './WorkshopPlanningView'
 import { WorkshopWorkersView } from './WorkshopWorkersView'
 
 type ViewMode = 'table' | 'kanban'
-type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche' | 'disegni' | 'officina' | 'operai'
+type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche' | 'disegni' | 'officina' | 'operai' | 'officina-planning'
 
 interface TabDef {
   id: MainTab
@@ -36,6 +37,7 @@ const TABS: TabDef[] = [
   { id: 'disegni', label: 'Libreria disegni', icon: 'M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v17.5A2.5 2.5 0 0 1 17.5 22H6.5A2.5 2.5 0 0 1 4 19.5ZM8 6h8M8 10h8M8 14h5', hint: 'Registro disegni e tipologie macchina' },
   { id: 'officina', label: 'Carico officina', icon: 'M14.7 6.3a4 4 0 0 0-5.6 5.6L3 18v3h3l6.1-6.1a4 4 0 0 0 5.6-5.6l-2.5 2.5-2.1-2.1z', hint: 'Cosa arriva in officina dopo il rilascio progettazione' },
   { id: 'operai', label: 'Operai officina', icon: 'M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21h16', hint: 'Anagrafica dipendenti officina e mansioni' },
+  { id: 'officina-planning', label: 'Pianificazione officina', icon: 'M4 5h16M4 12h16M4 19h16M8 3v18M16 3v18', hint: 'Assegnazioni operai e saturazione punti' },
   { id: 'log', label: 'Storico', icon: 'M3 3v18h18M7 13l3-3 3 3 5-5', hint: 'Cronologia modifiche' },
 ]
 
@@ -184,6 +186,8 @@ export function Dashboard() {
         <WorkshopLoadView />
       ) : tab === 'operai' ? (
         <WorkshopWorkersView />
+      ) : tab === 'officina-planning' ? (
+        <WorkshopPlanningView />
       ) : (
         <ActivityLogView />
       )}

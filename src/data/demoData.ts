@@ -451,6 +451,7 @@ export const demoData: AppData = {
   machineTypes: DEFAULT_MACHINE_TYPES,
   workshopOutputs: [],
   workshopWorkers: [],
+  workshopAssignments: [],
 }
 
 export function freshDemoData(): AppData {

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Absence, AppData, BusinessPartner, MachineType, Person, Status, WorkshopOutput, WorkshopWorker } from '../types'
+import type { Absence, AppData, BusinessPartner, MachineType, Person, Status, WorkshopAssignment, WorkshopAssignmentStatus, WorkshopOutput, WorkshopWorker } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
 import {
@@ -100,6 +100,18 @@ import type {
   WorkshopWorkerImportResult,
 } from '../services/workshopWorkersService'
 import type { WorkshopWorkerImportPlan } from '../utils/workshopWorkersImport'
+import {
+  createWorkshopAssignment as svcCreateWorkshopAssignment,
+  deleteWorkshopAssignment as svcDeleteWorkshopAssignment,
+  replaceWorkshopAssignmentsForOutput as svcReplaceWorkshopAssignmentsForOutput,
+  setWorkshopAssignmentStatus as svcSetWorkshopAssignmentStatus,
+  updateWorkshopAssignment as svcUpdateWorkshopAssignment,
+} from '../services/workshopAssignmentsService'
+import type {
+  CreateWorkshopAssignmentInput,
+  UpdateWorkshopAssignmentInput,
+  WorkshopAssignmentDraft,
+} from '../services/workshopAssignmentsService'
 
 interface UpdatePeopleOptions {
   /** Password admin per autorizzare modifiche a baselineLoadPercent */
@@ -113,6 +125,7 @@ interface DataContextValue {
   machineTypes: MachineType[]
   workshopOutputs: WorkshopOutput[]
   workshopWorkers: WorkshopWorker[]
+  workshopAssignments: WorkshopAssignment[]
   // workItems
   createWorkItem: (input: CreateWorkItemInput) => string
   updateWorkItem: (id: string, patch: UpdateWorkItemInput) => void
@@ -156,6 +169,12 @@ interface DataContextValue {
   updateWorkshopWorker: (id: string, patch: UpdateWorkshopWorkerInput) => void
   setWorkshopWorkerActive: (id: string, active: boolean) => void
   applyWorkshopWorkerImport: (plan: WorkshopWorkerImportPlan) => WorkshopWorkerImportResult
+  // workshop assignments
+  createWorkshopAssignment: (input: CreateWorkshopAssignmentInput) => string
+  updateWorkshopAssignment: (id: string, patch: UpdateWorkshopAssignmentInput) => void
+  deleteWorkshopAssignment: (id: string) => void
+  setWorkshopAssignmentStatus: (id: string, status: WorkshopAssignmentStatus) => void
+  replaceWorkshopAssignmentsForOutput: (workshopOutputId: string, assignments: WorkshopAssignmentDraft[]) => void
   // import/export
   importData: (next: AppData, options?: ImportDataOptions) => void
   exportData: () => BackupExportResult
@@ -577,6 +596,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return result
   }, [commitData])
 
+  const createWorkshopAssignment = useCallback((input: CreateWorkshopAssignmentInput): string => {
+    const result = svcCreateWorkshopAssignment(dataRef.current, input)
+    commitData(result.data)
+    return result.id
+  }, [commitData])
+
+  const updateWorkshopAssignment = useCallback((id: string, patch: UpdateWorkshopAssignmentInput) => {
+    commitData(svcUpdateWorkshopAssignment(dataRef.current, id, patch))
+  }, [commitData])
+
+  const deleteWorkshopAssignment = useCallback((id: string) => {
+    commitData(svcDeleteWorkshopAssignment(dataRef.current, id))
+  }, [commitData])
+
+  const setWorkshopAssignmentStatus = useCallback((id: string, status: WorkshopAssignmentStatus) => {
+    commitData(svcSetWorkshopAssignmentStatus(dataRef.current, id, status))
+  }, [commitData])
+
+  const replaceWorkshopAssignmentsForOutput = useCallback((workshopOutputId: string, assignments: WorkshopAssignmentDraft[]) => {
+    commitData(svcReplaceWorkshopAssignmentsForOutput(dataRef.current, workshopOutputId, assignments))
+  }, [commitData])
+
   const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
     const safeNext = mergeImportWithSharedCollections(next, dataRef.current)
     const description = [
@@ -588,6 +629,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       `${safeNext.machineTypes.length} tipologie disegno`,
       `${safeNext.workshopOutputs.length} output officina`,
       `${safeNext.workshopWorkers.length} operai officina`,
+      `${safeNext.workshopAssignments.length} assegnazioni officina`,
       options.fileName ? `file: ${options.fileName}` : '',
       options.exportedAt ? `esportato: ${options.exportedAt}` : '',
       options.version ? `versione: ${options.version}` : '',
@@ -618,7 +660,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         entityId: 'backup',
         action: 'exported',
         title: 'Backup JSON esportato',
-        description: `${dataRef.current.people.length} persone - ${dataRef.current.workItems.length} lavori - ${dataRef.current.tasks.length} task - ${dataRef.current.machineTypes.length} tipologie disegno - ${dataRef.current.workshopOutputs.length} output officina - ${dataRef.current.workshopWorkers.length} operai officina - file: ${filename}`,
+        description: `${dataRef.current.people.length} persone - ${dataRef.current.workItems.length} lavori - ${dataRef.current.tasks.length} task - ${dataRef.current.machineTypes.length} tipologie disegno - ${dataRef.current.workshopOutputs.length} output officina - ${dataRef.current.workshopWorkers.length} operai officina - ${dataRef.current.workshopAssignments.length} assegnazioni officina - file: ${filename}`,
       }, exportedAtDate),
     )
     const exportedAt = setLastBackupAt(exportedAtDate)
@@ -650,6 +692,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     machineTypes: data.machineTypes,
     workshopOutputs: data.workshopOutputs,
     workshopWorkers: data.workshopWorkers,
+    workshopAssignments: data.workshopAssignments,
     createWorkItem,
     updateWorkItem,
     createWorkItemWithWorkshopOutputs,
@@ -685,6 +728,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateWorkshopWorker,
     setWorkshopWorkerActive,
     applyWorkshopWorkerImport,
+    createWorkshopAssignment,
+    updateWorkshopAssignment,
+    deleteWorkshopAssignment,
+    setWorkshopAssignmentStatus,
+    replaceWorkshopAssignmentsForOutput,
     importData,
     exportData,
     markNotificationAsRead,
@@ -704,6 +752,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createMachineType, updateMachineType, setMachineTypeActive,
     createWorkshopOutput, updateWorkshopOutput, deleteWorkshopOutput, replaceWorkshopOutputsForWorkItem,
     createWorkshopWorker, updateWorkshopWorker, setWorkshopWorkerActive, applyWorkshopWorkerImport,
+    createWorkshopAssignment, updateWorkshopAssignment, deleteWorkshopAssignment, setWorkshopAssignmentStatus, replaceWorkshopAssignmentsForOutput,
     importData, exportData,
     markNotificationAsRead, markAllNotificationsAsRead,
     clearReadNotifications, clearAllNotifications,
@@ -725,6 +774,9 @@ function mergeImportWithSharedCollections(next: AppData, current: AppData): AppD
     businessPartners: next.businessPartners.length > 0 ? next.businessPartners : current.businessPartners,
     machineTypes: next.machineTypes.length > 0 ? next.machineTypes : current.machineTypes,
     workshopWorkers: next.workshopWorkers.length > 0 ? next.workshopWorkers : current.workshopWorkers,
+    workshopAssignments: next.workshopAssignments.length > 0
+      ? next.workshopAssignments
+      : current.workshopAssignments.filter((assignment) => importedWorkItemIds.has(assignment.workItemId)),
     workshopOutputs: next.workshopOutputs.length > 0
       ? next.workshopOutputs
       : current.workshopOutputs.filter((output) => importedWorkItemIds.has(output.workItemId)),
