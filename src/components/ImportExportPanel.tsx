@@ -11,6 +11,7 @@ import { getLastBackupAt, validateBackupPayload } from '../utils/backup'
 import { generateWeeklyAdminReport } from '../utils/weeklyReport'
 import { ImportPreviewModal } from './ImportPreviewModal'
 import { WeeklyReportModal } from './WeeklyReportModal'
+import { BackupManagerModal } from './BackupManagerModal'
 
 interface PendingImport {
   fileName: string
@@ -25,6 +26,7 @@ export function ImportExportPanel() {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [backupManagerOpen, setBackupManagerOpen] = useState(false)
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null)
   const [lastBackupAt, setLastBackupAtState] = useState<string | null>(() => getLastBackupAt())
   const [serverBackupStatus, setServerBackupStatus] = useState<BackupStatus | null>(null)
@@ -143,6 +145,12 @@ export function ImportExportPanel() {
           <MenuItem onClick={handlePickFile} icon={<Icon path="M12 21V9m0 0-4 4m4-4 4 4M5 3h14" />}>
             Importa backup JSON
           </MenuItem>
+          <MenuItem
+            onClick={() => { setBackupManagerOpen(true); setOpen(false) }}
+            icon={<Icon path="M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2M4 7h16M4 7v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7M9 12h6" />}
+          >
+            Gestione e ripristino backup
+          </MenuItem>
 
           <div className="my-1 border-t border-slate-800" />
 
@@ -173,6 +181,8 @@ export function ImportExportPanel() {
       />
 
       <WeeklyReportModal open={previewOpen} onClose={() => setPreviewOpen(false)} />
+
+      <BackupManagerModal open={backupManagerOpen} onClose={() => setBackupManagerOpen(false)} />
     </div>
   )
 }

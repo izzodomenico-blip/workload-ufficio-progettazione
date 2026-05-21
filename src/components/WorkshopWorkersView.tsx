@@ -324,13 +324,9 @@ function WorkshopWorkerFormModal({
   onSave: (payload: CreateWorkshopWorkerInput) => void
 }) {
   const [form, setForm] = useState<CreateWorkshopWorkerInput>(initial)
-  const [showAnagrafici, setShowAnagrafici] = useState(false)
 
   useEffect(() => {
-    if (open) {
-      setForm(initial)
-      setShowAnagrafici(false)
-    }
+    if (open) setForm(initial)
   }, [open, title])
 
   function set<K extends keyof CreateWorkshopWorkerInput>(key: K, value: CreateWorkshopWorkerInput[K]) {
@@ -462,61 +458,13 @@ function WorkshopWorkerFormModal({
           </div>
         </section>
 
-        {/* 4. Dettagli anagrafici (chiuso di default - dati piu sensibili) */}
-        <section className="space-y-3">
-          <button
-            type="button"
-            onClick={() => setShowAnagrafici((value) => !value)}
-            aria-expanded={showAnagrafici}
-            className="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2.5 text-left text-sm font-medium text-slate-200 transition hover:border-slate-700 hover:bg-slate-800/60"
-          >
-            <span className="flex items-center gap-2">
-              <LockIcon />
-              {showAnagrafici ? 'Nascondi dettagli anagrafici' : 'Mostra dettagli anagrafici'}
-            </span>
-            <ChevronIcon open={showAnagrafici} />
-          </button>
-          {showAnagrafici && (
-            <div className="grid grid-cols-1 gap-4 rounded-lg border border-slate-800/70 bg-slate-900/30 p-4 md:grid-cols-2">
-              <Field label="Indirizzo" className="md:col-span-2">
-                <input className="input-base" value={form.address} onChange={(event) => set('address', event.target.value)} placeholder="Indirizzo se disponibile" />
-              </Field>
-              <Field label="Citta">
-                <input className="input-base" value={form.city} onChange={(event) => set('city', event.target.value)} />
-              </Field>
-              <Field label="Provincia">
-                <input className="input-base" value={form.province} onChange={(event) => set('province', event.target.value)} />
-              </Field>
-              <Field label="Codice fiscale">
-                <input className="input-base font-mono" value={form.fiscalCode} onChange={(event) => set('fiscalCode', event.target.value)} />
-              </Field>
-              <Field label="Tipo contratto">
-                <input className="input-base" value={form.employmentType} onChange={(event) => set('employmentType', event.target.value)} />
-              </Field>
-              <Field label="Data nascita">
-                <input type="date" className="input-base" value={form.birthDate} onChange={(event) => set('birthDate', event.target.value)} />
-              </Field>
-              <Field label="Data assunzione">
-                <input type="date" className="input-base" value={form.hireDate} onChange={(event) => set('hireDate', event.target.value)} />
-              </Field>
-              {form.extraFields && Object.keys(form.extraFields).length > 0 && (
-                <div className="md:col-span-2 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
-                  <div className="section-label">Dettagli extra importati</div>
-                  <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-slate-300 md:grid-cols-2">
-                    {Object.entries(form.extraFields).map(([key, value]) => (
-                      <div key={key} className="min-w-0">
-                        <span className="text-slate-500">{key}: </span>
-                        <span className="break-words text-slate-200">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
+        {/* I dettagli anagrafici (indirizzo, citta, provincia, codice fiscale,
+            tipo contratto, date, campi extra importati da Excel) sono
+            volutamente NON mostrati in questa schermata per privacy visiva.
+            I dati restano nel database e vengono preservati al salvataggio
+            (lo stato `form` li conserva e li reinvia con `...form`). */}
 
-        {/* 5. Note */}
+        {/* Note */}
         <section className="space-y-3">
           <FormSectionHeading>Note</FormSectionHeading>
           <textarea rows={3} className="input-base resize-y" value={form.notes} onChange={(event) => set('notes', event.target.value)} />
@@ -627,26 +575,6 @@ function FormSectionHeading({ children }: { children: ReactNode }) {
   )
 }
 
-function LockIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="11" width="18" height="11" rx="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  )
-}
-
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-      className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-      aria-hidden
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  )
-}
 
 function Info({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (

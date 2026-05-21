@@ -136,6 +136,65 @@ export function fetchBackupStatus(): Promise<BackupStatus> {
   return request<BackupStatus>('/api/backup/status')
 }
 
+export type BackupKind = 'manual' | 'auto'
+
+export interface BackupArchive {
+  id: string
+  kind: BackupKind
+  createdAt: string
+  jsonSize: number
+  dbSize: number | null
+  hasDb: boolean
+}
+
+export interface BackupCountsSnapshot {
+  people: number
+  workItems: number
+  tasks: number
+  absences: number
+  businessPartners: number
+  machineTypes: number
+  workshopOutputs: number
+  workshopWorkers: number
+  workshopAssignments: number
+  activityLog?: number
+  notifications?: number
+}
+
+export interface BackupPreview {
+  kind: BackupKind
+  file: string
+  backupInfo: { exportedAt?: string; version?: string; reason?: string; backupKind?: string } | null
+  counts: BackupCountsSnapshot
+}
+
+export interface RestoreResult {
+  restoredFrom: string
+  kind: BackupKind
+  before: BackupCountsSnapshot
+  after: BackupCountsSnapshot
+  safetyBackup: { jsonPath: string; dbPath: string } | null
+}
+
+export function fetchBackupArchives(): Promise<BackupArchive[]> {
+  return request<BackupArchive[]>('/api/backups')
+}
+
+export function fetchBackupPreview(kind: BackupKind, file: string): Promise<BackupPreview> {
+  return request<BackupPreview>(`/api/backups/preview?kind=${encodeURIComponent(kind)}&file=${encodeURIComponent(file)}`)
+}
+
+export function restoreBackup(kind: BackupKind, file: string): Promise<RestoreResult> {
+  return request<RestoreResult>('/api/backups/restore', {
+    method: 'POST',
+    body: JSON.stringify({ kind, file }),
+  })
+}
+
+export function backupDownloadUrl(kind: BackupKind, file: string): string {
+  return `/api/backups/download?kind=${encodeURIComponent(kind)}&file=${encodeURIComponent(file)}`
+}
+
 export async function createMachineTypeRecord(machineType: MachineType): Promise<MachineType> {
   return request<MachineType>('/api/machine-types', {
     method: 'POST',

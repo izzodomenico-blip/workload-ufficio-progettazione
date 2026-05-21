@@ -115,6 +115,74 @@ Esempio:
 http://192.168.1.50:3000
 ```
 
+## Avvio quotidiano con il file .bat (uso in ufficio)
+
+Per l'uso di tutti i giorni sul PC server c'è un avvio guidato:
+
+```text
+scripts\windows\Avvia_Workload.bat
+```
+
+### Avvio della mattina
+
+1. Sul PC server, apri la cartella `scripts\windows\` e fai **doppio clic** su
+   `Avvia_Workload.bat` (consigliato: crea un collegamento sul Desktop —
+   tasto destro sul file → *Invia a* → *Desktop*).
+2. Il launcher esegue da solo i controlli e l'avvio:
+   - verifica che **Node.js** e **npm** siano installati;
+   - si posiziona nella cartella del progetto;
+   - controlla se la **porta 3000** è già occupata;
+   - avvia il server (`npm run start`);
+   - mostra il **link locale** e il **link di rete** per i colleghi;
+   - apre il browser su `http://localhost:3000` dopo pochi secondi.
+3. **Lascia la finestra nera aperta** per tutta la giornata. Compare l'avviso:
+   *"NON CHIUDERE QUESTA FINESTRA: il server si spegne."* Chiudere la finestra
+   (o premere `Ctrl+C`) ferma il server e i colleghi perdono l'accesso.
+
+A fine giornata: chiudi la finestra per spegnere il server.
+
+### Cosa dare ai colleghi
+
+Ai colleghi serve solo il **link di rete** mostrato dal launcher, nella forma:
+
+```text
+http://IP_DEL_PC_SERVER:3000
+```
+
+Il `.bat` rileva e stampa l'IP automaticamente (es. `http://192.168.0.110:3000`).
+Devono essere sulla **stessa rete locale** e tenere il link nei preferiti del
+browser. Non serve installare nulla sui loro PC.
+
+### Cosa fare se cambia l'IP del PC server
+
+L'IP locale può cambiare (DHCP, riavvio del router). Se i colleghi non riescono
+più ad aprire l'app:
+
+1. Sul PC server riavvia `Avvia_Workload.bat`: in alto rileggi il nuovo
+   **link di rete** stampato e ridallo ai colleghi; **oppure**
+2. Esegui `ipconfig` e leggi la voce **Indirizzo IPv4**.
+3. Per evitare che cambi, chiedi all'IT di assegnare un **IP statico** (o una
+   prenotazione DHCP) al PC server: così il link resta sempre lo stesso.
+
+### Cosa fare se la porta 3000 è occupata
+
+Se la porta 3000 risulta già occupata, il launcher mostra il processo che la usa
+e propone una scelta:
+
+- **[C] Chiudi il processo e riavvia** — di solito è un'istanza del server
+  rimasta aperta: la chiude e riavvia pulito.
+- **[A] Apri solo l'app** — il server è già attivo: apre soltanto il browser
+  (utile se hai chiuso per sbaglio solo la scheda del browser, non la finestra).
+- **[E] Esci** — non fa nulla.
+
+In alternativa, da Prompt dei comandi puoi individuare e chiudere manualmente il
+processo:
+
+```powershell
+netstat -ano | findstr :3000
+taskkill /PID <numero_PID> /F
+```
+
 ## Trovare l'IP del PC server su Windows
 
 Apri PowerShell o Prompt dei comandi e usa:

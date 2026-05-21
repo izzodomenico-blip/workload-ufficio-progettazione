@@ -185,6 +185,8 @@ interface DataContextValue {
   // import/export
   importData: (next: AppData, options?: ImportDataOptions) => void
   exportData: () => BackupExportResult
+  /** Ricarica lo stato condiviso dal server (es. dopo un ripristino backup). */
+  reloadFromServer: () => Promise<void>
   // notifications
   markNotificationAsRead: (id: string) => void
   markAllNotificationsAsRead: () => void
@@ -716,6 +718,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     commitData(svcClearAllNotifications(dataRef.current))
   }, [commitData])
 
+  const reloadFromServer = useCallback(async () => {
+    const response = await fetchAppData()
+    applyRemoteData(response.data, response.revision)
+  }, [applyRemoteData])
+
   const value = useMemo<DataContextValue>(() => ({
     data,
     absences: data.absences,
@@ -768,6 +775,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     replaceWorkshopAssignmentsForOutput,
     importData,
     exportData,
+    reloadFromServer,
     markNotificationAsRead,
     markAllNotificationsAsRead,
     clearReadNotifications,
@@ -786,7 +794,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createWorkshopOutput, updateWorkshopOutput, updateWorkshopOutputAfterCommercialCheck, deleteWorkshopOutput, replaceWorkshopOutputsForWorkItem,
     createWorkshopWorker, updateWorkshopWorker, setWorkshopWorkerActive, applyWorkshopWorkerImport,
     createWorkshopAssignment, updateWorkshopAssignment, deleteWorkshopAssignment, setWorkshopAssignmentStatus, replaceWorkshopAssignmentsForOutput,
-    importData, exportData,
+    importData, exportData, reloadFromServer,
     markNotificationAsRead, markAllNotificationsAsRead,
     clearReadNotifications, clearAllNotifications,
   ])

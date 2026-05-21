@@ -12,7 +12,11 @@ import { EMPTY_APP_DATA, normalizeAppData } from '../services/appData.js'
 import {
   createPreMutationBackup,
   getBackupStatus,
+  listBackupArchives,
+  readBackupPreview,
   recordAutomaticBackupActivity,
+  resolveBackupFile,
+  restoreFromBackup,
   scheduleAutoBackup,
 } from '../backupService.js'
 import { parseAnagraficheXml } from '../services/anagraficheImport.js'
@@ -156,6 +160,49 @@ export function createApiRouter() {
 
   router.get('/backup/status', (_req, res) => {
     res.json(getBackupStatus())
+  })
+
+  // === Gestione / ripristino backup ===
+  router.get('/backups', (_req, res, next) => {
+    try {
+      res.set('cache-control', 'no-store')
+      res.json(listBackupArchives())
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  router.get('/backups/preview', (req, res, next) => {
+    try {
+      const preview = readBackupPreview(String(req.query.kind || ''), String(req.query.file || ''))
+      res.json(preview)
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
+  })
+
+  router.get('/backups/download', (req, res, next) => {
+    try {
+      const full = resolveBackupFile(String(req.query.kind || ''), String(req.query.file || ''))
+      if (!full) {
+        res.status(404).json({ error: 'Backup non trovato.' })
+        return
+      }
+      res.download(full)
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  router.post('/backups/restore', (req, res, next) => {
+    try {
+      const body = req.body ?? {}
+      const result = restoreFromBackup(String(body.kind || ''), String(body.file || ''))
+      sendDataRevisionHeaders(res)
+      res.json(result)
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
   })
 
   registerMachineTypeRoutes(router)

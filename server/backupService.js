@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { DB_PATH, ROOT_DIR, getAppData, getDb } from './db.js'
-import { createBackupPayload, timestampForFilename } from './services/appData.js'
+import { DB_PATH, ROOT_DIR, getAppData, getDb, saveAppData } from './db.js'
+import { countAppData, createBackupPayload, extractAppData, timestampForFilename } from './services/appData.js'
 
 export const BACKUPS_DIR = path.join(ROOT_DIR, 'backups')
 export const AUTO_BACKUPS_DIR = path.join(BACKUPS_DIR, 'auto')
@@ -163,6 +163,144 @@ export function getBackupStatus() {
     autoBackupEnabled: true,
     pendingAutoBackupAt: pendingDueAt ? new Date(pendingDueAt).toISOString() : null,
     lastAutoBackupError: status.lastAutoBackupError ?? null,
+  }
+}
+
+// ===========================
+// Gestione / ripristino backup
+// ===========================
+
+const BACKUP_KINDS = {
+  manual: { dir: BACKUPS_DIR, jsonPrefix: 'backup_workload_ufficio_', dbPrefix: 'backup_workload_db_' },
+  auto: { dir: AUTO_BACKUPS_DIR, jsonPrefix: 'auto_backup_workload_', dbPrefix: 'auto_backup_workload_' },
+}
+
+function safeReaddir(dir) {
+  try {
+    return fs.existsSync(dir) ? fs.readdirSync(dir) : []
+  } catch {
+    return []
+  }
+}
+
+/** Elenco di tutti i backup (manuali + automatici) ricavato dai file .json. */
+export function listBackupArchives() {
+  ensureBackupDirs()
+  const archives = []
+  for (const [kind, cfg] of Object.entries(BACKUP_KINDS)) {
+    for (const name of safeReaddir(cfg.dir)) {
+      if (!name.startsWith(cfg.jsonPrefix) || !name.endsWith('.json')) continue
+      const stamp = name.slice(cfg.jsonPrefix.length, -'.json'.length)
+      const jsonPath = path.join(cfg.dir, name)
+      const dbName = `${cfg.dbPrefix}${stamp}.db`
+      const dbPath = path.join(cfg.dir, dbName)
+      let jsonStat
+      try { jsonStat = fs.statSync(jsonPath) } catch { continue }
+      const hasDb = fs.existsSync(dbPath)
+      archives.push({
+        id: name,
+        kind,
+        createdAt: jsonStat.mtime.toISOString(),
+        jsonSize: jsonStat.size,
+        dbSize: hasDb ? fs.statSync(dbPath).size : null,
+        hasDb,
+      })
+    }
+  }
+  archives.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return archives
+}
+
+/** Risolve in modo sicuro il path di un file di backup, prevenendo path traversal. */
+export function resolveBackupFile(kind, file) {
+  const cfg = BACKUP_KINDS[kind]
+  if (!cfg) return null
+  if (typeof file !== 'string' || file.length === 0) return null
+  if (file.includes('/') || file.includes('\\') || file.includes('..')) return null
+  const isJson = file.startsWith(cfg.jsonPrefix) && file.endsWith('.json')
+  const isDb = file.startsWith(cfg.dbPrefix) && file.endsWith('.db')
+  if (!isJson && !isDb) return null
+  const full = path.resolve(path.join(cfg.dir, file))
+  if (!full.startsWith(path.resolve(cfg.dir))) return null
+  if (!fs.existsSync(full)) return null
+  return full
+}
+
+function backupNotFound() {
+  const err = new Error('Backup non trovato.')
+  err.statusCode = 404
+  return err
+}
+
+/** Conteggi e metadati di un backup, senza applicarlo. */
+export function readBackupPreview(kind, file) {
+  const full = resolveBackupFile(kind, file)
+  if (!full || !full.endsWith('.json')) throw backupNotFound()
+  const raw = JSON.parse(fs.readFileSync(full, 'utf8'))
+  const data = extractAppData(raw)
+  const backupInfo = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw.backupInfo ?? null) : null
+  return { kind, file, backupInfo, counts: countAppData(data) }
+}
+
+/**
+ * Ripristino sicuro:
+ *  1. crea un backup di sicurezza dello stato attuale (kind manual);
+ *  2. applica i dati del backup scelto (normalizzati, compat vecchi backup);
+ *  3. registra un evento nello storico.
+ * Non cancella i backup esistenti, non resetta lo schema del database.
+ */
+export function restoreFromBackup(kind, file) {
+  const full = resolveBackupFile(kind, file)
+  if (!full || !full.endsWith('.json')) throw backupNotFound()
+  const raw = JSON.parse(fs.readFileSync(full, 'utf8'))
+  const restored = extractAppData(raw)
+  const db = getDb()
+  const before = countAppData(getAppData(db))
+
+  let safetyBackup = null
+  try {
+    const safety = createDatabaseBackup(`pre-restore-${kind}`, { kind: 'manual' })
+    safetyBackup = { jsonPath: safety.jsonPath, dbPath: safety.dbPath }
+  } catch (error) {
+    console.error('Backup di sicurezza pre-ripristino fallito:', error)
+  }
+
+  saveAppData(restored, db)
+  recordRestoreActivity(file, restored, db)
+
+  return {
+    restoredFrom: file,
+    kind,
+    before,
+    after: countAppData(restored),
+    safetyBackup,
+  }
+}
+
+function recordRestoreActivity(file, data, db) {
+  try {
+    const at = new Date()
+    const timestamp = at.toISOString()
+    const counts = countAppData(data)
+    const entry = {
+      id: `log_restore_${at.getTime()}_${Math.random().toString(36).slice(2, 8)}`,
+      timestamp,
+      entityType: 'system',
+      entityId: 'restore',
+      action: 'imported',
+      title: 'Ripristino backup eseguito',
+      description: `Da ${file} - ${counts.workItems} lavori, ${counts.workshopOutputs} output officina, ${counts.businessPartners} anagrafiche`,
+    }
+    db.prepare('INSERT INTO activity_log (id, timestamp, data, updated_at) VALUES (?, ?, ?, ?)')
+      .run(entry.id, timestamp, JSON.stringify(entry), timestamp)
+    db.prepare(`
+      DELETE FROM activity_log
+      WHERE id NOT IN (
+        SELECT id FROM activity_log ORDER BY timestamp DESC LIMIT 1000
+      )
+    `).run()
+  } catch (error) {
+    console.error('Registrazione storico ripristino fallita:', error)
   }
 }
 
