@@ -68,7 +68,7 @@ export function BusinessPartnerAutocomplete({
         }}
       />
       {open && results.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto scroll-thin rounded-md border border-slate-700 bg-[color:var(--color-panel)] shadow-2xl">
+        <div className="menu-surface absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto scroll-thin">
           {results.map((p, i) => (
             <button
               key={p.id}

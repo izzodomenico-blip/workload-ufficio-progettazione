@@ -207,7 +207,7 @@ export function WorkshopWorkersView() {
 
       <div className="panel overflow-hidden">
         <div className="overflow-x-auto scroll-thin">
-          <table className="w-full min-w-[1180px] text-left text-sm">
+          <table className="w-full min-w-[920px] text-left text-sm">
             <thead className="table-head border-b border-slate-800">
               <tr>
                 <th className="px-3 py-2.5 w-[28px]" />
@@ -215,9 +215,7 @@ export function WorkshopWorkersView() {
                 <th className="px-3 py-2.5 font-semibold">Ruolo / mansione</th>
                 <th className="px-3 py-2.5 font-semibold">Reparto</th>
                 <th className="px-3 py-2.5 font-semibold">Skill</th>
-                <th className="px-3 py-2.5 font-semibold">Telefono</th>
-                <th className="px-3 py-2.5 font-semibold">Cellulare</th>
-                <th className="px-3 py-2.5 font-semibold">Email</th>
+                <th className="px-3 py-2.5 font-semibold">Contatto</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Cap. giorno</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Cap. sett.</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Azioni</th>
@@ -236,9 +234,7 @@ export function WorkshopWorkersView() {
                   <td className="px-3 py-2.5 text-slate-300">{worker.role || '-'}</td>
                   <td className="px-3 py-2.5 text-slate-300">{worker.department || '-'}</td>
                   <td className="px-3 py-2.5"><SkillBadges worker={worker} /></td>
-                  <td className="px-3 py-2.5 text-slate-400">{worker.phone || '-'}</td>
-                  <td className="px-3 py-2.5 text-slate-400">{worker.mobilePhone || '-'}</td>
-                  <td className="px-3 py-2.5 text-slate-400">{worker.email || '-'}</td>
+                  <td className="px-3 py-2.5 text-slate-400">{worker.phone || worker.mobilePhone || '-'}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{worker.dailyCapacityPoints}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{worker.weeklyCapacityPoints}</td>
                   <td className="px-3 py-2.5 text-right">
@@ -256,7 +252,7 @@ export function WorkshopWorkersView() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-3 py-14 text-center text-sm text-slate-500">
+                  <td colSpan={9} className="px-3 py-14 text-center text-sm text-slate-500">
                     Nessun operaio officina corrisponde ai filtri correnti.
                   </td>
                 </tr>
@@ -328,9 +324,13 @@ function WorkshopWorkerFormModal({
   onSave: (payload: CreateWorkshopWorkerInput) => void
 }) {
   const [form, setForm] = useState<CreateWorkshopWorkerInput>(initial)
+  const [showAnagrafici, setShowAnagrafici] = useState(false)
 
   useEffect(() => {
-    if (open) setForm(initial)
+    if (open) {
+      setForm(initial)
+      setShowAnagrafici(false)
+    }
   }, [open, title])
 
   function set<K extends keyof CreateWorkshopWorkerInput>(key: K, value: CreateWorkshopWorkerInput[K]) {
@@ -377,105 +377,150 @@ function WorkshopWorkerFormModal({
         </>
       }
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Field label="Nome">
-          <input className="input-base" value={form.firstName} onChange={(event) => set('firstName', event.target.value)} />
-        </Field>
-        <Field label="Cognome">
-          <input className="input-base" value={form.lastName} onChange={(event) => set('lastName', event.target.value)} />
-        </Field>
-        <Field label="Nominativo" className="md:col-span-2">
-          <input className="input-base" value={form.displayName} onChange={(event) => set('displayName', event.target.value)} placeholder="Mario Rossi" />
-        </Field>
-        <Field label="Codice / matricola">
-          <input className="input-base" value={form.employeeCode} onChange={(event) => set('employeeCode', event.target.value)} />
-        </Field>
-        <Field label="Codice fiscale">
-          <input className="input-base font-mono" value={form.fiscalCode} onChange={(event) => set('fiscalCode', event.target.value)} />
-        </Field>
-        <Field label="Mansione / ruolo">
-          <input className="input-base" value={form.role} onChange={(event) => set('role', event.target.value)} />
-        </Field>
-        <Field label="Reparto">
-          <input className="input-base" value={form.department} onChange={(event) => set('department', event.target.value)} />
-        </Field>
-        <Field label="Tipo contratto">
-          <input className="input-base" value={form.employmentType} onChange={(event) => set('employmentType', event.target.value)} />
-        </Field>
-        <Field label="Skill primaria">
-          <select value={form.primarySkill} onChange={(event) => set('primarySkill', event.target.value as WorkshopWorkerSkill | '')} className="input-base">
-            <option value="">Nessuna</option>
-            {form.skills.map((skill) => (
-              <option key={skill} value={skill}>{WORKSHOP_WORKER_SKILL_LABELS[skill]}</option>
-            ))}
-          </select>
-        </Field>
-        <div className="md:col-span-2">
-          <div className="mb-2 section-label">Mansioni abilitate</div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
-            {ALL_WORKSHOP_WORKER_SKILLS.map((skill) => (
-              <label key={skill} className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={form.skills.includes(skill)}
-                  onChange={() => toggleSkill(skill)}
-                  className="h-4 w-4 rounded border-slate-700 bg-slate-900"
-                />
-                <span>{WORKSHOP_WORKER_SKILL_LABELS[skill]}</span>
+      <div className="space-y-6">
+        {/* 1. Dati principali */}
+        <section className="space-y-3">
+          <FormSectionHeading>Dati principali</FormSectionHeading>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Nome">
+              <input className="input-base" value={form.firstName} onChange={(event) => set('firstName', event.target.value)} />
+            </Field>
+            <Field label="Cognome">
+              <input className="input-base" value={form.lastName} onChange={(event) => set('lastName', event.target.value)} />
+            </Field>
+            <Field label="Nominativo" className="md:col-span-2">
+              <input className="input-base" value={form.displayName} onChange={(event) => set('displayName', event.target.value)} placeholder="Mario Rossi" />
+            </Field>
+            <Field label="Codice / matricola">
+              <input className="input-base" value={form.employeeCode} onChange={(event) => set('employeeCode', event.target.value)} />
+            </Field>
+            <Field label="Mansione / ruolo">
+              <input className="input-base" value={form.role} onChange={(event) => set('role', event.target.value)} />
+            </Field>
+            <Field label="Reparto">
+              <input className="input-base" value={form.department} onChange={(event) => set('department', event.target.value)} />
+            </Field>
+            <Field label="Stato">
+              <label className="flex h-[38px] items-center gap-2 rounded-md border border-slate-800 bg-slate-900/40 px-3 text-sm text-slate-200">
+                <input type="checkbox" checked={form.active} onChange={(event) => set('active', event.target.checked)} className="h-4 w-4 rounded border-slate-700 bg-slate-900" />
+                {form.active ? 'Attivo' : 'Disattivato'}
               </label>
-            ))}
+            </Field>
           </div>
-        </div>
-        <Field label="Telefono">
-          <input className="input-base" value={form.phone} onChange={(event) => set('phone', event.target.value)} />
-        </Field>
-        <Field label="Cellulare">
-          <input className="input-base" value={form.mobilePhone} onChange={(event) => set('mobilePhone', event.target.value)} />
-        </Field>
-        <Field label="Email">
-          <input type="email" className="input-base" value={form.email} onChange={(event) => set('email', event.target.value)} />
-        </Field>
-        <Field label="Indirizzo">
-          <input className="input-base" value={form.address} onChange={(event) => set('address', event.target.value)} placeholder="Indirizzo se disponibile" />
-        </Field>
-        <Field label="Citta">
-          <input className="input-base" value={form.city} onChange={(event) => set('city', event.target.value)} />
-        </Field>
-        <Field label="Provincia">
-          <input className="input-base" value={form.province} onChange={(event) => set('province', event.target.value)} />
-        </Field>
-        <Field label="Data nascita">
-          <input type="date" className="input-base" value={form.birthDate} onChange={(event) => set('birthDate', event.target.value)} />
-        </Field>
-        <Field label="Data assunzione">
-          <input type="date" className="input-base" value={form.hireDate} onChange={(event) => set('hireDate', event.target.value)} />
-        </Field>
-        <Field label="Capacita giornaliera">
-          <input type="number" min={1} className="input-base" value={form.dailyCapacityPoints} onChange={(event) => set('dailyCapacityPoints', Number(event.target.value))} />
-        </Field>
-        <Field label="Capacita settimanale">
-          <input type="number" min={1} className="input-base" value={form.weeklyCapacityPoints} onChange={(event) => set('weeklyCapacityPoints', Number(event.target.value))} />
-        </Field>
-        <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm text-slate-200">
-          <input type="checkbox" checked={form.active} onChange={(event) => set('active', event.target.checked)} className="h-4 w-4 rounded border-slate-700 bg-slate-900" />
-          Attivo
-        </label>
-        <Field label="Note" className="md:col-span-2">
-          <textarea rows={3} className="input-base resize-y" value={form.notes} onChange={(event) => set('notes', event.target.value)} />
-        </Field>
-        {form.extraFields && Object.keys(form.extraFields).length > 0 && (
-          <div className="md:col-span-2 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
-            <div className="section-label">Dettagli extra importati</div>
-            <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-slate-300 md:grid-cols-2">
-              {Object.entries(form.extraFields).map(([key, value]) => (
-                <div key={key} className="min-w-0">
-                  <span className="text-slate-500">{key}: </span>
-                  <span className="break-words text-slate-200">{value}</span>
-                </div>
+        </section>
+
+        {/* 2. Contatti */}
+        <section className="space-y-3">
+          <FormSectionHeading>Contatti</FormSectionHeading>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Field label="Telefono">
+              <input className="input-base" value={form.phone} onChange={(event) => set('phone', event.target.value)} />
+            </Field>
+            <Field label="Cellulare">
+              <input className="input-base" value={form.mobilePhone} onChange={(event) => set('mobilePhone', event.target.value)} />
+            </Field>
+            <Field label="Email">
+              <input type="email" className="input-base" value={form.email} onChange={(event) => set('email', event.target.value)} />
+            </Field>
+          </div>
+        </section>
+
+        {/* 3. Mansioni e capacita */}
+        <section className="space-y-3">
+          <FormSectionHeading>Mansioni e capacita</FormSectionHeading>
+          <div>
+            <div className="mb-2 section-label">Mansioni abilitate</div>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
+              {ALL_WORKSHOP_WORKER_SKILLS.map((skill) => (
+                <label key={skill} className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={form.skills.includes(skill)}
+                    onChange={() => toggleSkill(skill)}
+                    className="h-4 w-4 rounded border-slate-700 bg-slate-900"
+                  />
+                  <span>{WORKSHOP_WORKER_SKILL_LABELS[skill]}</span>
+                </label>
               ))}
             </div>
           </div>
-        )}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Field label="Skill primaria">
+              <select value={form.primarySkill} onChange={(event) => set('primarySkill', event.target.value as WorkshopWorkerSkill | '')} className="input-base">
+                <option value="">Nessuna</option>
+                {form.skills.map((skill) => (
+                  <option key={skill} value={skill}>{WORKSHOP_WORKER_SKILL_LABELS[skill]}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Capacita giornaliera">
+              <input type="number" min={1} className="input-base" value={form.dailyCapacityPoints} onChange={(event) => set('dailyCapacityPoints', Number(event.target.value))} />
+            </Field>
+            <Field label="Capacita settimanale">
+              <input type="number" min={1} className="input-base" value={form.weeklyCapacityPoints} onChange={(event) => set('weeklyCapacityPoints', Number(event.target.value))} />
+            </Field>
+          </div>
+        </section>
+
+        {/* 4. Dettagli anagrafici (chiuso di default - dati piu sensibili) */}
+        <section className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowAnagrafici((value) => !value)}
+            aria-expanded={showAnagrafici}
+            className="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2.5 text-left text-sm font-medium text-slate-200 transition hover:border-slate-700 hover:bg-slate-800/60"
+          >
+            <span className="flex items-center gap-2">
+              <LockIcon />
+              {showAnagrafici ? 'Nascondi dettagli anagrafici' : 'Mostra dettagli anagrafici'}
+            </span>
+            <ChevronIcon open={showAnagrafici} />
+          </button>
+          {showAnagrafici && (
+            <div className="grid grid-cols-1 gap-4 rounded-lg border border-slate-800/70 bg-slate-900/30 p-4 md:grid-cols-2">
+              <Field label="Indirizzo" className="md:col-span-2">
+                <input className="input-base" value={form.address} onChange={(event) => set('address', event.target.value)} placeholder="Indirizzo se disponibile" />
+              </Field>
+              <Field label="Citta">
+                <input className="input-base" value={form.city} onChange={(event) => set('city', event.target.value)} />
+              </Field>
+              <Field label="Provincia">
+                <input className="input-base" value={form.province} onChange={(event) => set('province', event.target.value)} />
+              </Field>
+              <Field label="Codice fiscale">
+                <input className="input-base font-mono" value={form.fiscalCode} onChange={(event) => set('fiscalCode', event.target.value)} />
+              </Field>
+              <Field label="Tipo contratto">
+                <input className="input-base" value={form.employmentType} onChange={(event) => set('employmentType', event.target.value)} />
+              </Field>
+              <Field label="Data nascita">
+                <input type="date" className="input-base" value={form.birthDate} onChange={(event) => set('birthDate', event.target.value)} />
+              </Field>
+              <Field label="Data assunzione">
+                <input type="date" className="input-base" value={form.hireDate} onChange={(event) => set('hireDate', event.target.value)} />
+              </Field>
+              {form.extraFields && Object.keys(form.extraFields).length > 0 && (
+                <div className="md:col-span-2 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
+                  <div className="section-label">Dettagli extra importati</div>
+                  <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-slate-300 md:grid-cols-2">
+                    {Object.entries(form.extraFields).map(([key, value]) => (
+                      <div key={key} className="min-w-0">
+                        <span className="text-slate-500">{key}: </span>
+                        <span className="break-words text-slate-200">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* 5. Note */}
+        <section className="space-y-3">
+          <FormSectionHeading>Note</FormSectionHeading>
+          <textarea rows={3} className="input-base resize-y" value={form.notes} onChange={(event) => set('notes', event.target.value)} />
+        </section>
       </div>
     </Modal>
   )
@@ -539,14 +584,27 @@ function ImportWorkersPreviewModal({
 
 function SkillBadges({ worker }: { worker: WorkshopWorker }) {
   if (worker.skills.length === 0) return <span className="text-xs text-slate-500">-</span>
+  // Mostra la skill primaria per prima, poi le altre, max 3 visibili + "+N".
+  const ordered = worker.primarySkill && worker.skills.includes(worker.primarySkill)
+    ? [worker.primarySkill, ...worker.skills.filter((skill) => skill !== worker.primarySkill)]
+    : worker.skills
+  const visible = ordered.slice(0, 3)
+  const hidden = ordered.length - visible.length
   return (
     <div className="flex max-w-[240px] flex-wrap gap-1">
-      {worker.skills.slice(0, 4).map((skill) => (
+      {visible.map((skill) => (
         <span key={skill} className={`chip-sm ${skill === worker.primarySkill ? 'bg-sky-500/10 text-sky-200 ring-sky-500/30' : 'bg-slate-500/10 text-slate-300 ring-slate-500/25'}`}>
           {WORKSHOP_WORKER_SKILL_LABELS[skill]}
         </span>
       ))}
-      {worker.skills.length > 4 && <span className="chip-sm bg-slate-500/10 text-slate-400 ring-slate-500/25">+{worker.skills.length - 4}</span>}
+      {hidden > 0 && (
+        <span
+          className="chip-sm bg-slate-500/10 text-slate-400 ring-slate-500/25"
+          title={ordered.slice(3).map((skill) => WORKSHOP_WORKER_SKILL_LABELS[skill]).join(', ')}
+        >
+          +{hidden}
+        </span>
+      )}
     </div>
   )
 }
@@ -557,6 +615,36 @@ function Field({ label, children, className = '' }: { label: string; children: R
       <span className="section-label">{label}</span>
       {children}
     </label>
+  )
+}
+
+function FormSectionHeading({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 border-b border-slate-800/70 pb-1.5">
+      <span className="section-accent bg-gradient-to-b from-sky-400 to-sky-600" aria-hidden />
+      <h3 className="text-sm font-semibold tracking-tight text-slate-100">{children}</h3>
+    </div>
+  )
+}
+
+function LockIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  )
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+      aria-hidden
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
   )
 }
 

@@ -165,6 +165,42 @@ body {
 }
 
 /* ===========================
+   Menus / Dropdowns / Autocomplete
+   Superficie opaca ad alto contrasto: evita trasparenze che lasciano
+   "vedere" lo sfondo, bordo marcato e ombra profonda per staccarsi da
+   card/drawer sottostanti. Lo z-index alto va impostato sul wrapper
+   posizionato (es. z-50) per non finire dietro modali/drawer.
+   =========================== */
+
+@utility menu-surface {
+  @apply overflow-hidden rounded-xl border bg-[color:var(--color-panel)];
+  border-color: var(--color-edge-strong);
+  box-shadow: var(--shadow-pop);
+}
+
+@utility menu-item {
+  @apply flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-slate-200 transition hover:bg-[color:var(--color-panel-hi)] focus:outline-none focus-visible:bg-[color:var(--color-panel-hi)];
+}
+
+/* ===========================
+   Empty states
+   Contenitore intenzionale per liste/tabelle vuote: non una schermata
+   bianca ma un riquadro tratteggiato con icona, titolo e microcopy.
+   =========================== */
+
+@utility empty-state {
+  @apply flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed px-6 py-10 text-center text-sm text-slate-400;
+  border-color: var(--color-edge);
+  background-color: color-mix(in oklab, var(--color-surface-1) 50%, transparent);
+}
+
+@utility empty-state-icon {
+  @apply mb-1 flex h-10 w-10 items-center justify-center rounded-full text-slate-500;
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-edge);
+}
+
+/* ===========================
    Scrollbar
    =========================== */
 

@@ -129,7 +129,7 @@ export function ImportExportPanel() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-40 mt-2 w-80 overflow-hidden rounded-xl border border-slate-700/80 bg-[color:var(--color-panel)] shadow-2xl"
+          className="menu-surface absolute right-0 top-full z-50 mt-2 w-80"
         >
           <SectionLabel>Backup dati</SectionLabel>
           {reminder && <BackupReminderBox reminder={reminder} />}

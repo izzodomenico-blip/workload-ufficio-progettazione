@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Filters, WorkItem } from '../types'
 import { EMPTY_FILTERS, isOpen } from '../types'
@@ -10,36 +10,52 @@ import { WorkItemsTable } from './WorkItemsTable'
 import { WorkloadKanban } from './WorkloadKanban'
 import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
 import { ImportExportPanel } from './ImportExportPanel'
-import { PlanningMatrix } from './PlanningMatrix'
-import { PersonAgendaView } from './PersonAgendaView'
-import { ActivityLogView } from './ActivityLogView'
-import { BusinessPartnersView } from './BusinessPartnersView'
-import { MachineTypesLibraryView } from './MachineTypesLibraryView'
-import { WorkshopLoadView } from './WorkshopLoadView'
-import { WorkshopPlanningView } from './WorkshopPlanningView'
-import { WorkshopWorkersView } from './WorkshopWorkersView'
+
+// Viste non-default caricate on-demand (code-splitting): riducono il bundle
+// iniziale e vengono scaricate solo quando si apre la relativa tab.
+const PlanningMatrix = lazy(() => import('./PlanningMatrix').then((m) => ({ default: m.PlanningMatrix })))
+const PersonAgendaView = lazy(() => import('./PersonAgendaView').then((m) => ({ default: m.PersonAgendaView })))
+const ActivityLogView = lazy(() => import('./ActivityLogView').then((m) => ({ default: m.ActivityLogView })))
+const BusinessPartnersView = lazy(() => import('./BusinessPartnersView').then((m) => ({ default: m.BusinessPartnersView })))
+const MachineTypesLibraryView = lazy(() => import('./MachineTypesLibraryView').then((m) => ({ default: m.MachineTypesLibraryView })))
+const WorkshopLoadView = lazy(() => import('./WorkshopLoadView').then((m) => ({ default: m.WorkshopLoadView })))
+const WorkshopPlanningView = lazy(() => import('./WorkshopPlanningView').then((m) => ({ default: m.WorkshopPlanningView })))
+const WorkshopWorkersView = lazy(() => import('./WorkshopWorkersView').then((m) => ({ default: m.WorkshopWorkersView })))
 
 type ViewMode = 'table' | 'kanban'
 type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche' | 'disegni' | 'officina' | 'operai' | 'officina-planning'
+type TabGroup = 'ufficio' | 'tabelle' | 'officina' | 'sistema'
 
 interface TabDef {
   id: MainTab
   label: string
   icon: string
   hint: string
+  group: TabGroup
 }
 
 const TABS: TabDef[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'M3 12h4l3-9 4 18 3-9h4', hint: 'Carico settimana e lavori aperti' },
-  { id: 'planning', label: 'Pianificazione', icon: 'M3 5h18M3 12h18M3 19h18', hint: 'Matrice carico 4–8 settimane' },
-  { id: 'agenda', label: 'Agenda persone', icon: 'M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z', hint: 'Vista singola persona' },
-  { id: 'anagrafiche', label: 'Anagrafiche', icon: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', hint: 'Clienti, fornitori, personale' },
-  { id: 'disegni', label: 'Libreria disegni', icon: 'M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v17.5A2.5 2.5 0 0 1 17.5 22H6.5A2.5 2.5 0 0 1 4 19.5ZM8 6h8M8 10h8M8 14h5', hint: 'Registro disegni e tipologie macchina' },
-  { id: 'officina', label: 'Carico officina', icon: 'M14.7 6.3a4 4 0 0 0-5.6 5.6L3 18v3h3l6.1-6.1a4 4 0 0 0 5.6-5.6l-2.5 2.5-2.1-2.1z', hint: 'Cosa arriva in officina dopo il rilascio progettazione' },
-  { id: 'operai', label: 'Operai officina', icon: 'M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21h16', hint: 'Anagrafica dipendenti officina e mansioni' },
-  { id: 'officina-planning', label: 'Pianificazione officina', icon: 'M4 5h16M4 12h16M4 19h16M8 3v18M16 3v18', hint: 'Assegnazioni operai e saturazione punti' },
-  { id: 'log', label: 'Storico', icon: 'M3 3v18h18M7 13l3-3 3 3 5-5', hint: 'Cronologia modifiche' },
+  // Ufficio tecnico
+  { id: 'dashboard', label: 'Dashboard', icon: 'M3 12h4l3-9 4 18 3-9h4', hint: 'Carico settimana e lavori aperti', group: 'ufficio' },
+  { id: 'planning', label: 'Pianificazione', icon: 'M3 5h18M3 12h18M3 19h18', hint: 'Matrice carico 4–8 settimane', group: 'ufficio' },
+  { id: 'agenda', label: 'Agenda persone', icon: 'M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z', hint: 'Vista singola persona', group: 'ufficio' },
+  // Anagrafiche / tabelle
+  { id: 'anagrafiche', label: 'Anagrafiche', icon: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', hint: 'Clienti, fornitori, personale', group: 'tabelle' },
+  { id: 'disegni', label: 'Libreria disegni', icon: 'M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v17.5A2.5 2.5 0 0 1 17.5 22H6.5A2.5 2.5 0 0 1 4 19.5ZM8 6h8M8 10h8M8 14h5', hint: 'Registro disegni e tipologie macchina', group: 'tabelle' },
+  { id: 'operai', label: 'Operai officina', icon: 'M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21h16', hint: 'Anagrafica dipendenti officina e mansioni', group: 'tabelle' },
+  // Officina
+  { id: 'officina', label: 'Carico officina', icon: 'M14.7 6.3a4 4 0 0 0-5.6 5.6L3 18v3h3l6.1-6.1a4 4 0 0 0 5.6-5.6l-2.5 2.5-2.1-2.1z', hint: 'Cosa arriva in officina dopo il rilascio progettazione', group: 'officina' },
+  { id: 'officina-planning', label: 'Pianificazione officina', icon: 'M4 5h16M4 12h16M4 19h16M8 3v18M16 3v18', hint: 'Assegnazioni operai e saturazione punti', group: 'officina' },
+  // Sistema
+  { id: 'log', label: 'Storico', icon: 'M3 3v18h18M7 13l3-3 3 3 5-5', hint: 'Cronologia modifiche', group: 'sistema' },
 ]
+
+const GROUP_LABEL: Record<TabGroup, string> = {
+  ufficio: 'Ufficio tecnico',
+  tabelle: 'Anagrafiche e tabelle',
+  officina: 'Officina',
+  sistema: 'Sistema',
+}
 
 export function Dashboard() {
   const { data } = useData()
@@ -90,20 +106,30 @@ export function Dashboard() {
             aria-label="Sezione principale"
             className="tabs-track overflow-x-auto scroll-thin"
           >
-            {TABS.map((t) => {
+            {TABS.map((t, i) => {
               const active = tab === t.id
+              const newGroup = i > 0 && TABS[i - 1].group !== t.group
               return (
-                <button
-                  key={t.id}
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setTab(t.id)}
-                  title={t.hint}
-                  className={`tab-item ${active ? 'tab-item-active' : 'hover:text-slate-200 hover:bg-slate-800/40'}`}
-                >
-                  <TabIcon path={t.icon} />
-                  {t.label}
-                </button>
+                <div key={t.id} className="flex items-center">
+                  {newGroup && (
+                    <span
+                      className="mx-1 h-5 w-px shrink-0 bg-[color:var(--color-edge-strong)]"
+                      role="separator"
+                      aria-label={GROUP_LABEL[t.group]}
+                      title={GROUP_LABEL[t.group]}
+                    />
+                  )}
+                  <button
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTab(t.id)}
+                    title={`${GROUP_LABEL[t.group]} · ${t.hint}`}
+                    className={`tab-item ${active ? 'tab-item-active' : 'hover:text-slate-200 hover:bg-slate-800/40'}`}
+                  >
+                    <TabIcon path={t.icon} />
+                    {t.label}
+                  </button>
+                </div>
               )
             })}
           </nav>
@@ -111,6 +137,7 @@ export function Dashboard() {
         </div>
       </div>
 
+      <Suspense fallback={<ViewLoading />}>
       {tab === 'dashboard' ? (
         <>
           <HeroStats data={data} />
@@ -191,6 +218,16 @@ export function Dashboard() {
       ) : (
         <ActivityLogView />
       )}
+      </Suspense>
+    </div>
+  )
+}
+
+function ViewLoading() {
+  return (
+    <div className="flex items-center justify-center gap-3 py-20 text-sm text-slate-400" role="status" aria-live="polite">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" aria-hidden />
+      Caricamento vista…
     </div>
   )
 }
