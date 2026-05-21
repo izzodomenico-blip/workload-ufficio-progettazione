@@ -295,4 +295,122 @@ textarea:focus-visible,
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
+
+  /* Report Executive: layout dedicato A4.
+     Gli altri report continuano a usare le classi generiche sopra. */
+  .executive-report-print-root {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    transform: none !important;
+    background: white !important;
+  }
+
+  .executive-report-print-area {
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: #0f172a !important;
+    font-size: 10.5pt !important;
+    line-height: 1.35 !important;
+    letter-spacing: 0 !important;
+    overflow: visible !important;
+  }
+
+  .executive-report-print-area,
+  .executive-report-print-area * {
+    letter-spacing: 0 !important;
+    text-shadow: none !important;
+    color-scheme: light !important;
+  }
+
+  .executive-report-body {
+    padding: 0 !important;
+  }
+
+  .executive-report-header {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 12mm !important;
+    align-items: start !important;
+    padding-bottom: 6mm !important;
+  }
+
+  .executive-report-title {
+    font-size: 22pt !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .executive-section-title {
+    font-size: 12pt !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+  }
+
+  .executive-print-section.print-keep {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .executive-kpi-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  .executive-print-card,
+  .executive-person-row {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .executive-print-card {
+    min-width: 0 !important;
+    padding: 7px 9px !important;
+  }
+
+  .executive-report-columns {
+    display: block !important;
+  }
+
+  .executive-report-columns > * + * {
+    margin-top: 12px !important;
+  }
+
+  .executive-people-list {
+    overflow: visible !important;
+  }
+
+  .executive-person-row {
+    grid-template-columns: 42px minmax(0, 1fr) 74px !important;
+    align-items: start !important;
+    gap: 8px !important;
+    padding: 7px 9px !important;
+  }
+
+  .executive-report-print-area .truncate {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+
+  .executive-next-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  .executive-next-columns {
+    display: block !important;
+  }
+
+  .executive-next-columns > * + * {
+    margin-top: 10px !important;
+  }
 }

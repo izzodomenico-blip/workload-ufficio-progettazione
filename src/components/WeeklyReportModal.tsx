@@ -78,7 +78,7 @@ export function WeeklyReportModal({ open, onClose }: Props) {
 
   return (
     <div
-      className="report-print-root fixed inset-0 z-50 overflow-y-auto"
+      className="report-print-root executive-report-print-root fixed inset-0 z-50 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="Anteprima report settimanale"
@@ -97,17 +97,25 @@ export function WeeklyReportModal({ open, onClose }: Props) {
           </span>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <span className="hidden max-w-[320px] text-[11px] leading-snug text-slate-400 md:inline">
+            Nel dialog di stampa disattiva "Intestazioni e pie di pagina" se il browser li mostra.
+          </span>
           <button type="button" onClick={onClose} className="btn-ghost">
             Chiudi
           </button>
-          <button type="button" onClick={() => window.print()} className="btn-primary">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="btn-primary"
+            title="Nel dialog di stampa disattiva 'Intestazioni e pie di pagina' se il browser li mostra."
+          >
             <PrinterIcon /> Stampa · Salva PDF
           </button>
         </div>
       </div>
 
-      <article className="report-print-area relative z-10 mx-auto my-6 max-w-[210mm] bg-white text-slate-900 shadow-2xl ring-1 ring-slate-200 print:m-0 print:max-w-none print:shadow-none print:ring-0">
-        <div className="px-9 pt-8 pb-9 print:px-0 print:pt-2 print:pb-0">
+      <article className="report-print-area executive-report-print-area relative z-10 mx-auto my-6 max-w-[210mm] bg-white text-slate-900 shadow-2xl ring-1 ring-slate-200 print:m-0 print:max-w-none print:shadow-none print:ring-0">
+        <div className="executive-report-body px-9 pt-8 pb-9 print:px-0 print:pt-2 print:pb-0">
           <ReportHeader current={current} generatedAt={generatedAt} />
           <div className="mt-6">
             <KpiBar current={current} />
@@ -120,7 +128,7 @@ export function WeeklyReportModal({ open, onClose }: Props) {
               workItemById={workItemById}
             />
           </div>
-          <div className="mt-6 grid grid-cols-2 gap-5 print:gap-4">
+          <div className="executive-report-columns mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2 print:gap-4">
             <AbsencesSection
               absences={current.absences}
               personById={personById}
@@ -156,11 +164,11 @@ function SectionTitle({
   meta?: ReactNode
 }) {
   return (
-    <h2 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+    <h2 className="executive-section-title flex items-center gap-2 text-sm font-semibold text-slate-800">
       <span className={`h-3 w-1 rounded-sm ${accent}`} aria-hidden />
       <span>{children}</span>
       {meta !== undefined && (
-        <span className="ml-1 font-normal normal-case tracking-normal text-slate-400">· {meta}</span>
+        <span className="ml-1 text-xs font-normal text-slate-500">· {meta}</span>
       )}
     </h2>
   )
@@ -170,7 +178,7 @@ function SectionTitle({
 
 function ReportHeader({ current, generatedAt }: { current: CurrentWeekReport; generatedAt: Date }) {
   return (
-    <header className="flex items-start justify-between gap-6 border-b border-slate-200 pb-5">
+    <header className="executive-report-header flex items-start justify-between gap-6 border-b border-slate-200 pb-5">
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900">
           <svg viewBox="0 0 64 64" className="h-6 w-6" aria-hidden>
@@ -185,16 +193,16 @@ function ReportHeader({ current, generatedAt }: { current: CurrentWeekReport; ge
           </svg>
         </div>
         <div>
-          <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-slate-900">
+          <h1 className="executive-report-title text-[24px] font-semibold leading-tight text-slate-950">
             Report settimanale
           </h1>
-          <p className="mt-0.5 text-[11px] uppercase tracking-[0.18em] text-slate-500">
+          <p className="mt-1 text-sm font-medium text-slate-600">
             Ufficio Progettazione Meccanica
           </p>
         </div>
       </div>
       <div className="text-right">
-        <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+        <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
           Settimana {current.weekIso}
         </div>
         <div className="mt-1.5 text-sm font-medium text-slate-700">
@@ -268,9 +276,9 @@ function KpiBar({ current }: { current: CurrentWeekReport }) {
   ]
 
   return (
-    <section className="print-keep">
+    <section className="executive-print-section print-keep">
       <SectionTitle accent="bg-sky-500">Sintesi</SectionTitle>
-      <div className="mt-2.5 grid grid-cols-6 gap-2.5 print:gap-2">
+      <div className="executive-kpi-grid mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 print:gap-2">
         {tiles.map((t) => (
           <KpiTile key={t.label} {...t} />
         ))}
@@ -282,10 +290,10 @@ function KpiBar({ current }: { current: CurrentWeekReport }) {
 function KpiTile({ value, label, sub, tone }: { value: number; label: string; sub: string; tone: string }) {
   const accent = TONE_TEXT[tone] ?? TONE_TEXT.slate
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5 print:bg-white">
+    <div className="executive-print-card rounded-lg border border-slate-200 bg-slate-50/60 px-3.5 py-3 print:bg-white">
       <div className={`text-2xl font-semibold tabular-nums leading-none ${accent}`}>{value}</div>
-      <div className="mt-1.5 text-[11px] font-medium text-slate-700">{label}</div>
-      <div className="mt-0.5 text-[10px] text-slate-500">{sub}</div>
+      <div className="mt-1.5 text-xs font-medium text-slate-700">{label}</div>
+      <div className="mt-0.5 text-[11px] leading-snug text-slate-500">{sub}</div>
     </div>
   )
 }
@@ -348,7 +356,7 @@ function PeopleSection({
       <SectionTitle accent="bg-slate-700" meta={`${workload.length} persone`}>
         Carico di lavoro
       </SectionTitle>
-      <div className="mt-2.5 overflow-hidden rounded-lg border border-slate-200">
+      <div className="executive-people-list mt-3 overflow-hidden rounded-lg border border-slate-200">
         {workload.map((w, idx) => (
           <PersonRow
             key={w.person.id}
@@ -377,13 +385,13 @@ function PersonRow({
   workItemById: Map<string, WorkItem>
   isLast: boolean
 }) {
-  const top = topWorkloadActivitiesForPerson(tasks, workItems, wl.person, 2)
+  const top = topWorkloadActivitiesForPerson(tasks, workItems, wl.person, 1)
   const barWidth = wl.realCapacity > 0 ? Math.min(100, wl.loadPercent) : wl.weekHours > 0 ? 100 : 0
   const overflow = wl.loadPercent > 100 ? Math.min(40, (wl.loadPercent - 100) / 2) : 0
 
   return (
     <div
-      className={`print-keep grid grid-cols-[auto_1fr_auto] items-center gap-x-3 px-3 py-2.5 ${
+      className={`executive-person-row print-keep grid grid-cols-[auto_1fr_auto] items-center gap-x-3 px-3.5 py-3 ${
         isLast ? '' : 'border-b border-slate-100'
       }`}
     >
@@ -423,7 +431,7 @@ function PersonRow({
                 isWithinDays(wi.plannedProductionReleaseDate, 21)
               return (
                 <span key={`${activity.kind}-${activity.id}`} className="inline-flex min-w-0 items-center gap-1">
-                  <span className={`rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide ${
+                  <span className={`rounded px-1 py-px text-[9px] font-semibold ${
                     activity.kind === 'task' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
                   }`}>
                     {activity.kind === 'task' ? 'Task' : 'Lavoro'}
@@ -434,13 +442,13 @@ function PersonRow({
                   <span className="truncate text-slate-600">{activity.title}</span>
                   <span className="text-slate-400">({formatItalianShort(activity.dueDate)})</span>
                   {phase && (
-                    <span className="rounded bg-indigo-100 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-indigo-700">
+                    <span className="rounded bg-indigo-100 px-1 py-px text-[9px] font-semibold text-indigo-700">
                       {phase}
                     </span>
                   )}
                   {commPrio && (commPrio === 'alta' || commPrio === 'critica') && (
                     <span
-                      className={`rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide ${
+                      className={`rounded px-1 py-px text-[9px] font-semibold ${
                         commPrio === 'critica' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
                       }`}
                       title="Priorità commerciale"
@@ -449,7 +457,7 @@ function PersonRow({
                     </span>
                   )}
                   {releaseSoon && wi?.plannedProductionReleaseDate && (
-                    <span className="rounded bg-sky-100 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-sky-700" title="Rilascio produzione previsto vicino">
+                    <span className="rounded bg-sky-100 px-1 py-px text-[9px] font-semibold text-sky-700" title="Rilascio produzione previsto vicino">
                       rel. {formatItalianShort(wi.plannedProductionReleaseDate)}
                     </span>
                   )}
@@ -459,7 +467,7 @@ function PersonRow({
           </div>
         ) : (
           <div className="mt-1.5 text-[11px] italic text-slate-400">
-            {wl.level === 'absent' ? 'Assente tutta la settimana' : 'Nessun task assegnato'}
+            {wl.level === 'absent' ? 'Assente tutta la settimana' : 'Nessuna attivita pianificata'}
           </div>
         )}
       </div>
@@ -468,7 +476,7 @@ function PersonRow({
         <div className={`text-base font-semibold tabular-nums leading-none ${LEVEL_PCT_TEXT[wl.level]}`}>
           {wl.level === 'absent' ? '—' : `${wl.loadPercent}%`}
         </div>
-        <div className="mt-1 text-[10px] uppercase tracking-wide text-slate-400">{LEVEL_LABEL[wl.level]}</div>
+        <div className="mt-1 text-[10px] font-medium text-slate-500">{LEVEL_LABEL[wl.level]}</div>
         <div className="mt-0.5 text-[11px] tabular-nums text-slate-500">
           {wl.weekHours}h / {wl.realCapacity}h
         </div>
@@ -507,7 +515,7 @@ function AbsencesSection({
   weekEnd: Date
 }) {
   return (
-    <section className="print-keep">
+    <section className="executive-print-section print-keep">
       <SectionTitle accent="bg-emerald-500" meta={absences.length}>
         Ferie · permessi · malattie
       </SectionTitle>
@@ -551,7 +559,7 @@ function CriticalSection({ issues }: { issues: string[] }) {
   const shown = issues.slice(0, 7)
   const more = Math.max(0, issues.length - 7)
   return (
-    <section className="print-keep">
+    <section className="executive-print-section print-keep">
       <SectionTitle accent="bg-red-500" meta={issues.length}>
         Criticità
       </SectionTitle>
@@ -594,7 +602,7 @@ function NextWeekSection({
   const reducedCount = next.reducedCapacityPeople.length
   const outlook = planning.summary
   return (
-    <section className="print-keep">
+    <section className="executive-print-section print-keep">
       <SectionTitle
         accent="bg-sky-500"
         meta={`S${next.weekIso} · ${fmtDayMonth(next.weekStart)} — ${fmtDayMonth(next.weekEnd)}`}
@@ -619,7 +627,7 @@ function NextWeekSection({
         pianificate
       </p>
 
-      <div className="mt-2.5 grid grid-cols-4 gap-2.5 print:gap-2">
+      <div className="executive-next-grid mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4 print:gap-2">
         <NextTile value={next.startingTasks.length} label="Task in partenza" tone="sky" />
         <NextTile value={next.endingTasks.length} label="Task in scadenza" tone="amber" />
         <NextTile value={next.activeWorkItems.length} label="Lavori attivi" tone="slate" />
@@ -631,9 +639,9 @@ function NextWeekSection({
       </div>
 
       {(next.endingTasks.length > 0 || reducedCount > 0) && (
-        <div className="mt-3 grid grid-cols-2 gap-4">
+        <div className="executive-next-columns mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
-            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            <div className="mb-1.5 text-xs font-semibold text-slate-600">
               In scadenza
             </div>
             {next.endingTasks.length === 0 ? (
@@ -662,7 +670,7 @@ function NextWeekSection({
             )}
           </div>
           <div>
-            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            <div className="mb-1.5 text-xs font-semibold text-slate-600">
               Capacità ridotta
             </div>
             {reducedCount === 0 ? (
@@ -693,7 +701,7 @@ function NextWeekSection({
 function NextTile({ value, label, tone }: { value: number; label: string; tone: string }) {
   const accent = TONE_TEXT[tone] ?? TONE_TEXT.slate
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 print:bg-white">
+    <div className="executive-print-card rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 print:bg-white">
       <div className={`text-xl font-semibold tabular-nums leading-none ${accent}`}>{value}</div>
       <div className="mt-1 text-[11px] text-slate-600">{label}</div>
     </div>
