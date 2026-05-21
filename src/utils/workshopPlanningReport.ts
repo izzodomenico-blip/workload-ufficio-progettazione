@@ -22,7 +22,6 @@ import {
   aggregateWorkerLoadByWeek,
   getAssignmentCoverageForOutput,
   getMonthWeeks,
-  getOutputRequiredProcesses,
   getWeekDays,
   saturationScore10,
   type OutputCoverage,
@@ -201,6 +200,7 @@ export function buildWorkshopPlanningReport(
     loadRows = aggregateWorkerLoadByMonth(workshopAssignments, workshopWorkers, filters.monthAnchor, station).map(toWorkerRow)
   }
   if (filters.workerFilter) loadRows = loadRows.filter((row) => row.worker.id === filters.workerFilter)
+  if (filters.onlyOverloads) loadRows = loadRows.filter((row) => row.level === 'sovraccarico')
 
   const overloadedWorkers = loadRows
     .filter((row) => row.level === 'sovraccarico')
@@ -274,7 +274,7 @@ export function buildWorkshopPlanningReport(
     .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'))
 
   // --- breakdown periodo ---
-  const periodBreakdown = buildPeriodBreakdown(filters, workshopAssignments, loadRows, station)
+  const periodBreakdown = buildPeriodBreakdown(filters, activePeriodAssignments, loadRows, station)
 
   // --- top assegnazioni ---
   const topAssignments: PlanningReportAssignmentRow[] = periodAssignments

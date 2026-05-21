@@ -35,6 +35,8 @@ import { formatISODate, formatItalianShort, parseISODate, startOfWeek, todayISO 
 import { Modal } from './Modal'
 import { ConfirmDialog } from './ConfirmDialog'
 import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
+import { WorkshopPlanningReportModal } from './WorkshopPlanningReportModal'
+import type { WorkshopPlanningReportFilters } from '../utils/workshopPlanningReport'
 
 type AssignmentStatusFilter = WorkshopAssignmentStatus | ''
 type ProcessFilter = WorkshopAssignmentProcess | ''
@@ -99,6 +101,7 @@ export function WorkshopPlanningView() {
   const [drawerWorkItemId, setDrawerWorkItemId] = useState<string | null>(null)
   const [detailWorkerId, setDetailWorkerId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<WorkshopAssignment | null>(null)
+  const [reportOpen, setReportOpen] = useState(false)
 
   const workItemById = useMemo(() => new Map(data.workItems.map((workItem) => [workItem.id, workItem])), [data.workItems])
   const workerById = useMemo(() => new Map(workshopWorkers.map((worker) => [worker.id, worker])), [workshopWorkers])
@@ -170,6 +173,30 @@ export function WorkshopPlanningView() {
     ? workshopAssignments.filter((assignment) => assignment.workerId === detailWorker.id && assignment.plannedDate === selectedDate)
     : []
 
+  const reportFilters = useMemo<WorkshopPlanningReportFilters>(() => ({
+    viewMode,
+    selectedDate,
+    weekStart,
+    monthAnchor,
+    processFilter,
+    workerFilter,
+    assignmentStatusFilter,
+    query,
+    onlyOverloads,
+    onlyUnassigned,
+  }), [
+    viewMode,
+    selectedDate,
+    weekStart,
+    monthAnchor,
+    processFilter,
+    workerFilter,
+    assignmentStatusFilter,
+    query,
+    onlyOverloads,
+    onlyUnassigned,
+  ])
+
   function confirmDelete() {
     if (!deleteTarget) return
     deleteWorkshopAssignment(deleteTarget.id)
@@ -187,8 +214,13 @@ export function WorkshopPlanningView() {
             Assegna processi degli output officina agli operai e controlla la saturazione relativa per giorno, settimana e mese.
           </p>
         </div>
-        <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
-          Saturazione su scala <strong>0–10</strong> (10 = piena). Non sono ore: è un indice relativo di carico produttivo.
+        <div className="flex flex-col items-end gap-2">
+          <button type="button" className="btn-primary text-xs" onClick={() => setReportOpen(true)}>
+            <PrinterIcon /> Report pianificazione
+          </button>
+          <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
+            Saturazione su scala <strong>0–10</strong> (10 = piena). Non sono ore: è un indice relativo di carico produttivo.
+          </div>
         </div>
       </header>
 
@@ -349,6 +381,7 @@ export function WorkshopPlanningView() {
       />
 
       <WorkItemDetailDrawer workItemId={drawerWorkItemId} onClose={() => setDrawerWorkItemId(null)} />
+      <WorkshopPlanningReportModal open={reportOpen} onClose={() => setReportOpen(false)} filters={reportFilters} />
     </section>
   )
 }
@@ -1186,6 +1219,14 @@ function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
+function PrinterIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" />
     </svg>
   )
 }
