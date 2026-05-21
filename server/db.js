@@ -26,6 +26,7 @@ const TABLES = {
   businessPartners: 'business_partners',
   machineTypes: 'machine_types',
   workshopOutputs: 'workshop_outputs',
+  workshopWorkers: 'workshop_workers',
 }
 
 let dbInstance = null
@@ -76,6 +77,7 @@ export function getAppData(db = getDb()) {
     businessPartners: readJsonRows(db, TABLES.businessPartners, 'name COLLATE NOCASE ASC'),
     machineTypes: readJsonRows(db, TABLES.machineTypes, 'code COLLATE NOCASE ASC'),
     workshopOutputs: readJsonRows(db, TABLES.workshopOutputs, 'planned_release_date ASC, rowid ASC'),
+    workshopWorkers: readJsonRows(db, TABLES.workshopWorkers, 'display_name COLLATE NOCASE ASC'),
   })
 }
 
@@ -97,6 +99,7 @@ export function saveAppData(data, db = getDb()) {
     replaceBusinessPartners(db, safeData.businessPartners, now)
     replaceMachineTypes(db, safeData.machineTypes, now)
     replaceWorkshopOutputs(db, safeData.workshopOutputs, now)
+    replaceWorkshopWorkers(db, safeData.workshopWorkers, now)
     bumpDataRevision(db, now)
     db.exec('COMMIT;')
   } catch (error) {
@@ -282,6 +285,27 @@ function replaceWorkshopOutputs(db, rows, now) {
       row.status,
       row.plannedReleaseDate || null,
       row.actualReleaseDate || null,
+      JSON.stringify(row),
+      now,
+    )
+  }
+}
+
+function replaceWorkshopWorkers(db, rows, now) {
+  db.prepare('DELETE FROM workshop_workers').run()
+  const insert = db.prepare(`
+    INSERT INTO workshop_workers
+      (id, employee_code, display_name, department, primary_skill, active, data, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  for (const row of rows) {
+    insert.run(
+      row.id,
+      row.employeeCode || null,
+      row.displayName,
+      row.department || null,
+      row.primarySkill || null,
+      row.active ? 1 : 0,
       JSON.stringify(row),
       now,
     )

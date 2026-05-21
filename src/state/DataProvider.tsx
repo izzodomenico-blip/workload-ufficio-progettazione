@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Absence, AppData, BusinessPartner, MachineType, Person, Status, WorkshopOutput } from '../types'
+import type { Absence, AppData, BusinessPartner, MachineType, Person, Status, WorkshopOutput, WorkshopWorker } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
 import {
@@ -88,6 +88,18 @@ import type {
   UpdateWorkshopOutputInput,
   WorkshopOutputDraft,
 } from '../services/workshopOutputsService'
+import {
+  applyWorkshopWorkerImport as svcApplyWorkshopWorkerImport,
+  createWorkshopWorker as svcCreateWorkshopWorker,
+  setWorkshopWorkerActive as svcSetWorkshopWorkerActive,
+  updateWorkshopWorker as svcUpdateWorkshopWorker,
+} from '../services/workshopWorkersService'
+import type {
+  CreateWorkshopWorkerInput,
+  UpdateWorkshopWorkerInput,
+  WorkshopWorkerImportResult,
+} from '../services/workshopWorkersService'
+import type { WorkshopWorkerImportPlan } from '../utils/workshopWorkersImport'
 
 interface UpdatePeopleOptions {
   /** Password admin per autorizzare modifiche a baselineLoadPercent */
@@ -100,6 +112,7 @@ interface DataContextValue {
   businessPartners: BusinessPartner[]
   machineTypes: MachineType[]
   workshopOutputs: WorkshopOutput[]
+  workshopWorkers: WorkshopWorker[]
   // workItems
   createWorkItem: (input: CreateWorkItemInput) => string
   updateWorkItem: (id: string, patch: UpdateWorkItemInput) => void
@@ -138,6 +151,11 @@ interface DataContextValue {
   updateWorkshopOutput: (id: string, patch: UpdateWorkshopOutputInput) => void
   deleteWorkshopOutput: (id: string) => void
   replaceWorkshopOutputsForWorkItem: (workItemId: string, outputs: WorkshopOutputDraft[]) => void
+  // workshop workers
+  createWorkshopWorker: (input: CreateWorkshopWorkerInput) => string
+  updateWorkshopWorker: (id: string, patch: UpdateWorkshopWorkerInput) => void
+  setWorkshopWorkerActive: (id: string, active: boolean) => void
+  applyWorkshopWorkerImport: (plan: WorkshopWorkerImportPlan) => WorkshopWorkerImportResult
   // import/export
   importData: (next: AppData, options?: ImportDataOptions) => void
   exportData: () => BackupExportResult
@@ -539,6 +557,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
     commitData(svcReplaceWorkshopOutputsForWorkItem(dataRef.current, workItemId, outputs))
   }, [commitData])
 
+  const createWorkshopWorker = useCallback((input: CreateWorkshopWorkerInput): string => {
+    const result = svcCreateWorkshopWorker(dataRef.current, input)
+    commitData(result.data)
+    return result.id
+  }, [commitData])
+
+  const updateWorkshopWorker = useCallback((id: string, patch: UpdateWorkshopWorkerInput) => {
+    commitData(svcUpdateWorkshopWorker(dataRef.current, id, patch))
+  }, [commitData])
+
+  const setWorkshopWorkerActive = useCallback((id: string, active: boolean) => {
+    commitData(svcSetWorkshopWorkerActive(dataRef.current, id, active))
+  }, [commitData])
+
+  const applyWorkshopWorkerImport = useCallback((plan: WorkshopWorkerImportPlan): WorkshopWorkerImportResult => {
+    const { data: nextData, result } = svcApplyWorkshopWorkerImport(dataRef.current, plan)
+    commitData(nextData, { risky: true, reason: 'import-workshop-workers' })
+    return result
+  }, [commitData])
+
   const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
     const safeNext = mergeImportWithSharedCollections(next, dataRef.current)
     const description = [
@@ -549,6 +587,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       `${safeNext.notifications.length} notifiche`,
       `${safeNext.machineTypes.length} tipologie disegno`,
       `${safeNext.workshopOutputs.length} output officina`,
+      `${safeNext.workshopWorkers.length} operai officina`,
       options.fileName ? `file: ${options.fileName}` : '',
       options.exportedAt ? `esportato: ${options.exportedAt}` : '',
       options.version ? `versione: ${options.version}` : '',
@@ -579,7 +618,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         entityId: 'backup',
         action: 'exported',
         title: 'Backup JSON esportato',
-        description: `${dataRef.current.people.length} persone - ${dataRef.current.workItems.length} lavori - ${dataRef.current.tasks.length} task - ${dataRef.current.machineTypes.length} tipologie disegno - ${dataRef.current.workshopOutputs.length} output officina - file: ${filename}`,
+        description: `${dataRef.current.people.length} persone - ${dataRef.current.workItems.length} lavori - ${dataRef.current.tasks.length} task - ${dataRef.current.machineTypes.length} tipologie disegno - ${dataRef.current.workshopOutputs.length} output officina - ${dataRef.current.workshopWorkers.length} operai officina - file: ${filename}`,
       }, exportedAtDate),
     )
     const exportedAt = setLastBackupAt(exportedAtDate)
@@ -610,6 +649,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     businessPartners: data.businessPartners,
     machineTypes: data.machineTypes,
     workshopOutputs: data.workshopOutputs,
+    workshopWorkers: data.workshopWorkers,
     createWorkItem,
     updateWorkItem,
     createWorkItemWithWorkshopOutputs,
@@ -641,6 +681,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateWorkshopOutput,
     deleteWorkshopOutput,
     replaceWorkshopOutputsForWorkItem,
+    createWorkshopWorker,
+    updateWorkshopWorker,
+    setWorkshopWorkerActive,
+    applyWorkshopWorkerImport,
     importData,
     exportData,
     markNotificationAsRead,
@@ -659,6 +703,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     planCustomerLinking, applyCustomerLinking,
     createMachineType, updateMachineType, setMachineTypeActive,
     createWorkshopOutput, updateWorkshopOutput, deleteWorkshopOutput, replaceWorkshopOutputsForWorkItem,
+    createWorkshopWorker, updateWorkshopWorker, setWorkshopWorkerActive, applyWorkshopWorkerImport,
     importData, exportData,
     markNotificationAsRead, markAllNotificationsAsRead,
     clearReadNotifications, clearAllNotifications,
@@ -679,6 +724,7 @@ function mergeImportWithSharedCollections(next: AppData, current: AppData): AppD
     ...next,
     businessPartners: next.businessPartners.length > 0 ? next.businessPartners : current.businessPartners,
     machineTypes: next.machineTypes.length > 0 ? next.machineTypes : current.machineTypes,
+    workshopWorkers: next.workshopWorkers.length > 0 ? next.workshopWorkers : current.workshopWorkers,
     workshopOutputs: next.workshopOutputs.length > 0
       ? next.workshopOutputs
       : current.workshopOutputs.filter((output) => importedWorkItemIds.has(output.workItemId)),

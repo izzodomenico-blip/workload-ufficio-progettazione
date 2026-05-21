@@ -21,6 +21,8 @@ backups/auto/*
 # Vanno custoditi in cartella aziendale protetta, mai committati.
 imports/
 *.xml
+*.xls
+*.xlsx
 
 # Config admin (contiene hash password baseline workload)
 server/admin.config.json

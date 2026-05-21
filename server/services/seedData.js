@@ -161,5 +161,6 @@ export function freshSeedData() {
     businessPartners: [],
     machineTypes: getDefaultMachineTypes(),
     workshopOutputs: [],
+    workshopWorkers: [],
   }
 }

@@ -450,6 +450,7 @@ export const demoData: AppData = {
   businessPartners,
   machineTypes: DEFAULT_MACHINE_TYPES,
   workshopOutputs: [],
+  workshopWorkers: [],
 }
 
 export function freshDemoData(): AppData {

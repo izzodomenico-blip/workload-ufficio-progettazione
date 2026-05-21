@@ -171,6 +171,7 @@ Backup da interfaccia:
 - Il file contiene `backupInfo` e `data`.
 - Il JSON include anche `businessPartners` e `machineTypes`.
 - Il JSON include anche `workshopOutputs`.
+- Il JSON include anche `workshopWorkers`.
 - L'export registra un evento nello storico.
 
 Backup da terminale:
@@ -263,11 +264,12 @@ Compatibilità mantenuta:
 - JSON senza `notifications`;
 - JSON senza `machineTypes`;
 - JSON senza `workshopOutputs`;
+- JSON senza `workshopWorkers`;
 - stati legacy rimappati agli stati attuali.
 
 Protezione moduli nuovi: se un vecchio backup non contiene `businessPartners`,
-`machineTypes` o `workshopOutputs`, l'import non azzera automaticamente le
-tabelle condivise gia presenti sul server.
+`machineTypes`, `workshopOutputs` o `workshopWorkers`, l'import non azzera
+automaticamente le tabelle condivise gia presenti sul server.
 
 ## Report e notifiche
 
@@ -512,6 +514,83 @@ Livelli indicativi:
 Gli output sono salvati in `workshop_outputs` e nei backup JSON come
 `data.workshopOutputs`. I backup precedenti senza `workshopOutputs` restano
 importabili e non cancellano automaticamente gli output gia presenti sul server.
+
+## Operai officina
+
+La vista **Operai officina** gestisce l'anagrafica dei dipendenti di officina:
+nominativo, ruolo/mansione, reparto, telefoni, email, codice fiscale, indirizzo,
+date disponibili, skill operative e capacita relativa.
+
+Le skill disponibili sono Laser piano, Laser tubi, Piegatrice, Saldatore,
+Tornitura, Fresatura, Montatore, Verniciatura / Trattamento, Collaudo,
+Magazzino, Manutenzione e Altro.
+
+Ogni operaio puo avere piu skill e una `primarySkill` opzionale.
+`dailyCapacityPoints` e `weeklyCapacityPoints` sono **punti capacita relativi**:
+non sono ore. Il default e 100 punti/giorno e 500 punti/settimana.
+
+### Import Excel dipendenti
+
+Metti i file Excel HR nella cartella:
+
+```text
+imports/hr/
+```
+
+Esempio:
+
+```text
+imports/hr/ELENCO DIPENDENTI_AGG. APRILE 2026.xls
+```
+
+Poi apri **Operai officina** e usa **Importa Excel dipendenti**. L'app legge il
+file scelto, mostra una preview e salva solo dopo conferma.
+
+Colonne riconosciute: `Nome`, `Cognome`, `Nominativo`, `Dipendente`,
+`Matricola`, `Codice`, `Mansione`, `Qualifica`, `Mansioni effettive`,
+`Reparto`, `AREA AZIENDALE DI IMPIEGO`, `Telefono`, `Cellulare`, `Mobile`,
+`Email`, `Codice fiscale`, `Luogo e data nascita`, `Data assunzione`,
+`Indirizzo`, `Comune`, `Citta`, `Provincia`, `Tipo di contratto`, `Note`.
+
+Le colonne non riconosciute vengono mantenute come dettagli extra quando hanno
+un valore utile e sono visibili nella preview come colonne extra.
+
+### Deduplica import
+
+L'import non cancella dipendenti esistenti. Per ogni riga:
+
+1. se `employeeCode` coincide, aggiorna;
+2. altrimenti se `fiscalCode` coincide, aggiorna;
+3. altrimenti se `displayName` + telefono/cellulare coincidono, aggiorna;
+4. altrimenti crea un nuovo operaio.
+
+La colonna `Mansione` / `Qualifica` viene usata per proporre skill automatiche:
+`laser` -> Laser piano, `laser tubo` / `tubi` -> Laser tubi, `piega` ->
+Piegatrice, `sald` -> Saldatore, `torn` -> Tornitura, `fres` -> Fresatura,
+`mont` -> Montatore, `vern` -> Verniciatura, `collaudo` -> Collaudo,
+`magazz` -> Magazzino, `manut` -> Manutenzione. Se non viene riconosciuta,
+viene assegnata `Altro`. Tutto resta modificabile manualmente.
+
+### Attivare o disattivare operai
+
+Usa **Disattiva** / **Riattiva** dalla tabella. Non viene fatta cancellazione
+fisica: `active=false` nasconde l'operaio dai filtri attivi e conserva storico,
+contatti e backup.
+
+### Privacy operai
+
+I dati HR possono contenere telefoni, indirizzi, codice fiscale e altri dati
+personali. Per questo:
+
+- `imports/`, `*.xls` e `*.xlsx` sono ignorati da Git;
+- non caricare file Excel dipendenti su GitHub;
+- non esporre l'app su internet, usarla solo su rete locale fidata;
+- i backup `.db` e `.json` includono anche `workshopWorkers`, quindi vanno
+  custoditi in una posizione aziendale protetta.
+
+La tabella SQLite e `workshop_workers`; nei backup JSON la collezione e
+`data.workshopWorkers`. I backup vecchi senza `workshopWorkers` restano
+importabili.
 
 ## Dashboard Carico officina
 

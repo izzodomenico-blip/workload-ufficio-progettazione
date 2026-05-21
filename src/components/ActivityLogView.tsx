@@ -180,6 +180,7 @@ const ENTITY_LABEL: Record<ActivityLogEntityType, string> = {
   absence: 'Assenze',
   machineType: 'Tipologie disegno',
   workshopOutput: 'Output officina',
+  workshopWorker: 'Operai officina',
   system: 'Sistema',
 }
 
@@ -272,6 +273,7 @@ const ENTITY_DOT: Record<ActivityLogEntityType, string> = {
   absence: 'bg-amber-400',
   machineType: 'bg-cyan-400',
   workshopOutput: 'bg-orange-400',
+  workshopWorker: 'bg-lime-400',
   system: 'bg-slate-400',
 }
 

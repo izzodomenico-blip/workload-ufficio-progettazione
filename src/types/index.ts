@@ -137,6 +137,7 @@ export type ActivityLogEntityType =
   | 'absence'
   | 'machineType'
   | 'workshopOutput'
+  | 'workshopWorker'
   | 'system'
 
 export interface ActivityLogEntry {
@@ -170,6 +171,7 @@ export const ALL_ACTIVITY_ENTITY_TYPES: ActivityLogEntityType[] = [
   'absence',
   'machineType',
   'workshopOutput',
+  'workshopWorker',
   'system',
 ]
 
@@ -341,6 +343,81 @@ export interface WorkshopOutput {
   updatedAt: string
 }
 
+// === Operai / dipendenti officina ===
+
+export type WorkshopWorkerSkill =
+  | 'laser_piano'
+  | 'laser_tubo'
+  | 'piegatrice'
+  | 'saldatura'
+  | 'tornitura'
+  | 'fresatura'
+  | 'montaggio'
+  | 'verniciatura'
+  | 'collaudo'
+  | 'magazzino'
+  | 'manutenzione'
+  | 'altro'
+
+export const ALL_WORKSHOP_WORKER_SKILLS: WorkshopWorkerSkill[] = [
+  'laser_piano',
+  'laser_tubo',
+  'piegatrice',
+  'saldatura',
+  'tornitura',
+  'fresatura',
+  'montaggio',
+  'verniciatura',
+  'collaudo',
+  'magazzino',
+  'manutenzione',
+  'altro',
+]
+
+export const WORKSHOP_WORKER_SKILL_LABELS: Record<WorkshopWorkerSkill, string> = {
+  laser_piano: 'Laser piano',
+  laser_tubo: 'Laser tubi',
+  piegatrice: 'Piegatrice',
+  saldatura: 'Saldatore',
+  tornitura: 'Tornitura',
+  fresatura: 'Fresatura',
+  montaggio: 'Montatore',
+  verniciatura: 'Verniciatura / Trattamento',
+  collaudo: 'Collaudo',
+  magazzino: 'Magazzino',
+  manutenzione: 'Manutenzione',
+  altro: 'Altro',
+}
+
+export interface WorkshopWorker {
+  id: string
+  employeeCode: string
+  firstName: string
+  lastName: string
+  displayName: string
+  role: string
+  department: string
+  employmentType: string
+  phone: string
+  mobilePhone: string
+  email: string
+  address: string
+  city: string
+  province: string
+  fiscalCode: string
+  birthDate: string
+  hireDate: string
+  skills: WorkshopWorkerSkill[]
+  primarySkill: WorkshopWorkerSkill | ''
+  dailyCapacityPoints: number
+  weeklyCapacityPoints: number
+  active: boolean
+  notes: string
+  extraFields?: Record<string, string>
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AppData {
   people: Person[]
   workItems: WorkItem[]
@@ -351,6 +428,7 @@ export interface AppData {
   businessPartners: BusinessPartner[]
   machineTypes: MachineType[]
   workshopOutputs: WorkshopOutput[]
+  workshopWorkers: WorkshopWorker[]
 }
 
 export interface Filters {

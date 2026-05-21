@@ -179,6 +179,7 @@ function withAppDataDefaults(data: Partial<AppData>): AppData {
     businessPartners: Array.isArray(data.businessPartners) ? data.businessPartners : [],
     machineTypes: Array.isArray(data.machineTypes) ? data.machineTypes : [],
     workshopOutputs: Array.isArray(data.workshopOutputs) ? data.workshopOutputs : [],
+    workshopWorkers: Array.isArray(data.workshopWorkers) ? data.workshopWorkers : [],
   }
 }
 

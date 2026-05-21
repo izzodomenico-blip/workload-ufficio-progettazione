@@ -35,6 +35,20 @@ const VALID_WORKSHOP_OUTPUT_STATUSES = new Set([
   'ricevuto_officina',
   'sospeso',
 ])
+const VALID_WORKSHOP_WORKER_SKILLS = new Set([
+  'laser_piano',
+  'laser_tubo',
+  'piegatrice',
+  'saldatura',
+  'tornitura',
+  'fresatura',
+  'montaggio',
+  'verniciatura',
+  'collaudo',
+  'magazzino',
+  'manutenzione',
+  'altro',
+])
 
 const DEFAULT_MACHINE_TYPES_BY_CODE = new Map(
   getDefaultMachineTypes().map((item) => [item.code.toUpperCase(), item]),
@@ -102,6 +116,7 @@ const VALID_ACTIVITY_ENTITY_TYPES = new Set([
   'absence',
   'machineType',
   'workshopOutput',
+  'workshopWorker',
   'system',
 ])
 
@@ -115,6 +130,7 @@ export const EMPTY_APP_DATA = {
   businessPartners: [],
   machineTypes: [],
   workshopOutputs: [],
+  workshopWorkers: [],
 }
 
 export function extractAppData(payload) {
@@ -148,6 +164,9 @@ export function normalizeAppData(input) {
   if (root.workshopOutputs !== undefined && !Array.isArray(root.workshopOutputs)) {
     throw new Error('workshopOutputs deve essere un array oppure assente.')
   }
+  if (root.workshopWorkers !== undefined && !Array.isArray(root.workshopWorkers)) {
+    throw new Error('workshopWorkers deve essere un array oppure assente.')
+  }
 
   return {
     people: root.people.map((item, index) => normalizePerson(item, index)),
@@ -159,6 +178,7 @@ export function normalizeAppData(input) {
     businessPartners: (root.businessPartners ?? []).map(normalizeBusinessPartner).filter(Boolean),
     machineTypes: (root.machineTypes ?? []).map(normalizeMachineType).filter(Boolean),
     workshopOutputs: (root.workshopOutputs ?? []).map(normalizeWorkshopOutput).filter(Boolean),
+    workshopWorkers: (root.workshopWorkers ?? []).map(normalizeWorkshopWorker).filter(Boolean),
   }
 }
 
@@ -173,6 +193,7 @@ export function countAppData(data) {
     businessPartners: data.businessPartners.length,
     machineTypes: data.machineTypes.length,
     workshopOutputs: data.workshopOutputs.length,
+    workshopWorkers: data.workshopWorkers.length,
   }
 }
 
@@ -394,6 +415,51 @@ function normalizeWorkshopOutput(item) {
   }
 }
 
+function normalizeWorkshopWorker(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id)) return null
+  const firstName = isString(o.firstName) ? o.firstName.trim() : ''
+  const lastName = isString(o.lastName) ? o.lastName.trim() : ''
+  const displayName = isNonEmptyString(o.displayName)
+    ? o.displayName.trim()
+    : [firstName, lastName].filter(Boolean).join(' ').trim()
+  if (!displayName) return null
+  const skills = stringArray(o.skills).filter((skill) => VALID_WORKSHOP_WORKER_SKILLS.has(skill))
+  const primarySkill = isString(o.primarySkill) && VALID_WORKSHOP_WORKER_SKILLS.has(o.primarySkill)
+    ? o.primarySkill
+    : (skills[0] ?? '')
+  const now = new Date().toISOString()
+  return {
+    ...o,
+    id: o.id,
+    employeeCode: isString(o.employeeCode) ? o.employeeCode.trim() : '',
+    firstName,
+    lastName,
+    displayName,
+    role: isString(o.role) ? o.role.trim() : '',
+    department: isString(o.department) ? o.department.trim() : '',
+    employmentType: isString(o.employmentType) ? o.employmentType.trim() : '',
+    phone: isString(o.phone) ? o.phone.trim() : '',
+    mobilePhone: isString(o.mobilePhone) ? o.mobilePhone.trim() : '',
+    email: isString(o.email) ? o.email.trim() : '',
+    address: isString(o.address) ? o.address.trim() : '',
+    city: isString(o.city) ? o.city.trim() : '',
+    province: isString(o.province) ? o.province.trim().toUpperCase() : '',
+    fiscalCode: isString(o.fiscalCode) ? o.fiscalCode.trim().toUpperCase() : '',
+    birthDate: isString(o.birthDate) ? o.birthDate.trim() : '',
+    hireDate: isString(o.hireDate) ? o.hireDate.trim() : '',
+    skills,
+    primarySkill,
+    dailyCapacityPoints: positiveNumber(o.dailyCapacityPoints, 100),
+    weeklyCapacityPoints: positiveNumber(o.weeklyCapacityPoints, 500),
+    active: typeof o.active === 'boolean' ? o.active : true,
+    notes: isString(o.notes) ? o.notes : '',
+    extraFields: asObject(o.extraFields) ? stringMap(o.extraFields) : undefined,
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
 function normalizeNotification(item) {
   const o = asObject(item)
   if (!o || !isNonEmptyString(o.id) || !isNonEmptyString(o.timestamp)) return null
@@ -493,6 +559,16 @@ function normalizePercent(value) {
 
 function stringArray(value) {
   return Array.isArray(value) ? value.filter((item) => typeof item === 'string') : []
+}
+
+function stringMap(value) {
+  const o = asObject(value)
+  if (!o) return {}
+  return Object.fromEntries(
+    Object.entries(o)
+      .filter(([, v]) => v !== undefined && v !== null && String(v).trim().length > 0)
+      .map(([k, v]) => [k, String(v).trim()]),
+  )
 }
 
 function pad2(value) {

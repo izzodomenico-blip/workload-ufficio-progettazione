@@ -37,8 +37,9 @@ const APP_DATA_COLLECTIONS = [
   'businessPartners',
   'machineTypes',
   'workshopOutputs',
+  'workshopWorkers',
 ]
-const PRESERVE_IF_EMPTY_COLLECTIONS = new Set(['businessPartners', 'machineTypes', 'workshopOutputs'])
+const PRESERVE_IF_EMPTY_COLLECTIONS = new Set(['businessPartners', 'machineTypes', 'workshopOutputs', 'workshopWorkers'])
 
 /**
  * Estrae l'AppData da un payload PUT /app-data preservando le collezioni
@@ -182,6 +183,10 @@ export function createApiRouter() {
   registerCollectionRoutes(router, {
     apiName: 'workshop-outputs',
     collection: 'workshopOutputs',
+  })
+  registerCollectionRoutes(router, {
+    apiName: 'workshop-workers',
+    collection: 'workshopWorkers',
   })
 
   router.put('/business-partners/:id/activate', (req, res, next) => {
