@@ -1,11 +1,14 @@
-import { useMemo } from 'react'
-import type { AppData, Status, WorkItem } from '../types'
+import { useMemo, useState } from 'react'
+import type { AppData, Status, WorkItem, WorkshopOutput } from '../types'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
 import { TypeBadge } from './TypeBadge'
 import { PriorityBadge } from './PriorityBadge'
 import { StatusSelect } from './StatusSelect'
 import { formatItalianShort, isOverdue } from '../utils/dates'
+import { pendingCommercialOutputsForWorkItem, WORK_ITEM_CLOSING_STATUSES } from '../utils/commercialComponents'
+import type { CommercialClosureResolution } from '../utils/commercialComponents'
+import { CommercialComponentsConfirmModal } from './CommercialComponentsConfirmModal'
 
 interface KanbanColumn {
   id: string
@@ -30,8 +33,13 @@ interface Props {
 }
 
 export function WorkloadKanban({ data, items, onSelect }: Props) {
-  const { setWorkItemStatus } = useData()
+  const { setWorkItemStatus, setWorkItemStatusAfterCommercialCheck } = useData()
   const toast = useToast()
+  const [commercialCheck, setCommercialCheck] = useState<{
+    item: WorkItem
+    status: Status
+    pendingOutputs: WorkshopOutput[]
+  } | null>(null)
   const personById = useMemo(() => new Map(data.people.map((p) => [p.id, p])), [data.people])
 
   const grouped = useMemo(() => {
@@ -44,7 +52,27 @@ export function WorkloadKanban({ data, items, onSelect }: Props) {
     return map
   }, [items])
 
+  function handleStatusChange(item: WorkItem, status: Status) {
+    const pendingOutputs = WORK_ITEM_CLOSING_STATUSES.has(status)
+      ? pendingCommercialOutputsForWorkItem(data, item.id)
+      : []
+    if (pendingOutputs.length > 0) {
+      setCommercialCheck({ item, status, pendingOutputs })
+      return
+    }
+    setWorkItemStatus(item.id, status)
+    toast.info(`${item.code || item.title}: ${status}`)
+  }
+
+  function resolveCommercialCheck(resolution: CommercialClosureResolution) {
+    if (!commercialCheck) return
+    setWorkItemStatusAfterCommercialCheck(commercialCheck.item.id, commercialCheck.status, resolution)
+    toast.info(`${commercialCheck.item.code || commercialCheck.item.title}: ${commercialCheck.status}`)
+    setCommercialCheck(null)
+  }
+
   return (
+    <>
     <div className="panel p-3">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         {COLUMNS.map((col) => {
@@ -114,7 +142,7 @@ export function WorkloadKanban({ data, items, onSelect }: Props) {
                       <div className="mt-2">
                         <StatusSelect
                           value={w.status}
-                          onChange={(s) => { setWorkItemStatus(w.id, s); toast.info(`${w.code || w.title}: ${s}`) }}
+                          onChange={(s) => handleStatusChange(w, s)}
                         />
                       </div>
                       <div className="mt-2 flex items-center justify-between text-[11px]">
@@ -148,5 +176,13 @@ export function WorkloadKanban({ data, items, onSelect }: Props) {
         })}
       </div>
     </div>
+    <CommercialComponentsConfirmModal
+      open={Boolean(commercialCheck)}
+      pendingOutputs={commercialCheck?.pendingOutputs ?? []}
+      targetLabel={commercialCheck ? `${commercialCheck.item.code || commercialCheck.item.title} -> ${commercialCheck.status}` : ''}
+      onCancel={() => setCommercialCheck(null)}
+      onResolve={resolveCommercialCheck}
+    />
+    </>
   )
 }

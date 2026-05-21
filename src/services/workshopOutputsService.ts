@@ -1,7 +1,20 @@
-import type { AppData, MachineType, WorkshopOutput, WorkshopOutputStatus } from '../types'
+import type { AppData, MachineType, WorkshopOutput, WorkshopOutputStatus, WorkshopWorkerSkill } from '../types'
 import { logEntry, workItemLabel } from '../utils/activityLog'
 import { uid } from '../utils/format'
 import { calculateWorkshopImpact } from '../utils/workshopImpact'
+
+const STANDARD_COMPONENT_PROCESS_SET = new Set<WorkshopWorkerSkill>([
+  'laser_piano',
+  'laser_tubo',
+  'piegatrice',
+  'saldatura',
+  'tornitura',
+  'fresatura',
+  'montaggio',
+  'verniciatura',
+  'collaudo',
+  'altro',
+])
 
 export type WorkshopOutputDraft =
   Omit<WorkshopOutput, 'id' | 'workItemId' | 'createdAt' | 'updatedAt'> &
@@ -15,6 +28,8 @@ const PROCESS_FIELDS = [
   { flag: 'requiresTubeLaser', weight: 'tubeLaserWeightPercent', key: 'tube' },
   { flag: 'requiresBending', weight: 'bendingWeightPercent', key: 'bend' },
   { flag: 'requiresWelding', weight: 'weldingWeightPercent', key: 'weld' },
+  { flag: 'requiresTurning', weight: 'turningWeightPercent', key: 'turn' },
+  { flag: 'requiresMilling', weight: 'millingWeightPercent', key: 'mill' },
   { flag: 'requiresAssembly', weight: 'assemblyWeightPercent', key: 'assembly' },
   { flag: 'requiresPainting', weight: 'paintingWeightPercent', key: 'painting' },
   { flag: 'requiresTesting', weight: 'testingWeightPercent', key: 'testing' },
@@ -53,10 +68,26 @@ function normalizeDraft(
     requiresTubeLaser: Boolean(draft.requiresTubeLaser),
     requiresBending: Boolean(draft.requiresBending),
     requiresWelding: Boolean(draft.requiresWelding),
+    requiresTurning: Boolean(draft.requiresTurning),
+    requiresMilling: Boolean(draft.requiresMilling),
     requiresAssembly: Boolean(draft.requiresAssembly),
     requiresPainting: Boolean(draft.requiresPainting),
     requiresTesting: Boolean(draft.requiresTesting),
     ...cleanProcessWeights(draft),
+    hasStandardComponents: Boolean(draft.hasStandardComponents),
+    standardComponentsDescription: cleanString(draft.standardComponentsDescription),
+    standardComponentsQuantity: cleanInteger(draft.standardComponentsQuantity ?? 0, 0),
+    standardComponentsReadyFromDate: cleanString(draft.standardComponentsReadyFromDate) || existing?.standardComponentsReadyFromDate || draft.createdAt?.slice(0, 10) || at.slice(0, 10),
+    standardComponentsImpactScore: cleanNumber(draft.standardComponentsImpactScore ?? Math.round((draft.impactScore || 0) * 2.5) / 10, 0, 0),
+    standardComponentsProcesses: cleanStandardProcesses(draft.standardComponentsProcesses),
+    standardComponentsNotes: cleanString(draft.standardComponentsNotes),
+    hasCommercialComponents: Boolean(draft.hasCommercialComponents),
+    commercialComponentsDescription: cleanString(draft.commercialComponentsDescription),
+    commercialComponentsOrderRequired: Boolean(draft.commercialComponentsOrderRequired),
+    commercialComponentsOrdered: Boolean(draft.commercialComponentsOrdered),
+    commercialComponentsOrderedAt: cleanString(draft.commercialComponentsOrderedAt),
+    commercialComponentsOrderedBy: cleanString(draft.commercialComponentsOrderedBy),
+    commercialComponentsNotes: cleanString(draft.commercialComponentsNotes),
     plannedReleaseDate: draft.plannedReleaseDate ?? '',
     actualReleaseDate: draft.actualReleaseDate ?? '',
     impactScore: 0,
@@ -65,10 +96,19 @@ function normalizeDraft(
     createdAt: existing?.createdAt ?? draft.createdAt ?? at,
     updatedAt: at,
   }
+  const calculated = calculateWorkshopImpact(base, machineTypeFor(data, base))
+  const standardImpact = base.hasStandardComponents
+    ? cleanNumber(draft.standardComponentsImpactScore ?? Math.round(calculated * 2.5) / 10, Math.round(calculated * 2.5) / 10, 0)
+    : 0
   return {
     ...base,
-    impactScore: calculateWorkshopImpact(base, machineTypeFor(data, base)),
+    standardComponentsImpactScore: standardImpact,
+    impactScore: calculated,
   }
+}
+
+function cleanString(value: string | undefined | null): string {
+  return value?.trim() ?? ''
 }
 
 function cleanNumber(value: number, fallback: number, min: number): number {
@@ -81,9 +121,9 @@ function cleanInteger(value: number, fallback: number): number {
   return Math.max(0, Math.round(value))
 }
 
-function cleanPercent(value: number, fallback: number): number {
+function cleanPercent(value: number | undefined, fallback: number): number {
   if (!Number.isFinite(value)) return fallback
-  return Math.max(0, Math.min(100, Math.round(value)))
+  return Math.max(0, Math.min(100, Math.round(value ?? fallback)))
 }
 
 function cleanProcessWeights(draft: WorkshopOutputDraft) {
@@ -100,10 +140,16 @@ function cleanProcessWeights(draft: WorkshopOutputDraft) {
     | 'tubeLaserWeightPercent'
     | 'bendingWeightPercent'
     | 'weldingWeightPercent'
+    | 'turningWeightPercent'
+    | 'millingWeightPercent'
     | 'assemblyWeightPercent'
     | 'paintingWeightPercent'
     | 'testingWeightPercent'
   >
+}
+
+function cleanStandardProcesses(value: WorkshopOutputDraft['standardComponentsProcesses']): WorkshopWorkerSkill[] {
+  return Array.from(new Set((value ?? []).filter((process): process is WorkshopWorkerSkill => STANDARD_COMPONENT_PROCESS_SET.has(process))))
 }
 
 function sortOutputs(outputs: WorkshopOutput[]): WorkshopOutput[] {
@@ -133,6 +179,8 @@ function describeChange(before: WorkshopOutput, after: WorkshopOutput): string {
   if (before.actualReleaseDate !== after.actualReleaseDate) parts.push('rilascio effettivo aggiornato')
   if (before.status !== after.status) parts.push(`stato ${statusLabel(before.status)} -> ${statusLabel(after.status)}`)
   if (before.impactScore !== after.impactScore) parts.push(`impatto ${before.impactScore} -> ${after.impactScore}`)
+  if (before.hasStandardComponents !== after.hasStandardComponents) parts.push('componenti standard aggiornati')
+  if (before.hasCommercialComponents !== after.hasCommercialComponents || before.commercialComponentsOrdered !== after.commercialComponentsOrdered) parts.push('componenti commerciali aggiornati')
   if (processKey(before) !== processKey(after)) parts.push('processi aggiornati')
   return parts.length > 0 ? parts.join(' - ') : 'modifica minore'
 }

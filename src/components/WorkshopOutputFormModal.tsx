@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { MachineType, WorkshopOutputStatus } from '../types'
-import { ALL_MACHINE_COMPLEXITIES, ALL_WORKSHOP_OUTPUT_STATUSES } from '../types'
+import type { MachineType, WorkshopAssignmentProcess, WorkshopOutputStatus } from '../types'
+import { ALL_MACHINE_COMPLEXITIES, ALL_WORKSHOP_OUTPUT_STATUSES, WORKSHOP_WORKER_SKILL_LABELS } from '../types'
 import type { WorkshopOutputDraft } from '../services/workshopOutputsService'
 import { calculateWorkshopImpact, getWorkshopImpactLevel, WORKSHOP_IMPACT_EXPLANATION } from '../utils/workshopImpact'
 import { Modal } from './Modal'
@@ -45,6 +45,20 @@ const EMPTY_OUTPUT: WorkshopOutputDraft = {
   testingWeightPercent: 0,
   plannedReleaseDate: '',
   actualReleaseDate: '',
+  hasStandardComponents: false,
+  standardComponentsDescription: '',
+  standardComponentsQuantity: 0,
+  standardComponentsReadyFromDate: '',
+  standardComponentsImpactScore: 0,
+  standardComponentsProcesses: [],
+  standardComponentsNotes: '',
+  hasCommercialComponents: false,
+  commercialComponentsDescription: '',
+  commercialComponentsOrderRequired: false,
+  commercialComponentsOrdered: false,
+  commercialComponentsOrderedAt: '',
+  commercialComponentsOrderedBy: '',
+  commercialComponentsNotes: '',
   impactScore: 0,
   status: 'previsto',
   notes: '',
@@ -70,6 +84,19 @@ const STATUS_LABEL: Record<WorkshopOutputStatus, string> = {
   ricevuto_officina: 'Ricevuto officina',
   sospeso: 'Sospeso',
 }
+
+const STANDARD_PROCESS_OPTIONS: WorkshopAssignmentProcess[] = [
+  'laser_piano',
+  'laser_tubo',
+  'piegatrice',
+  'saldatura',
+  'tornitura',
+  'fresatura',
+  'montaggio',
+  'verniciatura',
+  'collaudo',
+  'altro',
+]
 
 export function WorkshopOutputFormModal({
   open,
@@ -113,6 +140,16 @@ export function WorkshopOutputFormModal({
 
   function set<K extends keyof WorkshopOutputDraft>(key: K, value: WorkshopOutputDraft[K]) {
     setValues((current) => recalculate({ ...current, [key]: value }, machineTypes))
+  }
+
+  function setStandardProcess(process: WorkshopAssignmentProcess, checked: boolean) {
+    setValues((current) => {
+      const existing = current.standardComponentsProcesses ?? []
+      const nextProcesses = checked
+        ? Array.from(new Set([...existing, process]))
+        : existing.filter((item) => item !== process)
+      return recalculate({ ...current, standardComponentsProcesses: nextProcesses }, machineTypes)
+    })
   }
 
   function selectMachineType(machineType: MachineType) {
@@ -325,6 +362,106 @@ export function WorkshopOutputFormModal({
                 Le percentuali sono incidenze relative del processo per questo output; non devono sommare per forza a 100.
               </p>
             </div>
+
+            <section className="md:col-span-2 rounded-xl border border-slate-800 bg-slate-900/35 p-3">
+              <label className="flex items-start gap-2 text-sm font-medium text-slate-100">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900"
+                  checked={Boolean(values.hasStandardComponents)}
+                  onChange={(event) => {
+                    const checked = event.target.checked
+                    setValues((current) => recalculate({
+                      ...current,
+                      hasStandardComponents: checked,
+                      standardComponentsReadyFromDate: checked && !current.standardComponentsReadyFromDate
+                        ? new Date().toISOString().slice(0, 10)
+                        : current.standardComponentsReadyFromDate,
+                      standardComponentsImpactScore: checked && (!current.standardComponentsImpactScore || current.standardComponentsImpactScore <= 0)
+                        ? Math.max(0.1, Math.round((current.impactScore || values.impactScore || 1) * 2.5) / 10)
+                        : current.standardComponentsImpactScore,
+                    }, machineTypes))
+                  }}
+                />
+                Sono presenti componenti/disegni standard producibili in anticipo
+              </label>
+              <p className="mt-2 text-[11px] text-slate-500">
+                Le parti standard possono essere pianificate prima del rilascio completo della macchina, perché già note o standardizzate.
+              </p>
+              {values.hasStandardComponents && (
+                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
+                  <FormField label="Descrizione componenti" className="md:col-span-4">
+                    <textarea rows={2} className="input-base resize-y" value={values.standardComponentsDescription ?? ''} onChange={(event) => set('standardComponentsDescription', event.target.value)} />
+                  </FormField>
+                  <FormField label="Quantità indicativa">
+                    <input type="number" min={0} step={1} className="input-base" value={values.standardComponentsQuantity ?? 0} onChange={(event) => set('standardComponentsQuantity', Number(event.target.value))} />
+                  </FormField>
+                  <FormField label="Producibile da">
+                    <input type="date" className="input-base" value={values.standardComponentsReadyFromDate ?? ''} onChange={(event) => set('standardComponentsReadyFromDate', event.target.value)} />
+                  </FormField>
+                  <FormField label="Impatto standard stimato">
+                    <input type="number" min={0} step={0.1} className="input-base" value={values.standardComponentsImpactScore ?? 0} onChange={(event) => set('standardComponentsImpactScore', Number(event.target.value))} />
+                  </FormField>
+                  <FormField label="Processi coinvolti" className="md:col-span-4">
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                      {STANDARD_PROCESS_OPTIONS.map((process) => (
+                        <label key={process} className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/25 px-2.5 py-2 text-xs text-slate-300">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-slate-700 bg-slate-900"
+                            checked={(values.standardComponentsProcesses ?? []).includes(process)}
+                            onChange={(event) => setStandardProcess(process, event.target.checked)}
+                          />
+                          {WORKSHOP_WORKER_SKILL_LABELS[process]}
+                        </label>
+                      ))}
+                    </div>
+                  </FormField>
+                  <FormField label="Note standard" className="md:col-span-4">
+                    <textarea rows={2} className="input-base resize-y" value={values.standardComponentsNotes ?? ''} onChange={(event) => set('standardComponentsNotes', event.target.value)} />
+                  </FormField>
+                </div>
+              )}
+            </section>
+
+            <section className="md:col-span-2 rounded-xl border border-slate-800 bg-slate-900/35 p-3">
+              <label className="flex items-start gap-2 text-sm font-medium text-slate-100">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900"
+                  checked={Boolean(values.hasCommercialComponents)}
+                  onChange={(event) => set('hasCommercialComponents', event.target.checked)}
+                />
+                Sono presenti componenti commerciali
+              </label>
+              <p className="mt-2 text-[11px] text-slate-500">
+                Questo promemoria serve a evitare la chiusura dell'output/progetto senza confermare l'acquisto dei componenti commerciali necessari.
+              </p>
+              {values.hasCommercialComponents && (
+                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
+                  <FormField label="Descrizione componenti commerciali" className="md:col-span-4">
+                    <textarea rows={2} className="input-base resize-y" value={values.commercialComponentsDescription ?? ''} onChange={(event) => set('commercialComponentsDescription', event.target.value)} />
+                  </FormField>
+                  <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/25 px-2.5 py-2 text-xs text-slate-300">
+                    <input type="checkbox" className="h-4 w-4 rounded border-slate-700 bg-slate-900" checked={Boolean(values.commercialComponentsOrderRequired)} onChange={(event) => set('commercialComponentsOrderRequired', event.target.checked)} />
+                    Ordine richiesto
+                  </label>
+                  <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/25 px-2.5 py-2 text-xs text-slate-300">
+                    <input type="checkbox" className="h-4 w-4 rounded border-slate-700 bg-slate-900" checked={Boolean(values.commercialComponentsOrdered)} onChange={(event) => set('commercialComponentsOrdered', event.target.checked)} />
+                    Componenti ordinati
+                  </label>
+                  <FormField label="Data ordine">
+                    <input type="date" className="input-base" value={values.commercialComponentsOrderedAt ?? ''} onChange={(event) => set('commercialComponentsOrderedAt', event.target.value)} />
+                  </FormField>
+                  <FormField label="Ordinato da">
+                    <input className="input-base" value={values.commercialComponentsOrderedBy ?? ''} onChange={(event) => set('commercialComponentsOrderedBy', event.target.value)} />
+                  </FormField>
+                  <FormField label="Note commerciali" className="md:col-span-4">
+                    <textarea rows={2} className="input-base resize-y" value={values.commercialComponentsNotes ?? ''} onChange={(event) => set('commercialComponentsNotes', event.target.value)} />
+                  </FormField>
+                </div>
+              )}
+            </section>
             <FormField label="Stato">
               <select
                 className="input-base"
@@ -410,6 +547,8 @@ function recalculate(output: WorkshopOutputDraft, machineTypes: MachineType[]): 
     tubeLaserWeightPercent: clampPercent(output.tubeLaserWeightPercent),
     bendingWeightPercent: clampPercent(output.bendingWeightPercent),
     weldingWeightPercent: clampPercent(output.weldingWeightPercent),
+    turningWeightPercent: clampPercent(output.turningWeightPercent ?? 0),
+    millingWeightPercent: clampPercent(output.millingWeightPercent ?? 0),
     assemblyWeightPercent: clampPercent(output.assemblyWeightPercent),
     paintingWeightPercent: clampPercent(output.paintingWeightPercent),
     testingWeightPercent: clampPercent(output.testingWeightPercent),

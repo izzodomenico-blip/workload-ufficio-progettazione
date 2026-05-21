@@ -346,6 +346,20 @@ export interface WorkshopOutput {
   requiresMilling?: boolean
   turningWeightPercent?: number
   millingWeightPercent?: number
+  hasStandardComponents?: boolean
+  standardComponentsDescription?: string
+  standardComponentsQuantity?: number
+  standardComponentsReadyFromDate?: string
+  standardComponentsImpactScore?: number
+  standardComponentsProcesses?: WorkshopWorkerSkill[]
+  standardComponentsNotes?: string
+  hasCommercialComponents?: boolean
+  commercialComponentsDescription?: string
+  commercialComponentsOrderRequired?: boolean
+  commercialComponentsOrdered?: boolean
+  commercialComponentsOrderedAt?: string
+  commercialComponentsOrderedBy?: string
+  commercialComponentsNotes?: string
   plannedReleaseDate: string
   actualReleaseDate: string
   impactScore: number
@@ -434,6 +448,8 @@ export interface WorkshopWorker {
 
 export type WorkshopAssignmentProcess = WorkshopWorkerSkill
 
+export type WorkshopAssignmentSourceType = 'output' | 'standard_component'
+
 export type WorkshopAssignmentStatus =
   | 'pianificato'
   | 'in_lavorazione'
@@ -460,6 +476,7 @@ export interface WorkshopAssignment {
   workItemId: string
   workerId: string
   process: WorkshopAssignmentProcess
+  sourceType?: WorkshopAssignmentSourceType
   plannedDate: string
   plannedWeek: string
   loadPoints: number

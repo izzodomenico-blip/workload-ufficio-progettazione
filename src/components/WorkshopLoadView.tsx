@@ -5,6 +5,7 @@ import type { WorkshopOutput, WorkshopOutputStatus } from '../types'
 import { useData } from '../state/DataProvider'
 import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
 import { WorkshopReportModal } from './WorkshopReportModal'
+import { CoefficientsGuideReportModal } from './CoefficientsGuideReportModal'
 import { WORKSHOP_IMPACT_EXPLANATION, type WorkshopImpactLevel } from '../utils/workshopImpact'
 import {
   applyNonPeriodFilters,
@@ -84,6 +85,7 @@ export function WorkshopLoadView() {
   const [filters, setFilters] = useState<WorkshopLoadFilters>(EMPTY_WORKSHOP_FILTERS)
   const [selectedWorkItemId, setSelectedWorkItemId] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
 
   const today = useMemo(() => new Date(), [])
 
@@ -130,6 +132,9 @@ export function WorkshopLoadView() {
           <div className="hidden rounded-md border border-slate-800 bg-slate-900/40 px-3 py-1.5 text-[11px] text-slate-400 lg:block">
             Indice impatto = peso relativo, <span className="text-slate-300">non rappresenta ore officina</span>
           </div>
+          <button onClick={() => setGuideOpen(true)} className="btn-ghost" title="Guida stampabile alla logica coefficienti">
+            Guida coefficienti
+          </button>
           {hasOutputs && (
             <button onClick={() => setReportOpen(true)} className="btn-primary" title="Anteprima report stampabile per la produzione">
               <ReportIcon /> Report produzione
@@ -196,6 +201,7 @@ export function WorkshopLoadView() {
 
       <WorkItemDetailDrawer workItemId={selectedWorkItemId} onClose={() => setSelectedWorkItemId(null)} />
       <WorkshopReportModal open={reportOpen} onClose={() => setReportOpen(false)} filters={filters} />
+      <CoefficientsGuideReportModal open={guideOpen} onClose={() => setGuideOpen(false)} />
     </div>
   )
 }

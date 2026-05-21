@@ -1,10 +1,12 @@
 import type {
   WorkshopAssignment,
   WorkshopAssignmentProcess,
+  WorkshopAssignmentSourceType,
   WorkshopOutput,
   WorkshopWorker,
 } from '../types'
 import { formatISODate, isoWeekNumber, parseISODate, startOfWeek } from './dates'
+import { compareWorkshopWorkers } from './workshopWorkers'
 
 export const WORKSHOP_ASSIGNMENT_PROCESS_LABELS: Record<WorkshopAssignmentProcess, string> = {
   laser_piano: 'Laser piano',
@@ -70,10 +72,22 @@ export function getOutputRequiredProcesses(output: WorkshopOutput): WorkshopAssi
   return processes
 }
 
+export function getStandardComponentProcesses(output: WorkshopOutput): WorkshopAssignmentProcess[] {
+  return (output.standardComponentsProcesses ?? [])
+    .filter((process): process is WorkshopAssignmentProcess => process in WORKSHOP_ASSIGNMENT_PROCESS_LABELS)
+}
+
 export function estimateProcessLoadPoints(output: WorkshopOutput, process: WorkshopAssignmentProcess): number {
   const required = getOutputRequiredProcesses(output)
   const divisor = required.length > 0 ? required.length : 1
   const basePerProcess = output.impactScore / divisor
+  return round1(basePerProcess * PROCESS_LOAD_WEIGHTS[process])
+}
+
+export function estimateStandardComponentLoadPoints(output: WorkshopOutput, process: WorkshopAssignmentProcess): number {
+  const required = getStandardComponentProcesses(output)
+  const divisor = required.length > 0 ? required.length : 1
+  const basePerProcess = (output.standardComponentsImpactScore ?? 0) / divisor
   return round1(basePerProcess * PROCESS_LOAD_WEIGHTS[process])
 }
 
@@ -83,7 +97,7 @@ export function getAssignableWorkersForProcess(
 ): WorkshopWorker[] {
   return workers
     .filter((worker) => worker.active && worker.skills.includes(process))
-    .sort((a, b) => a.displayName.localeCompare(b.displayName, 'it', { sensitivity: 'base' }))
+    .sort(compareWorkshopWorkers)
 }
 
 export function aggregateWorkerLoadByDay(
@@ -97,7 +111,7 @@ export function aggregateWorkerLoadByDay(
     assignment.status !== 'sospeso' &&
     (!process || assignment.process === process)
   ))
-  return workers.filter((worker) => worker.active && (!process || worker.skills.includes(process))).map((worker) => {
+  return workers.filter((worker) => worker.active && (!process || worker.skills.includes(process))).sort(compareWorkshopWorkers).map((worker) => {
     const workerAssignments = byWorker.filter((assignment) => assignment.workerId === worker.id)
     const loadPoints = round1(workerAssignments.reduce((sum, assignment) => sum + assignment.loadPoints, 0))
     const capacityPoints = worker.dailyCapacityPoints || 100
@@ -126,7 +140,7 @@ export function aggregateWorkerLoadByWeek(
     assignment.status !== 'sospeso' &&
     (!process || assignment.process === process)
   ))
-  return workers.filter((worker) => worker.active && (!process || worker.skills.includes(process))).map((worker) => {
+  return workers.filter((worker) => worker.active && (!process || worker.skills.includes(process))).sort(compareWorkshopWorkers).map((worker) => {
     const workerAssignments = byWorker.filter((assignment) => assignment.workerId === worker.id)
     const loadPoints = round1(workerAssignments.reduce((sum, assignment) => sum + assignment.loadPoints, 0))
     const capacityPoints = worker.weeklyCapacityPoints || 500
@@ -208,7 +222,7 @@ export function aggregateWorkerLoadByMonth(
     assignment.status !== 'sospeso' &&
     (!process || assignment.process === process)
   ))
-  return workers.filter((worker) => worker.active && (!process || worker.skills.includes(process))).map((worker) => {
+  return workers.filter((worker) => worker.active && (!process || worker.skills.includes(process))).sort(compareWorkshopWorkers).map((worker) => {
     const weeklyCapacity = worker.weeklyCapacityPoints || 500
     const weekCells: WorkerWeekCell[] = weeks.map((weekStart) => {
       const daySet = new Set(getWeekDays(weekStart))
@@ -244,16 +258,22 @@ export function aggregateWorkerLoadByMonth(
 export function getAssignmentCoverageForOutput(
   output: WorkshopOutput,
   assignments: WorkshopAssignment[],
+  sourceType: WorkshopAssignmentSourceType = 'output',
 ): OutputCoverage {
-  const requiredProcesses = getOutputRequiredProcesses(output)
+  const requiredProcesses = sourceType === 'standard_component'
+    ? getStandardComponentProcesses(output)
+    : getOutputRequiredProcesses(output)
   const activeAssignments = assignments.filter((assignment) => (
     assignment.workshopOutputId === output.id &&
-    assignment.status !== 'sospeso'
+    assignment.status !== 'sospeso' &&
+    (assignment.sourceType ?? 'output') === sourceType
   ))
   const processStatus = Object.fromEntries(
     requiredProcesses.map((process) => {
       const matching = activeAssignments.filter((assignment) => assignment.process === process)
-      const expected = estimateProcessLoadPoints(output, process)
+      const expected = sourceType === 'standard_component'
+        ? estimateStandardComponentLoadPoints(output, process)
+        : estimateProcessLoadPoints(output, process)
       const assigned = matching.reduce((sum, assignment) => sum + assignment.loadPoints, 0)
       const status = matching.length === 0
         ? 'missing'

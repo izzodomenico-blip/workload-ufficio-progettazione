@@ -145,6 +145,14 @@ function OutputRow({
             <span>Rilascio previsto: <span className="text-slate-200">{output.plannedReleaseDate || '---'}</span></span>
             <span>Stato: <span className="text-slate-200">{workshopOutputStatusLabel(output.status)}</span></span>
             <span>Processi: <span className="text-slate-200">{processes.length > 0 ? processes.join(', ') : 'nessuno'}</span></span>
+            {output.hasStandardComponents && (
+              <span className="text-emerald-200">standard anticipabili · impatto {output.standardComponentsImpactScore ?? 0}</span>
+            )}
+            {output.hasCommercialComponents && (
+              <span className={output.commercialComponentsOrderRequired && !output.commercialComponentsOrdered ? 'text-amber-200' : 'text-sky-200'}>
+                commerciali {output.commercialComponentsOrdered ? 'ordinati' : 'da verificare'}
+              </span>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -155,4 +163,3 @@ function OutputRow({
     </div>
   )
 }
-

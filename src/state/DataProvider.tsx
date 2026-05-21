@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Absence, AppData, BusinessPartner, MachineType, Person, Status, WorkshopAssignment, WorkshopAssignmentStatus, WorkshopOutput, WorkshopWorker } from '../types'
+import type { Absence, AppData, BusinessPartner, MachineType, Person, Status, WorkshopAssignment, WorkshopAssignmentSourceType, WorkshopAssignmentStatus, WorkshopOutput, WorkshopWorker } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
 import {
@@ -112,6 +112,11 @@ import type {
   UpdateWorkshopAssignmentInput,
   WorkshopAssignmentDraft,
 } from '../services/workshopAssignmentsService'
+import {
+  pendingCommercialOutputsForOutput,
+  pendingCommercialOutputsForWorkItem,
+} from '../utils/commercialComponents'
+import type { CommercialClosureResolution } from '../utils/commercialComponents'
 
 interface UpdatePeopleOptions {
   /** Password admin per autorizzare modifiche a baselineLoadPercent */
@@ -133,6 +138,7 @@ interface DataContextValue {
   updateWorkItemWithWorkshopOutputs: (id: string, patch: UpdateWorkItemInput, outputs: WorkshopOutputDraft[]) => void
   deleteWorkItem: (id: string) => void
   setWorkItemStatus: (id: string, status: Status) => void
+  setWorkItemStatusAfterCommercialCheck: (id: string, status: Status, resolution: CommercialClosureResolution) => void
   convertStudioToCommessa: (id: string, newCode?: string) => void
   // tasks
   createTask: (workItemId: string, input: CreateTaskInput) => string
@@ -162,6 +168,7 @@ interface DataContextValue {
   // workshop outputs
   createWorkshopOutput: (workItemId: string, input: CreateWorkshopOutputInput) => string
   updateWorkshopOutput: (id: string, patch: UpdateWorkshopOutputInput) => void
+  updateWorkshopOutputAfterCommercialCheck: (id: string, patch: UpdateWorkshopOutputInput, resolution: CommercialClosureResolution) => void
   deleteWorkshopOutput: (id: string) => void
   replaceWorkshopOutputsForWorkItem: (workItemId: string, outputs: WorkshopOutputDraft[]) => void
   // workshop workers
@@ -174,7 +181,7 @@ interface DataContextValue {
   updateWorkshopAssignment: (id: string, patch: UpdateWorkshopAssignmentInput) => void
   deleteWorkshopAssignment: (id: string) => void
   setWorkshopAssignmentStatus: (id: string, status: WorkshopAssignmentStatus) => void
-  replaceWorkshopAssignmentsForOutput: (workshopOutputId: string, assignments: WorkshopAssignmentDraft[]) => void
+  replaceWorkshopAssignmentsForOutput: (workshopOutputId: string, assignments: WorkshopAssignmentDraft[], sourceType?: WorkshopAssignmentSourceType) => void
   // import/export
   importData: (next: AppData, options?: ImportDataOptions) => void
   exportData: () => BackupExportResult
@@ -327,6 +334,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const setWorkItemStatus = useCallback((id: string, status: Status) => {
     commitData(svcSetWorkItemStatus(dataRef.current, id, status))
+  }, [commitData])
+
+  const setWorkItemStatusAfterCommercialCheck = useCallback((id: string, status: Status, resolution: CommercialClosureResolution) => {
+    const current = dataRef.current
+    const pendingOutputs = pendingCommercialOutputsForWorkItem(current, id)
+    const resolvedData = resolveCommercialClosure(current, pendingOutputs, resolution, 'chiusura commessa')
+    commitData(svcSetWorkItemStatus(resolvedData, id, status))
   }, [commitData])
 
   const convertStudioToCommessa = useCallback((id: string, newCode?: string) => {
@@ -568,6 +582,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     commitData(svcUpdateWorkshopOutput(dataRef.current, id, patch))
   }, [commitData])
 
+  const updateWorkshopOutputAfterCommercialCheck = useCallback((id: string, patch: UpdateWorkshopOutputInput, resolution: CommercialClosureResolution) => {
+    const current = dataRef.current
+    const pendingOutputs = pendingCommercialOutputsForOutput(current, id)
+    const resolvedData = resolveCommercialClosure(current, pendingOutputs, resolution, 'chiusura output officina')
+    const target = current.workshopOutputs.find((output) => output.id === id)
+    const today = new Date().toISOString().slice(0, 10)
+    const resolvedPatch: UpdateWorkshopOutputInput = resolution === 'confirm_ordered' && target
+      ? {
+          ...patch,
+          commercialComponentsOrdered: true,
+          commercialComponentsOrderedAt: patch.commercialComponentsOrderedAt || target.commercialComponentsOrderedAt || today,
+          commercialComponentsOrderedBy: patch.commercialComponentsOrderedBy || target.commercialComponentsOrderedBy || 'utente locale',
+        }
+      : patch
+    commitData(svcUpdateWorkshopOutput(resolvedData, id, resolvedPatch))
+  }, [commitData])
+
   const deleteWorkshopOutput = useCallback((id: string) => {
     commitData(svcDeleteWorkshopOutput(dataRef.current, id))
   }, [commitData])
@@ -614,8 +645,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     commitData(svcSetWorkshopAssignmentStatus(dataRef.current, id, status))
   }, [commitData])
 
-  const replaceWorkshopAssignmentsForOutput = useCallback((workshopOutputId: string, assignments: WorkshopAssignmentDraft[]) => {
-    commitData(svcReplaceWorkshopAssignmentsForOutput(dataRef.current, workshopOutputId, assignments))
+  const replaceWorkshopAssignmentsForOutput = useCallback((workshopOutputId: string, assignments: WorkshopAssignmentDraft[], sourceType: WorkshopAssignmentSourceType = 'output') => {
+    commitData(svcReplaceWorkshopAssignmentsForOutput(dataRef.current, workshopOutputId, assignments, sourceType))
   }, [commitData])
 
   const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
@@ -699,6 +730,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateWorkItemWithWorkshopOutputs,
     deleteWorkItem,
     setWorkItemStatus,
+    setWorkItemStatusAfterCommercialCheck,
     convertStudioToCommessa,
     createTask,
     updateTask,
@@ -722,6 +754,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setMachineTypeActive,
     createWorkshopOutput,
     updateWorkshopOutput,
+    updateWorkshopOutputAfterCommercialCheck,
     deleteWorkshopOutput,
     replaceWorkshopOutputsForWorkItem,
     createWorkshopWorker,
@@ -742,7 +775,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }), [
     data,
     createWorkItem, updateWorkItem, createWorkItemWithWorkshopOutputs, updateWorkItemWithWorkshopOutputs,
-    deleteWorkItem, setWorkItemStatus, convertStudioToCommessa,
+    deleteWorkItem, setWorkItemStatus, setWorkItemStatusAfterCommercialCheck, convertStudioToCommessa,
     createTask, updateTask, deleteTask, setTaskStatus,
     updatePerson, updatePeople,
     createAbsence, updateAbsence, deleteAbsence,
@@ -750,7 +783,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     planBusinessPartnerImport, applyBusinessPartnerImport,
     planCustomerLinking, applyCustomerLinking,
     createMachineType, updateMachineType, setMachineTypeActive,
-    createWorkshopOutput, updateWorkshopOutput, deleteWorkshopOutput, replaceWorkshopOutputsForWorkItem,
+    createWorkshopOutput, updateWorkshopOutput, updateWorkshopOutputAfterCommercialCheck, deleteWorkshopOutput, replaceWorkshopOutputsForWorkItem,
     createWorkshopWorker, updateWorkshopWorker, setWorkshopWorkerActive, applyWorkshopWorkerImport,
     createWorkshopAssignment, updateWorkshopAssignment, deleteWorkshopAssignment, setWorkshopAssignmentStatus, replaceWorkshopAssignmentsForOutput,
     importData, exportData,
@@ -781,6 +814,64 @@ function mergeImportWithSharedCollections(next: AppData, current: AppData): AppD
       ? next.workshopOutputs
       : current.workshopOutputs.filter((output) => importedWorkItemIds.has(output.workItemId)),
   }
+}
+
+function resolveCommercialClosure(
+  data: AppData,
+  pendingOutputs: WorkshopOutput[],
+  resolution: CommercialClosureResolution,
+  scopeLabel: string,
+): AppData {
+  if (pendingOutputs.length === 0) return data
+  const pendingIds = new Set(pendingOutputs.map((output) => output.id))
+  const today = new Date().toISOString().slice(0, 10)
+  const now = new Date()
+
+  if (resolution === 'confirm_ordered') {
+    const nextData: AppData = {
+      ...data,
+      workshopOutputs: data.workshopOutputs.map((output) => (
+        pendingIds.has(output.id)
+          ? {
+              ...output,
+              commercialComponentsOrdered: true,
+              commercialComponentsOrderedAt: output.commercialComponentsOrderedAt || today,
+              commercialComponentsOrderedBy: output.commercialComponentsOrderedBy || 'utente locale',
+              updatedAt: now.toISOString(),
+            }
+          : output
+      )),
+    }
+    return appendActivityLog(
+      nextData,
+      createActivityLogEntry({
+        entityType: 'system',
+        entityId: 'commercial-components',
+        action: 'updated',
+        title: 'Componenti commerciali confermati',
+        description: `${scopeLabel}: ${pendingOutputs.length} output segnati come ordinati/verificati.`,
+        after: {
+          outputIds: pendingOutputs.map((output) => output.id),
+          orderedAt: today,
+          orderedBy: 'utente locale',
+        },
+      }, now),
+    )
+  }
+
+  return appendActivityLog(
+    data,
+    createActivityLogEntry({
+      entityType: 'system',
+      entityId: 'commercial-components-warning',
+      action: 'updated',
+      title: 'Chiusura eseguita con componenti commerciali non confermati',
+      description: `${scopeLabel}: ${pendingOutputs.length} output con ordine commerciale ancora da confermare.`,
+      before: {
+        outputIds: pendingOutputs.map((output) => output.id),
+      },
+    }, now),
+  )
 }
 
 async function persistMachineTypeChange(

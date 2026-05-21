@@ -265,6 +265,7 @@ textarea:focus-visible,
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
+    transform: none !important;
   }
 
   .report-print-area {
@@ -277,10 +278,17 @@ textarea:focus-visible,
     padding: 0 !important;
     background: white !important;
     color: #0f172a !important;
+    color-scheme: light !important;
     box-shadow: none !important;
     border: 0 !important;
     border-radius: 0 !important;
     overflow: visible !important;
+    transform: none !important;
+  }
+
+  .report-print-area * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
   }
 
   .print-keep {

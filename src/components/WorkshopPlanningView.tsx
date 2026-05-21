@@ -10,6 +10,7 @@ import type {
   WorkItem,
   WorkshopAssignment,
   WorkshopAssignmentProcess,
+  WorkshopAssignmentSourceType,
   WorkshopAssignmentStatus,
   WorkshopOutput,
   WorkshopWorker,
@@ -23,10 +24,12 @@ import {
   aggregateWorkerLoadByWeek,
   aggregateWorkerLoadByMonth,
   estimateProcessLoadPoints,
+  estimateStandardComponentLoadPoints,
   getAssignableWorkersForProcess,
   getAssignmentCoverageForOutput,
   getMonthWeeks,
   getOutputRequiredProcesses,
+  getStandardComponentProcesses,
   getWeekDays,
   getWorkerLoadLevel,
   saturationScore10,
@@ -37,6 +40,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
 import { WorkshopPlanningReportModal } from './WorkshopPlanningReportModal'
 import type { WorkshopPlanningReportFilters } from '../utils/workshopPlanningReport'
+import { sortWorkshopWorkers } from '../utils/workshopWorkers'
 
 type AssignmentStatusFilter = WorkshopAssignmentStatus | ''
 type ProcessFilter = WorkshopAssignmentProcess | ''
@@ -97,7 +101,7 @@ export function WorkshopPlanningView() {
   const [query, setQuery] = useState('')
   const [onlyOverloads, setOnlyOverloads] = useState(false)
   const [onlyUnassigned, setOnlyUnassigned] = useState(false)
-  const [assigningOutputId, setAssigningOutputId] = useState<string | null>(null)
+  const [assigning, setAssigning] = useState<{ outputId: string; sourceType: WorkshopAssignmentSourceType } | null>(null)
   const [drawerWorkItemId, setDrawerWorkItemId] = useState<string | null>(null)
   const [detailWorkerId, setDetailWorkerId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<WorkshopAssignment | null>(null)
@@ -105,12 +109,21 @@ export function WorkshopPlanningView() {
 
   const workItemById = useMemo(() => new Map(data.workItems.map((workItem) => [workItem.id, workItem])), [data.workItems])
   const workerById = useMemo(() => new Map(workshopWorkers.map((worker) => [worker.id, worker])), [workshopWorkers])
+  const sortedWorkshopWorkers = useMemo(() => sortWorkshopWorkers(workshopWorkers), [workshopWorkers])
   const outputById = useMemo(() => new Map(workshopOutputs.map((output) => [output.id, output])), [workshopOutputs])
   const outputCards = useMemo<OutputCard[]>(() => workshopOutputs.map((output) => ({
     output,
     workItem: workItemById.get(output.workItemId),
     coverage: getAssignmentCoverageForOutput(output, workshopAssignments),
   })), [workshopOutputs, workItemById, workshopAssignments])
+
+  const standardCards = useMemo<OutputCard[]>(() => workshopOutputs
+    .filter((output) => output.hasStandardComponents)
+    .map((output) => ({
+      output,
+      workItem: workItemById.get(output.workItemId),
+      coverage: getAssignmentCoverageForOutput(output, workshopAssignments, 'standard_component'),
+    })), [workshopOutputs, workItemById, workshopAssignments])
 
   const filteredOutputCards = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -129,6 +142,23 @@ export function WorkshopPlanningView() {
       return true
     })
   }, [outputCards, query, processFilter, onlyUnassigned, weekStart])
+
+  const filteredStandardCards = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return standardCards.filter((card) => {
+      if (!card.output.hasStandardComponents) return false
+      if (card.coverage.requiredProcesses.length === 0) return false
+      if (onlyUnassigned && card.coverage.status === 'assegnato') return false
+      if (processFilter && !card.coverage.requiredProcesses.includes(processFilter)) return false
+      const readyDate = card.output.standardComponentsReadyFromDate || card.output.createdAt.slice(0, 10)
+      if (readyDate && formatISODate(startOfWeek(parseISODate(readyDate))) !== weekStart && viewMode === 'weekly') return false
+      if (q) {
+        const hay = `${card.workItem?.code ?? ''} ${card.workItem?.customer ?? ''} ${card.workItem?.title ?? ''} ${card.output.machineTypeCode} ${card.output.machineTypeName} ${card.output.standardComponentsDescription ?? ''}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  }, [standardCards, query, processFilter, onlyUnassigned, weekStart, viewMode])
 
   const stationFilter = processFilter || undefined
 
@@ -167,7 +197,7 @@ export function WorkshopPlanningView() {
     })
   }, [workshopAssignments, workerById, outputById, workItemById, processFilter, workerFilter, assignmentStatusFilter, query, weekStart])
 
-  const assigningOutput = assigningOutputId ? workshopOutputs.find((output) => output.id === assigningOutputId) ?? null : null
+  const assigningOutput = assigning ? workshopOutputs.find((output) => output.id === assigning.outputId) ?? null : null
   const detailWorker = detailWorkerId ? workshopWorkers.find((worker) => worker.id === detailWorkerId) ?? null : null
   const detailAssignments = detailWorker
     ? workshopAssignments.filter((assignment) => assignment.workerId === detailWorker.id && assignment.plannedDate === selectedDate)
@@ -273,7 +303,7 @@ export function WorkshopPlanningView() {
         query={query}
         onlyOverloads={onlyOverloads}
         onlyUnassigned={onlyUnassigned}
-        workers={workshopWorkers}
+        workers={sortedWorkshopWorkers}
         onSelectedDateChange={setSelectedDate}
         onWeekStartChange={setWeekStart}
         onProcessFilterChange={setProcessFilter}
@@ -287,7 +317,14 @@ export function WorkshopPlanningView() {
       <OutputToAssignSection
         cards={filteredOutputCards}
         assignments={workshopAssignments}
-        onAssign={(outputId) => setAssigningOutputId(outputId)}
+        onAssign={(outputId) => setAssigning({ outputId, sourceType: 'output' })}
+        onWorkItemClick={setDrawerWorkItemId}
+      />
+
+      <StandardComponentsSection
+        cards={filteredStandardCards}
+        assignments={workshopAssignments}
+        onAssign={(outputId) => setAssigning({ outputId, sourceType: 'standard_component' })}
         onWorkItemClick={setDrawerWorkItemId}
       />
 
@@ -332,7 +369,7 @@ export function WorkshopPlanningView() {
         workers={workerById}
         outputs={outputById}
         workItems={workItemById}
-        onEdit={(outputId) => setAssigningOutputId(outputId)}
+        onEdit={(outputId, sourceType = 'output') => setAssigning({ outputId, sourceType })}
         onComplete={(id) => setWorkshopAssignmentStatus(id, 'completato')}
         onSuspend={(id) => setWorkshopAssignmentStatus(id, 'sospeso')}
         onDelete={setDeleteTarget}
@@ -343,14 +380,20 @@ export function WorkshopPlanningView() {
           open={Boolean(assigningOutput)}
           output={assigningOutput}
           workItem={workItemById.get(assigningOutput.workItemId)}
-          workers={workshopWorkers}
-          assignments={workshopAssignments.filter((assignment) => assignment.workshopOutputId === assigningOutput.id)}
-          defaultDate={assigningOutput.plannedReleaseDate || workItemById.get(assigningOutput.workItemId)?.plannedProductionReleaseDate || assigningOutput.actualReleaseDate || selectedDate}
-          onClose={() => setAssigningOutputId(null)}
+          workers={sortedWorkshopWorkers}
+          assignments={workshopAssignments.filter((assignment) => (
+            assignment.workshopOutputId === assigningOutput.id &&
+            (assignment.sourceType ?? 'output') === (assigning?.sourceType ?? 'output')
+          ))}
+          sourceType={assigning?.sourceType ?? 'output'}
+          defaultDate={(assigning?.sourceType === 'standard_component'
+            ? assigningOutput.standardComponentsReadyFromDate
+            : assigningOutput.plannedReleaseDate) || workItemById.get(assigningOutput.workItemId)?.plannedProductionReleaseDate || assigningOutput.actualReleaseDate || selectedDate}
+          onClose={() => setAssigning(null)}
           onSave={(drafts) => {
-            replaceWorkshopAssignmentsForOutput(assigningOutput.id, drafts)
+            replaceWorkshopAssignmentsForOutput(assigningOutput.id, drafts, assigning?.sourceType ?? 'output')
             toast.success('Assegnazioni officina salvate.')
-            setAssigningOutputId(null)
+            setAssigning(null)
           }}
         />
       )}
@@ -365,7 +408,7 @@ export function WorkshopPlanningView() {
           onClose={() => setDetailWorkerId(null)}
           onEdit={(outputId) => {
             setDetailWorkerId(null)
-            setAssigningOutputId(outputId)
+            setAssigning({ outputId, sourceType: 'output' })
           }}
         />
       )}
@@ -548,12 +591,98 @@ function OutputAssignmentCard({
   )
 }
 
+function StandardComponentsSection({
+  cards,
+  assignments,
+  onAssign,
+  onWorkItemClick,
+}: {
+  cards: OutputCard[]
+  assignments: WorkshopAssignment[]
+  onAssign: (outputId: string) => void
+  onWorkItemClick: (workItemId: string) => void
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader title="Componenti standard producibili" subtitle={`${cards.length} output con standard anticipabili`} />
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        {cards.map((card) => (
+          <StandardComponentCard
+            key={card.output.id}
+            card={card}
+            assignments={assignments.filter((assignment) => (
+              assignment.workshopOutputId === card.output.id &&
+              assignment.sourceType === 'standard_component'
+            ))}
+            onAssign={() => onAssign(card.output.id)}
+            onWorkItemClick={() => card.workItem && onWorkItemClick(card.workItem.id)}
+          />
+        ))}
+        {cards.length === 0 && (
+          <div className="panel border-dashed border-slate-700 p-6 text-center text-sm text-slate-500 xl:col-span-2">
+            Nessun componente standard anticipabile con i filtri correnti.
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function StandardComponentCard({
+  card,
+  assignments,
+  onAssign,
+  onWorkItemClick,
+}: {
+  card: OutputCard
+  assignments: WorkshopAssignment[]
+  onAssign: () => void
+  onWorkItemClick: () => void
+}) {
+  const { output, workItem, coverage } = card
+  return (
+    <div className="panel p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+            <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-slate-300">{workItem?.code ?? 'Senza commessa'}</span>
+            <span>{workItem?.customer ?? '-'}</span>
+            <CoverageBadge status={coverage.status} />
+          </div>
+          <h3 className="mt-2 text-base font-semibold text-slate-100">{output.machineTypeCode} - {output.machineTypeName}</h3>
+          <p className="mt-1 line-clamp-2 text-sm text-slate-400">{output.standardComponentsDescription || 'Componenti standard anticipabili'}</p>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">Impatto std.</div>
+          <div className="text-2xl font-semibold tabular-nums text-emerald-100">{(output.standardComponentsImpactScore ?? 0).toFixed(1)}</div>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-400 md:grid-cols-4">
+        <Info label="Quantita" value={String(output.standardComponentsQuantity ?? 0)} />
+        <Info label="Producibile da" value={output.standardComponentsReadyFromDate || '-'} />
+        <Info label="Output" value={output.machineTypeCode} />
+        <Info label="Assegnazioni" value={String(assignments.length)} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {coverage.requiredProcesses.map((process) => (
+          <ProcessCoverageBadge key={process} process={process} status={coverage.processStatus[process]} />
+        ))}
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        {workItem && <button className="btn-ghost text-xs" onClick={onWorkItemClick}>Apri commessa</button>}
+        <button className="btn-primary text-xs" onClick={onAssign}>Assegna standard</button>
+      </div>
+    </div>
+  )
+}
+
 function AssignWorkshopOutputModal({
   open,
   output,
   workItem,
   workers,
   assignments,
+  sourceType,
   defaultDate,
   onClose,
   onSave,
@@ -563,12 +692,13 @@ function AssignWorkshopOutputModal({
   workItem?: WorkItem
   workers: WorkshopWorker[]
   assignments: WorkshopAssignment[]
+  sourceType: WorkshopAssignmentSourceType
   defaultDate: string
   onClose: () => void
   onSave: (drafts: WorkshopAssignmentDraft[]) => void
 }) {
-  const requiredProcesses = getOutputRequiredProcesses(output)
-  const [rows, setRows] = useState<AssignmentRowDraft[]>(() => initialRows(output, assignments, defaultDate))
+  const requiredProcesses = sourceType === 'standard_component' ? getStandardComponentProcesses(output) : getOutputRequiredProcesses(output)
+  const [rows, setRows] = useState<AssignmentRowDraft[]>(() => initialRows(output, assignments, defaultDate, sourceType))
 
   function updateRow<K extends keyof AssignmentRowDraft>(key: string, field: K, value: AssignmentRowDraft[K]) {
     setRows((current) => current.map((row) => row.key === key ? { ...row, [field]: value } : row))
@@ -584,8 +714,9 @@ function AssignWorkshopOutputModal({
         workItemId: output.workItemId,
         workerId: '',
         process,
+        sourceType,
         plannedDate: defaultDate || todayISO(),
-        loadPoints: estimateProcessLoadPoints(output, process),
+        loadPoints: sourceType === 'standard_component' ? estimateStandardComponentLoadPoints(output, process) : estimateProcessLoadPoints(output, process),
         status: 'pianificato',
         notes: '',
         required: false,
@@ -600,6 +731,7 @@ function AssignWorkshopOutputModal({
       workItemId: row.workItemId,
       workerId: row.workerId,
       process: row.process,
+      sourceType: row.sourceType,
       plannedDate: row.plannedDate,
       plannedWeek: row.plannedWeek,
       loadPoints: row.loadPoints,
@@ -612,7 +744,7 @@ function AssignWorkshopOutputModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Assegna output officina"
+      title={sourceType === 'standard_component' ? 'Assegna standard anticipabili' : 'Assegna output officina'}
       subtitle={`${workItem?.code ?? 'Commessa'} - ${output.machineTypeCode} ${output.machineTypeName}`}
       size="xl"
       footer={
@@ -626,12 +758,13 @@ function AssignWorkshopOutputModal({
         <div className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/35 p-3 text-sm md:grid-cols-5">
           <Info label="Cliente" value={workItem?.customer ?? '-'} />
           <Info label="Tipologia" value={`${output.machineTypeCode} - ${output.machineTypeName}`} />
-          <Info label="Impatto" value={output.impactScore.toFixed(1)} />
-          <Info label="Previsto" value={output.plannedReleaseDate || defaultDate || '-'} />
+          <Info label="Impatto" value={sourceType === 'standard_component' ? String(output.standardComponentsImpactScore ?? 0) : output.impactScore.toFixed(1)} />
+          <Info label="Previsto" value={sourceType === 'standard_component' ? (output.standardComponentsReadyFromDate || defaultDate || '-') : (output.plannedReleaseDate || defaultDate || '-')} />
           <Info label="Processi" value={String(requiredProcesses.length)} />
         </div>
         <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
           I punti carico non sono ore. Il valore suggerito distribuisce l'impactScore sui processi richiesti e resta modificabile.
+          {sourceType === 'standard_component' ? ' Questa assegnazione riguarda solo i componenti standard anticipabili.' : ''}
         </div>
         <div className="space-y-2">
           {rows.map((row) => (
@@ -665,7 +798,7 @@ function AssignmentProcessRow({
   onChange: <K extends keyof AssignmentRowDraft>(key: string, field: K, value: AssignmentRowDraft[K]) => void
 }) {
   const compatible = getAssignableWorkersForProcess(row.process, workers)
-  const activeWorkers = workers.filter((worker) => worker.active)
+  const activeWorkers = sortWorkshopWorkers(workers.filter((worker) => worker.active))
   const selectedWorker = workers.find((worker) => worker.id === row.workerId)
   const incompatible = Boolean(selectedWorker && !selectedWorker.skills.includes(row.process))
   const orderedWorkers = [
@@ -683,7 +816,9 @@ function AssignmentProcessRow({
             onChange={(event) => {
               const process = event.target.value as WorkshopAssignmentProcess
               onChange(row.key, 'process', process)
-              onChange(row.key, 'loadPoints', estimateProcessLoadPoints(output, process))
+              onChange(row.key, 'loadPoints', row.sourceType === 'standard_component'
+                ? estimateStandardComponentLoadPoints(output, process)
+                : estimateProcessLoadPoints(output, process))
             }}
           >
             {ALL_WORKSHOP_WORKER_SKILLS.map((process) => (
@@ -939,7 +1074,7 @@ function AssignmentsTable({
   workers: Map<string, WorkshopWorker>
   outputs: Map<string, WorkshopOutput>
   workItems: Map<string, WorkItem>
-  onEdit: (outputId: string) => void
+  onEdit: (outputId: string, sourceType?: WorkshopAssignmentSourceType) => void
   onComplete: (id: string) => void
   onSuspend: (id: string) => void
   onDelete: (assignment: WorkshopAssignment) => void
@@ -980,7 +1115,7 @@ function AssignmentsTable({
                     <td className="px-3 py-2.5"><StatusBadge status={assignment.status} /></td>
                     <td className="px-3 py-2.5 text-right">
                       <div className="inline-flex items-center gap-2">
-                        <button className="btn-ghost text-xs" onClick={() => onEdit(assignment.workshopOutputId)}>Modifica</button>
+                        <button className="btn-ghost text-xs" onClick={() => onEdit(assignment.workshopOutputId, assignment.sourceType ?? 'output')}>Modifica</button>
                         <button className="btn-ghost text-xs text-emerald-200" onClick={() => onComplete(assignment.id)}>Completa</button>
                         <button className="btn-ghost text-xs text-amber-200" onClick={() => onSuspend(assignment.id)}>Sospendi</button>
                         <button className="btn-ghost text-xs text-red-200" onClick={() => onDelete(assignment)}>Elimina</button>
@@ -1094,8 +1229,13 @@ function MiniBar({ percent, level }: { percent: number; level: ReturnType<typeof
   )
 }
 
-function initialRows(output: WorkshopOutput, assignments: WorkshopAssignment[], defaultDate: string): AssignmentRowDraft[] {
-  const required = getOutputRequiredProcesses(output)
+function initialRows(
+  output: WorkshopOutput,
+  assignments: WorkshopAssignment[],
+  defaultDate: string,
+  sourceType: WorkshopAssignmentSourceType,
+): AssignmentRowDraft[] {
+  const required = sourceType === 'standard_component' ? getStandardComponentProcesses(output) : getOutputRequiredProcesses(output)
   const rows: AssignmentRowDraft[] = []
   for (const process of required) {
     const existing = assignments.find((assignment) => assignment.process === process)
@@ -1105,8 +1245,9 @@ function initialRows(output: WorkshopOutput, assignments: WorkshopAssignment[], 
       workItemId: output.workItemId,
       workerId: '',
       process,
+      sourceType,
       plannedDate: defaultDate || todayISO(),
-      loadPoints: estimateProcessLoadPoints(output, process),
+      loadPoints: sourceType === 'standard_component' ? estimateStandardComponentLoadPoints(output, process) : estimateProcessLoadPoints(output, process),
       status: 'pianificato',
       notes: '',
       required: true,
@@ -1129,6 +1270,7 @@ function toDraftRow(assignment: WorkshopAssignment, required: boolean): Assignme
     workItemId: assignment.workItemId,
     workerId: assignment.workerId,
     process: assignment.process,
+    sourceType: assignment.sourceType ?? 'output',
     plannedDate: assignment.plannedDate,
     plannedWeek: assignment.plannedWeek,
     loadPoints: assignment.loadPoints,

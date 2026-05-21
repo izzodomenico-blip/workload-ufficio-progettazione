@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import type { AppData, WorkItem } from '../types'
+import { useMemo, useState } from 'react'
+import type { AppData, Status, WorkItem, WorkshopOutput } from '../types'
 import { isOpen } from '../types'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
@@ -9,6 +9,9 @@ import { StatusSelect } from './StatusSelect'
 import { HealthBadge } from './HealthBadge'
 import { formatItalianShort, isOverdue, daysUntil } from '../utils/dates'
 import { calculateExpectedProgress, getWorkItemHealth } from '../utils/progress'
+import { pendingCommercialOutputsForWorkItem, WORK_ITEM_CLOSING_STATUSES } from '../utils/commercialComponents'
+import type { CommercialClosureResolution } from '../utils/commercialComponents'
+import { CommercialComponentsConfirmModal } from './CommercialComponentsConfirmModal'
 
 interface Props {
   data: AppData
@@ -17,8 +20,13 @@ interface Props {
 }
 
 export function WorkItemsTable({ data, items, onSelect }: Props) {
-  const { setWorkItemStatus } = useData()
+  const { setWorkItemStatus, setWorkItemStatusAfterCommercialCheck } = useData()
   const toast = useToast()
+  const [commercialCheck, setCommercialCheck] = useState<{
+    item: WorkItem
+    status: Status
+    pendingOutputs: WorkshopOutput[]
+  } | null>(null)
   const personById = new Map(data.people.map((p) => [p.id, p]))
   const tasksByItem = useMemo(() => {
     const m = new Map<string, typeof data.tasks>()
@@ -30,7 +38,27 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
     return m
   }, [data.tasks])
 
+  function handleStatusChange(item: WorkItem, status: Status) {
+    const pendingOutputs = WORK_ITEM_CLOSING_STATUSES.has(status)
+      ? pendingCommercialOutputsForWorkItem(data, item.id)
+      : []
+    if (pendingOutputs.length > 0) {
+      setCommercialCheck({ item, status, pendingOutputs })
+      return
+    }
+    setWorkItemStatus(item.id, status)
+    toast.info(`${item.code || item.title}: ${status}`)
+  }
+
+  function resolveCommercialCheck(resolution: CommercialClosureResolution) {
+    if (!commercialCheck) return
+    setWorkItemStatusAfterCommercialCheck(commercialCheck.item.id, commercialCheck.status, resolution)
+    toast.info(`${commercialCheck.item.code || commercialCheck.item.title}: ${commercialCheck.status}`)
+    setCommercialCheck(null)
+  }
+
   return (
+    <>
     <div className="panel overflow-hidden">
       <div className="flex items-center justify-between border-b border-slate-800 bg-[color:var(--color-surface-1)]/60 px-4 py-2.5">
         <div>
@@ -111,7 +139,7 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
                   <td className="px-3 py-2.5">
                     <StatusSelect
                       value={w.status}
-                      onChange={(s) => { setWorkItemStatus(w.id, s); toast.info(`${w.code || w.title}: ${s}`) }}
+                      onChange={(s) => handleStatusChange(w, s)}
                     />
                   </td>
                   <td className="px-3 py-2.5 text-slate-300">{owner?.name ?? '—'}</td>
@@ -176,6 +204,14 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
         </table>
       </div>
     </div>
+    <CommercialComponentsConfirmModal
+      open={Boolean(commercialCheck)}
+      pendingOutputs={commercialCheck?.pendingOutputs ?? []}
+      targetLabel={commercialCheck ? `${commercialCheck.item.code || commercialCheck.item.title} -> ${commercialCheck.status}` : ''}
+      onCancel={() => setCommercialCheck(null)}
+      onResolve={resolveCommercialCheck}
+    />
+    </>
   )
 }
 

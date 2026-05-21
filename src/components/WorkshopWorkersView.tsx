@@ -10,6 +10,8 @@ import { useToast } from '../state/ToastProvider'
 import type { CreateWorkshopWorkerInput } from '../services/workshopWorkersService'
 import { parseWorkshopWorkersExcel } from '../utils/workshopWorkersImport'
 import type { WorkshopWorkerImportPlan } from '../utils/workshopWorkersImport'
+import { sortWorkshopWorkers } from '../utils/workshopWorkers'
+import type { WorkshopWorkerSortMode } from '../utils/workshopWorkers'
 import { Modal } from './Modal'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -54,6 +56,7 @@ export function WorkshopWorkersView() {
   const [search, setSearch] = useState('')
   const [skillFilter, setSkillFilter] = useState<SkillFilter>('tutte')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('attivi')
+  const [sortMode, setSortMode] = useState<WorkshopWorkerSortMode>('lastName')
   const [editing, setEditing] = useState<WorkshopWorker | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [toggleTarget, setToggleTarget] = useState<WorkshopWorker | null>(null)
@@ -75,7 +78,7 @@ export function WorkshopWorkersView() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return workshopWorkers.filter((worker) => {
+    const rows = workshopWorkers.filter((worker) => {
       if (statusFilter === 'attivi' && !worker.active) return false
       if (statusFilter === 'disattivati' && worker.active) return false
       if (skillFilter !== 'tutte' && !worker.skills.includes(skillFilter)) return false
@@ -94,7 +97,8 @@ export function WorkshopWorkersView() {
       ].join(' ').toLowerCase()
       return hay.includes(q)
     })
-  }, [workshopWorkers, search, skillFilter, statusFilter])
+    return sortWorkshopWorkers(rows, sortMode)
+  }, [workshopWorkers, search, skillFilter, statusFilter, sortMode])
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -165,7 +169,7 @@ export function WorkshopWorkersView() {
         <KpiCard label="Disattivati" value={counts.inactive} tone="zinc" />
       </div>
 
-      <div className="panel grid grid-cols-1 gap-2 p-3 lg:grid-cols-[1fr_220px_180px]">
+      <div className="panel grid grid-cols-1 gap-2 p-3 lg:grid-cols-[1fr_220px_180px_180px]">
         <label>
           <span className="sr-only">Cerca operaio</span>
           <input
@@ -190,6 +194,13 @@ export function WorkshopWorkersView() {
             <option value="attivi">Solo attivi</option>
             <option value="disattivati">Solo disattivati</option>
             <option value="tutti">Tutti</option>
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">Ordinamento</span>
+          <select value={sortMode} onChange={(event) => setSortMode(event.target.value as WorkshopWorkerSortMode)} className="input-base">
+            <option value="lastName">Ordina per cognome</option>
+            <option value="firstName">Ordina per nome</option>
           </select>
         </label>
       </div>

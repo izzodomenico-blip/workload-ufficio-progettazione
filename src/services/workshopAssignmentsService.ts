@@ -2,6 +2,7 @@ import type {
   AppData,
   WorkshopAssignment,
   WorkshopAssignmentProcess,
+  WorkshopAssignmentSourceType,
   WorkshopAssignmentStatus,
 } from '../types'
 import { logEntry } from '../utils/activityLog'
@@ -38,11 +39,13 @@ function sortAssignments(rows: WorkshopAssignment[]): WorkshopAssignment[] {
 
 function normalizeDraft(input: WorkshopAssignmentDraft | CreateWorkshopAssignmentInput): CreateWorkshopAssignmentInput & { plannedWeek: string } {
   const plannedDate = cleanString(input.plannedDate)
+  const sourceType: WorkshopAssignmentSourceType = input.sourceType === 'standard_component' ? 'standard_component' : 'output'
   return {
     workshopOutputId: cleanString(input.workshopOutputId),
     workItemId: cleanString(input.workItemId),
     workerId: cleanString(input.workerId),
     process: input.process,
+    sourceType,
     plannedDate,
     plannedWeek: plannedDate ? getAssignmentPlannedWeek(plannedDate) : '',
     loadPoints: cleanLoadPoints(input.loadPoints),
@@ -151,15 +154,19 @@ export function replaceWorkshopAssignmentsForOutput(
   data: AppData,
   workshopOutputId: string,
   drafts: WorkshopAssignmentDraft[],
+  sourceType: WorkshopAssignmentSourceType = 'output',
 ): AppData {
-  const existing = data.workshopAssignments.filter((assignment) => assignment.workshopOutputId === workshopOutputId)
+  const existing = data.workshopAssignments.filter((assignment) => (
+    assignment.workshopOutputId === workshopOutputId &&
+    (assignment.sourceType ?? 'output') === sourceType
+  ))
   const existingById = new Map(existing.map((assignment) => [assignment.id, assignment]))
   const at = nowISO()
   const nextForOutput = drafts
     .filter((draft) => draft.workerId && draft.plannedDate && draft.loadPoints > 0)
     .map((draft) => {
       const current = draft.id ? existingById.get(draft.id) : undefined
-      const normalized = normalizeDraft(draft)
+      const normalized = normalizeDraft({ ...draft, sourceType })
       return {
         ...normalized,
         id: current?.id ?? uid('wa'),
@@ -171,6 +178,10 @@ export function replaceWorkshopAssignmentsForOutput(
     ...data,
     workshopAssignments: sortAssignments([
       ...data.workshopAssignments.filter((assignment) => assignment.workshopOutputId !== workshopOutputId),
+      ...data.workshopAssignments.filter((assignment) => (
+        assignment.workshopOutputId === workshopOutputId &&
+        (assignment.sourceType ?? 'output') !== sourceType
+      )),
       ...nextForOutput,
     ]),
   }
@@ -181,7 +192,7 @@ export function replaceWorkshopAssignmentsForOutput(
     entityType: 'workshopAssignment',
     entityId: workshopOutputId,
     action: created > 0 ? 'created' : deleted > 0 ? 'deleted' : 'updated',
-    title: 'Assegnazioni officina salvate',
+    title: sourceType === 'standard_component' ? 'Assegnazioni standard anticipabili salvate' : 'Assegnazioni officina salvate',
     description: `${created} create - ${updated} aggiornate - ${Math.max(0, deleted)} eliminate`,
     after: { workshopOutputId, created, updated, deleted: Math.max(0, deleted) },
   })

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Absence, ActivityLogEntry, Task, WorkItem } from '../types'
+import type { Absence, ActivityLogEntry, Status, Task, WorkItem, WorkshopOutput } from '../types'
 import { isOpen } from '../types'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
@@ -16,6 +16,9 @@ import { calculateExpectedProgress, getTaskHealth } from '../utils/progress'
 import { getRecentForWorkItem } from '../utils/activityLog'
 import { HealthBadge } from './HealthBadge'
 import { WorkshopOutputsDetailSection } from './WorkshopOutputsDetailSection'
+import { pendingCommercialOutputsForWorkItem, WORK_ITEM_CLOSING_STATUSES } from '../utils/commercialComponents'
+import type { CommercialClosureResolution } from '../utils/commercialComponents'
+import { CommercialComponentsConfirmModal } from './CommercialComponentsConfirmModal'
 
 interface Props {
   workItemId: string | null
@@ -48,7 +51,7 @@ export function WorkItemDetailDrawer({ workItemId, onClose }: Props) {
 }
 
 function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void }) {
-  const { data, setWorkItemStatus, deleteWorkItem, convertStudioToCommessa } = useData()
+  const { data, setWorkItemStatus, setWorkItemStatusAfterCommercialCheck, deleteWorkItem, convertStudioToCommessa } = useData()
   const toast = useToast()
   const personById = useMemo(() => new Map(data.people.map((p) => [p.id, p])), [data.people])
   const owner = personById.get(item.ownerId)
@@ -72,6 +75,10 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [taskFormState, setTaskFormState] = useState<{ open: boolean; mode: 'create' | 'edit'; task?: Task }>({ open: false, mode: 'create' })
   const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null)
+  const [commercialCheck, setCommercialCheck] = useState<{
+    status: Status
+    pendingOutputs: WorkshopOutput[]
+  } | null>(null)
 
   const overdue = isOverdue(item.dueDate)
   const days = daysUntil(item.dueDate)
@@ -87,6 +94,25 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
     setConfirmDelete(false)
     toast.success(`Lavoro eliminato: ${item.code || item.title}`)
     onClose()
+  }
+
+  function handleStatusChange(status: Status) {
+    const pendingOutputs = WORK_ITEM_CLOSING_STATUSES.has(status)
+      ? pendingCommercialOutputsForWorkItem(data, item.id)
+      : []
+    if (pendingOutputs.length > 0) {
+      setCommercialCheck({ status, pendingOutputs })
+      return
+    }
+    setWorkItemStatus(item.id, status)
+    toast.info(`Stato: ${status}`)
+  }
+
+  function resolveCommercialCheck(resolution: CommercialClosureResolution) {
+    if (!commercialCheck) return
+    setWorkItemStatusAfterCommercialCheck(item.id, commercialCheck.status, resolution)
+    toast.info(`Stato: ${commercialCheck.status}`)
+    setCommercialCheck(null)
   }
 
   return (
@@ -117,7 +143,7 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <StatusSelect
             value={item.status}
-            onChange={(s) => { setWorkItemStatus(item.id, s); toast.info(`Stato: ${s}`) }}
+            onChange={handleStatusChange}
             size="md"
           />
           <PriorityBadge priority={item.priority} />
@@ -318,6 +344,13 @@ function DetailContent({ item, onClose }: { item: WorkItem; onClose: () => void 
         open={confirmDeleteTaskId !== null}
         taskId={confirmDeleteTaskId}
         onClose={() => setConfirmDeleteTaskId(null)}
+      />
+      <CommercialComponentsConfirmModal
+        open={Boolean(commercialCheck)}
+        pendingOutputs={commercialCheck?.pendingOutputs ?? []}
+        targetLabel={`${item.code || item.title} -> ${commercialCheck?.status ?? ''}`}
+        onCancel={() => setCommercialCheck(null)}
+        onResolve={resolveCommercialCheck}
       />
     </>
   )

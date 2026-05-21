@@ -10,6 +10,7 @@ import { useToast } from '../state/ToastProvider'
 import type { CreateMachineTypeInput } from '../services/machineTypesService'
 import { Modal } from './Modal'
 import { ConfirmDialog } from './ConfirmDialog'
+import { CoefficientsGuideReportModal } from './CoefficientsGuideReportModal'
 
 type StatusFilter = 'active' | 'inactive' | 'all'
 type ProcessKey =
@@ -92,6 +93,7 @@ export function MachineTypesLibraryView() {
   const [form, setForm] = useState<CreateMachineTypeInput>(EMPTY_FORM)
   const [modalOpen, setModalOpen] = useState(false)
   const [toggleTarget, setToggleTarget] = useState<MachineType | null>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
 
   const families = useMemo(() => {
     const set = new Set<string>([...MACHINE_TYPE_FAMILIES])
@@ -206,10 +208,15 @@ export function MachineTypesLibraryView() {
             Tipologie macchina e default indicativi usati dal Registro Disegni INNO.TEC.
           </p>
         </div>
-        <button onClick={openCreate} className="btn-primary">
-          <PlusIcon />
-          Nuova tipologia
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => setGuideOpen(true)} className="btn-ghost">
+            Guida coefficienti
+          </button>
+          <button onClick={openCreate} className="btn-primary">
+            <PlusIcon />
+            Nuova tipologia
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -349,6 +356,7 @@ export function MachineTypesLibraryView() {
         onConfirm={confirmToggle}
         onCancel={() => setToggleTarget(null)}
       />
+      <CoefficientsGuideReportModal open={guideOpen} onClose={() => setGuideOpen(false)} />
     </section>
   )
 }
