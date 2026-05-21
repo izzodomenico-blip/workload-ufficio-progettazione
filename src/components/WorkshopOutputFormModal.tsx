@@ -29,6 +29,8 @@ const EMPTY_OUTPUT: WorkshopOutputDraft = {
   requiresTubeLaser: false,
   requiresBending: true,
   requiresWelding: true,
+  requiresTurning: false,
+  requiresMilling: false,
   requiresAssembly: true,
   requiresPainting: false,
   requiresTesting: false,
@@ -36,6 +38,8 @@ const EMPTY_OUTPUT: WorkshopOutputDraft = {
   tubeLaserWeightPercent: 0,
   bendingWeightPercent: 25,
   weldingWeightPercent: 25,
+  turningWeightPercent: 0,
+  millingWeightPercent: 0,
   assemblyWeightPercent: 25,
   paintingWeightPercent: 0,
   testingWeightPercent: 0,
@@ -51,6 +55,8 @@ const PROCESS_FIELDS = [
   { key: 'requiresTubeLaser', weight: 'tubeLaserWeightPercent', label: 'Laser tubo' },
   { key: 'requiresBending', weight: 'bendingWeightPercent', label: 'Piega' },
   { key: 'requiresWelding', weight: 'weldingWeightPercent', label: 'Saldatura/carpenteria' },
+  { key: 'requiresTurning', weight: 'turningWeightPercent', label: 'Tornitura' },
+  { key: 'requiresMilling', weight: 'millingWeightPercent', label: 'Fresatura' },
   { key: 'requiresAssembly', weight: 'assemblyWeightPercent', label: 'Montaggio' },
   { key: 'requiresPainting', weight: 'paintingWeightPercent', label: 'Verniciatura/trattamento' },
   { key: 'requiresTesting', weight: 'testingWeightPercent', label: 'Collaudo' },
@@ -124,6 +130,8 @@ export function WorkshopOutputFormModal({
       requiresTubeLaser: machineType.defaultRequiresTubeLaser,
       requiresBending: machineType.defaultRequiresBending,
       requiresWelding: machineType.defaultRequiresWelding,
+      requiresTurning: machineType.defaultRequiresTurning ?? false,
+      requiresMilling: machineType.defaultRequiresMilling ?? false,
       requiresAssembly: machineType.defaultRequiresAssembly,
       requiresPainting: machineType.defaultRequiresPainting,
       requiresTesting: machineType.defaultRequiresTesting,
@@ -131,6 +139,8 @@ export function WorkshopOutputFormModal({
       tubeLaserWeightPercent: machineType.defaultTubeLaserWeightPercent,
       bendingWeightPercent: machineType.defaultBendingWeightPercent,
       weldingWeightPercent: machineType.defaultWeldingWeightPercent,
+      turningWeightPercent: machineType.defaultTurningWeightPercent ?? 0,
+      millingWeightPercent: machineType.defaultMillingWeightPercent ?? 0,
       assemblyWeightPercent: machineType.defaultAssemblyWeightPercent,
       paintingWeightPercent: machineType.defaultPaintingWeightPercent,
       testingWeightPercent: machineType.defaultTestingWeightPercent,
@@ -290,7 +300,7 @@ export function WorkshopOutputFormModal({
                           setValues((current) => recalculate({
                             ...current,
                             [process.key]: checked,
-                            [process.weight]: checked && current[process.weight] <= 0 ? 20 : current[process.weight],
+                            [process.weight]: checked && (current[process.weight] ?? 0) <= 0 ? 20 : (current[process.weight] ?? 0),
                           }, machineTypes))
                         }}
                         className="h-4 w-4 rounded border-slate-700 bg-slate-900"
@@ -303,7 +313,7 @@ export function WorkshopOutputFormModal({
                       max={100}
                       step={5}
                       disabled={!values[process.key]}
-                      value={values[process.weight]}
+                      value={values[process.weight] ?? 0}
                       onChange={(event) => set(process.weight, Number(event.target.value))}
                       className="input-base h-8 px-2 text-right text-xs disabled:opacity-45"
                       aria-label={`Incidenza ${process.label}`}
@@ -359,6 +369,8 @@ export function workshopProcessLabels(output: Pick<
   | 'requiresTubeLaser'
   | 'requiresBending'
   | 'requiresWelding'
+  | 'requiresTurning'
+  | 'requiresMilling'
   | 'requiresAssembly'
   | 'requiresPainting'
   | 'requiresTesting'
@@ -366,13 +378,15 @@ export function workshopProcessLabels(output: Pick<
   | 'tubeLaserWeightPercent'
   | 'bendingWeightPercent'
   | 'weldingWeightPercent'
+  | 'turningWeightPercent'
+  | 'millingWeightPercent'
   | 'assemblyWeightPercent'
   | 'paintingWeightPercent'
   | 'testingWeightPercent'
 >): string[] {
   return PROCESS_FIELDS
     .filter((process) => Boolean(output[process.key]))
-    .map((process) => `${process.label} ${output[process.weight]}%`)
+    .map((process) => `${process.label} ${output[process.weight] ?? 0}%`)
 }
 
 export function impactLevelClass(level: ReturnType<typeof getWorkshopImpactLevel>): string {

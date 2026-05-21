@@ -72,6 +72,18 @@ const PROCESS_FIELDS = [
     outputWeight: 'weldingWeightPercent',
   },
   {
+    machineFlag: 'defaultRequiresTurning',
+    machineWeight: 'defaultTurningWeightPercent',
+    outputFlag: 'requiresTurning',
+    outputWeight: 'turningWeightPercent',
+  },
+  {
+    machineFlag: 'defaultRequiresMilling',
+    machineWeight: 'defaultMillingWeightPercent',
+    outputFlag: 'requiresMilling',
+    outputWeight: 'millingWeightPercent',
+  },
+  {
     machineFlag: 'defaultRequiresAssembly',
     machineWeight: 'defaultAssemblyWeightPercent',
     outputFlag: 'requiresAssembly',

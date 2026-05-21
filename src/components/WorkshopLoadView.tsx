@@ -69,6 +69,8 @@ const PROCESS_BADGE: Record<WorkshopProcessKey, string> = {
   requiresTubeLaser: 'bg-cyan-500/12 text-cyan-200 ring-cyan-500/30',
   requiresBending: 'bg-indigo-500/12 text-indigo-200 ring-indigo-500/30',
   requiresWelding: 'bg-orange-500/12 text-orange-200 ring-orange-500/30',
+  requiresTurning: 'bg-teal-500/12 text-teal-200 ring-teal-500/30',
+  requiresMilling: 'bg-lime-500/12 text-lime-200 ring-lime-500/30',
   requiresAssembly: 'bg-violet-500/12 text-violet-200 ring-violet-500/30',
   requiresPainting: 'bg-emerald-500/12 text-emerald-200 ring-emerald-500/30',
   requiresTesting: 'bg-amber-500/12 text-amber-200 ring-amber-500/30',
@@ -710,7 +712,7 @@ function processWeightPercent(output: WorkshopOutput, processKey: WorkshopProces
   const process = WORKSHOP_PROCESSES.find((item) => item.key === processKey)
   if (!process) return 0
   const value = output[process.weight]
-  return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0
 }
 
 // ===== Shared bits =====

@@ -4,7 +4,7 @@ import type {
   WorkshopOutput,
   WorkshopWorker,
 } from '../types'
-import { formatISODate, parseISODate, startOfWeek } from './dates'
+import { formatISODate, isoWeekNumber, parseISODate, startOfWeek } from './dates'
 
 export const WORKSHOP_ASSIGNMENT_PROCESS_LABELS: Record<WorkshopAssignmentProcess, string> = {
   laser_piano: 'Laser piano',
@@ -62,6 +62,8 @@ export function getOutputRequiredProcesses(output: WorkshopOutput): WorkshopAssi
   if (output.requiresTubeLaser) processes.push('laser_tubo')
   if (output.requiresBending) processes.push('piegatrice')
   if (output.requiresWelding) processes.push('saldatura')
+  if (output.requiresTurning) processes.push('tornitura')
+  if (output.requiresMilling) processes.push('fresatura')
   if (output.requiresAssembly) processes.push('montaggio')
   if (output.requiresPainting) processes.push('verniciatura')
   if (output.requiresTesting) processes.push('collaudo')
@@ -88,9 +90,14 @@ export function aggregateWorkerLoadByDay(
   assignments: WorkshopAssignment[],
   workers: WorkshopWorker[],
   date: string,
+  process?: WorkshopAssignmentProcess,
 ): WorkerLoadSummary[] {
-  const byWorker = assignments.filter((assignment) => assignment.plannedDate === date && assignment.status !== 'sospeso')
-  return workers.filter((worker) => worker.active).map((worker) => {
+  const byWorker = assignments.filter((assignment) => (
+    assignment.plannedDate === date &&
+    assignment.status !== 'sospeso' &&
+    (!process || assignment.process === process)
+  ))
+  return workers.filter((worker) => worker.active && (!process || worker.skills.includes(process))).map((worker) => {
     const workerAssignments = byWorker.filter((assignment) => assignment.workerId === worker.id)
     const loadPoints = round1(workerAssignments.reduce((sum, assignment) => sum + assignment.loadPoints, 0))
     const capacityPoints = worker.dailyCapacityPoints || 100
@@ -110,11 +117,16 @@ export function aggregateWorkerLoadByWeek(
   assignments: WorkshopAssignment[],
   workers: WorkshopWorker[],
   weekStart: string,
+  process?: WorkshopAssignmentProcess,
 ): WorkerLoadSummary[] {
   const weekDays = getWeekDays(weekStart)
   const daySet = new Set(weekDays)
-  const byWorker = assignments.filter((assignment) => daySet.has(assignment.plannedDate) && assignment.status !== 'sospeso')
-  return workers.filter((worker) => worker.active).map((worker) => {
+  const byWorker = assignments.filter((assignment) => (
+    daySet.has(assignment.plannedDate) &&
+    assignment.status !== 'sospeso' &&
+    (!process || assignment.process === process)
+  ))
+  return workers.filter((worker) => worker.active && (!process || worker.skills.includes(process))).map((worker) => {
     const workerAssignments = byWorker.filter((assignment) => assignment.workerId === worker.id)
     const loadPoints = round1(workerAssignments.reduce((sum, assignment) => sum + assignment.loadPoints, 0))
     const capacityPoints = worker.weeklyCapacityPoints || 500
@@ -135,6 +147,98 @@ export function getWorkerLoadLevel(percent: number): WorkerLoadLevel {
   if (percent >= 85) return 'pieno'
   if (percent >= 60) return 'normale'
   return 'disponibile'
+}
+
+/**
+ * Indice di saturazione su scala 0–10 (10 = saturazione massima = 100% capacità).
+ * Più intuitivo della percentuale per leggere a colpo d'occhio il carico di un
+ * operaio o di una postazione. Oltre 10 = sovraccarico.
+ */
+export function saturationScore10(percent: number): number {
+  return Math.round((percent / 10) * 10) / 10
+}
+
+// === Aggregazione mensile ===
+
+export interface WorkerWeekCell {
+  weekStart: string
+  weekIso: number
+  loadPoints: number
+  capacityPoints: number
+  percent: number
+  level: WorkerLoadLevel
+}
+
+export interface WorkerMonthLoad {
+  worker: WorkshopWorker
+  weeks: WorkerWeekCell[]
+  loadPoints: number
+  capacityPoints: number
+  percent: number
+  level: WorkerLoadLevel
+}
+
+/**
+ * Restituisce le settimane (lunedì ISO) che coprono il mese contenente
+ * `monthAnchorISO` (una data qualsiasi del mese, YYYY-MM-DD).
+ */
+export function getMonthWeeks(monthAnchorISO: string): string[] {
+  const anchor = parseISODate(monthAnchorISO)
+  const year = anchor.getFullYear()
+  const month = anchor.getMonth()
+  const firstWeek = startOfWeek(new Date(year, month, 1))
+  const lastWeek = startOfWeek(new Date(year, month + 1, 0))
+  const weeks: string[] = []
+  const cursor = new Date(firstWeek)
+  while (cursor.getTime() <= lastWeek.getTime()) {
+    weeks.push(formatISODate(cursor))
+    cursor.setDate(cursor.getDate() + 7)
+  }
+  return weeks
+}
+
+export function aggregateWorkerLoadByMonth(
+  assignments: WorkshopAssignment[],
+  workers: WorkshopWorker[],
+  monthAnchorISO: string,
+  process?: WorkshopAssignmentProcess,
+): WorkerMonthLoad[] {
+  const weeks = getMonthWeeks(monthAnchorISO)
+  const active = assignments.filter((assignment) => (
+    assignment.status !== 'sospeso' &&
+    (!process || assignment.process === process)
+  ))
+  return workers.filter((worker) => worker.active && (!process || worker.skills.includes(process))).map((worker) => {
+    const weeklyCapacity = worker.weeklyCapacityPoints || 500
+    const weekCells: WorkerWeekCell[] = weeks.map((weekStart) => {
+      const daySet = new Set(getWeekDays(weekStart))
+      const loadPoints = round1(
+        active
+          .filter((assignment) => assignment.workerId === worker.id && daySet.has(assignment.plannedDate))
+          .reduce((sum, assignment) => sum + assignment.loadPoints, 0),
+      )
+      const percent = weeklyCapacity > 0 ? Math.round((loadPoints / weeklyCapacity) * 100) : 0
+      return {
+        weekStart,
+        weekIso: isoWeekNumber(parseISODate(weekStart)),
+        loadPoints,
+        capacityPoints: weeklyCapacity,
+        percent,
+        level: getWorkerLoadLevel(percent),
+      }
+    })
+    const loadPoints = round1(weekCells.reduce((sum, cell) => sum + cell.loadPoints, 0))
+    const capacityPoints = weeklyCapacity * weeks.length
+    const percent = capacityPoints > 0 ? Math.round((loadPoints / capacityPoints) * 100) : 0
+    return {
+      worker,
+      weeks: weekCells,
+      loadPoints,
+      capacityPoints,
+      percent,
+      level: getWorkerLoadLevel(percent),
+    }
+  })
 }
 
 export function getAssignmentCoverageForOutput(

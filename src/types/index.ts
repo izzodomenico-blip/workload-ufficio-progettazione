@@ -284,6 +284,11 @@ export interface MachineType {
   defaultAssemblyWeightPercent: number
   defaultPaintingWeightPercent: number
   defaultTestingWeightPercent: number
+  // Lavorazioni meccaniche (opzionali per compat dati esistenti)
+  defaultRequiresTurning?: boolean
+  defaultRequiresMilling?: boolean
+  defaultTurningWeightPercent?: number
+  defaultMillingWeightPercent?: number
   typicalAssemblyCount: number
   typicalPartCount: number
   active: boolean
@@ -336,6 +341,11 @@ export interface WorkshopOutput {
   assemblyWeightPercent: number
   paintingWeightPercent: number
   testingWeightPercent: number
+  // Lavorazioni meccaniche (opzionali per compat dati esistenti)
+  requiresTurning?: boolean
+  requiresMilling?: boolean
+  turningWeightPercent?: number
+  millingWeightPercent?: number
   plannedReleaseDate: string
   actualReleaseDate: string
   impactScore: number

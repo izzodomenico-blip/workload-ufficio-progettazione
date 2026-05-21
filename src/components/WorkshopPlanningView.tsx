@@ -21,12 +21,15 @@ import {
   WORKSHOP_ASSIGNMENT_PROCESS_LABELS,
   aggregateWorkerLoadByDay,
   aggregateWorkerLoadByWeek,
+  aggregateWorkerLoadByMonth,
   estimateProcessLoadPoints,
   getAssignableWorkersForProcess,
   getAssignmentCoverageForOutput,
+  getMonthWeeks,
   getOutputRequiredProcesses,
   getWeekDays,
   getWorkerLoadLevel,
+  saturationScore10,
 } from '../utils/workshopCapacity'
 import { formatISODate, formatItalianShort, parseISODate, startOfWeek, todayISO } from '../utils/dates'
 import { Modal } from './Modal'
@@ -35,6 +38,15 @@ import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
 
 type AssignmentStatusFilter = WorkshopAssignmentStatus | ''
 type ProcessFilter = WorkshopAssignmentProcess | ''
+type PlanningViewMode = 'daily' | 'weekly' | 'monthly'
+
+const VIEW_MODE_OPTIONS: Array<{ value: PlanningViewMode; label: string }> = [
+  { value: 'daily', label: 'Giornaliera' },
+  { value: 'weekly', label: 'Settimanale' },
+  { value: 'monthly', label: 'Mensile' },
+]
+
+const MONTH_LABELS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre']
 
 interface OutputCard {
   output: WorkshopOutput
@@ -73,8 +85,10 @@ export function WorkshopPlanningView() {
     deleteWorkshopAssignment,
   } = useData()
   const toast = useToast()
+  const [viewMode, setViewMode] = useState<PlanningViewMode>('weekly')
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const [weekStart, setWeekStart] = useState(formatISODate(startOfWeek(new Date())))
+  const [monthAnchor, setMonthAnchor] = useState(todayISO())
   const [processFilter, setProcessFilter] = useState<ProcessFilter>('')
   const [workerFilter, setWorkerFilter] = useState('')
   const [assignmentStatusFilter, setAssignmentStatusFilter] = useState<AssignmentStatusFilter>('')
@@ -113,15 +127,24 @@ export function WorkshopPlanningView() {
     })
   }, [outputCards, query, processFilter, onlyUnassigned, weekStart])
 
+  const stationFilter = processFilter || undefined
+
   const dailyLoads = useMemo(() => {
-    const rows = aggregateWorkerLoadByDay(workshopAssignments, workshopWorkers, selectedDate)
+    const rows = aggregateWorkerLoadByDay(workshopAssignments, workshopWorkers, selectedDate, stationFilter)
     return onlyOverloads ? rows.filter((row) => row.level === 'sovraccarico') : rows
-  }, [workshopAssignments, workshopWorkers, selectedDate, onlyOverloads])
+  }, [workshopAssignments, workshopWorkers, selectedDate, onlyOverloads, stationFilter])
 
   const weeklyLoads = useMemo(() => {
-    const rows = aggregateWorkerLoadByWeek(workshopAssignments, workshopWorkers, weekStart)
+    const rows = aggregateWorkerLoadByWeek(workshopAssignments, workshopWorkers, weekStart, stationFilter)
     return onlyOverloads ? rows.filter((row) => row.level === 'sovraccarico') : rows
-  }, [workshopAssignments, workshopWorkers, weekStart, onlyOverloads])
+  }, [workshopAssignments, workshopWorkers, weekStart, onlyOverloads, stationFilter])
+
+  const monthlyLoads = useMemo(() => {
+    const rows = aggregateWorkerLoadByMonth(workshopAssignments, workshopWorkers, monthAnchor, stationFilter)
+    return onlyOverloads ? rows.filter((row) => row.level === 'sovraccarico') : rows
+  }, [workshopAssignments, workshopWorkers, monthAnchor, onlyOverloads, stationFilter])
+
+  const stationLabel = stationFilter ? WORKSHOP_ASSIGNMENT_PROCESS_LABELS[stationFilter] : ''
 
   const filteredAssignments = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -161,13 +184,53 @@ export function WorkshopPlanningView() {
           <div className="section-label">Produzione</div>
           <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-100">Pianificazione officina</h2>
           <p className="mt-1 max-w-3xl text-sm text-slate-400">
-            Assegna processi degli output officina agli operai e controlla saturazione relativa per giorno e settimana.
+            Assegna processi degli output officina agli operai e controlla la saturazione relativa per giorno, settimana e mese.
           </p>
         </div>
         <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
-          I punti carico non sono ore. Sono una misura relativa per confrontare saturazione e disponibilita.
+          Saturazione su scala <strong>0–10</strong> (10 = piena). Non sono ore: è un indice relativo di carico produttivo.
         </div>
       </header>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-lg border border-slate-800 bg-[color:var(--color-surface-1)] p-0.5 text-xs">
+          {VIEW_MODE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setViewMode(option.value)}
+              aria-pressed={viewMode === option.value}
+              className={`rounded-md px-3 py-1.5 font-medium transition ${
+                viewMode === option.value ? 'bg-slate-700/80 text-slate-100 shadow-inner' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {viewMode === 'daily' && (
+          <label className="inline-flex items-center gap-2 text-xs text-slate-400">
+            Giorno
+            <input type="date" className="input-base w-auto text-xs" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+          </label>
+        )}
+        {viewMode === 'weekly' && (
+          <label className="inline-flex items-center gap-2 text-xs text-slate-400">
+            Settimana
+            <input type="date" className="input-base w-auto text-xs" value={weekStart} onChange={(event) => setWeekStart(formatISODate(startOfWeek(parseISODate(event.target.value))))} />
+          </label>
+        )}
+        {viewMode === 'monthly' && (
+          <label className="inline-flex items-center gap-2 text-xs text-slate-400">
+            Mese
+            <input
+              type="month"
+              className="input-base w-auto text-xs"
+              value={monthAnchor.slice(0, 7)}
+              onChange={(event) => setMonthAnchor(event.target.value ? `${event.target.value}-01` : todayISO())}
+            />
+          </label>
+        )}
+      </div>
 
       <FiltersPanel
         selectedDate={selectedDate}
@@ -196,21 +259,41 @@ export function WorkshopPlanningView() {
         onWorkItemClick={setDrawerWorkItemId}
       />
 
-      <DailyLoadSection
-        rows={dailyLoads}
-        date={selectedDate}
-        onWorkerClick={setDetailWorkerId}
-      />
+      {viewMode === 'daily' && (
+        <DailyLoadSection
+          rows={dailyLoads}
+          date={selectedDate}
+          stationLabel={stationLabel}
+          onWorkerClick={setDetailWorkerId}
+        />
+      )}
 
-      <WeeklyLoadSection
-        rows={weeklyLoads}
-        assignments={workshopAssignments}
-        weekStart={weekStart}
-        onDayClick={(day) => {
-          setSelectedDate(day)
-          setWeekStart(formatISODate(startOfWeek(parseISODate(day))))
-        }}
-      />
+      {viewMode === 'weekly' && (
+        <WeeklyLoadSection
+          rows={weeklyLoads}
+          assignments={workshopAssignments}
+          weekStart={weekStart}
+          stationFilter={stationFilter}
+          stationLabel={stationLabel}
+          onDayClick={(day) => {
+            setSelectedDate(day)
+            setWeekStart(formatISODate(startOfWeek(parseISODate(day))))
+            setViewMode('daily')
+          }}
+        />
+      )}
+
+      {viewMode === 'monthly' && (
+        <MonthlyLoadSection
+          rows={monthlyLoads}
+          monthAnchor={monthAnchor}
+          stationLabel={stationLabel}
+          onWeekClick={(weekStartISO) => {
+            setWeekStart(weekStartISO)
+            setViewMode('weekly')
+          }}
+        />
+      )}
 
       <AssignmentsTable
         assignments={filteredAssignments}
@@ -623,15 +706,25 @@ function AssignmentProcessRow({
 function DailyLoadSection({
   rows,
   date,
+  stationLabel,
   onWorkerClick,
 }: {
   rows: ReturnType<typeof aggregateWorkerLoadByDay>
   date: string
+  stationLabel?: string
   onWorkerClick: (workerId: string) => void
 }) {
   return (
     <section className="space-y-3">
-      <SectionHeader title="Occupazione giornaliera" subtitle={formatItalianShort(date)} />
+      <SectionHeader
+        title={stationLabel ? `Occupazione giornaliera · ${stationLabel}` : 'Occupazione giornaliera'}
+        subtitle={stationLabel ? `${formatItalianShort(date)} · solo operai con skill ${stationLabel}` : formatItalianShort(date)}
+      />
+      {rows.length === 0 && (
+        <div className="panel px-3 py-6 text-center text-[12px] text-slate-500">
+          Nessun operaio {stationLabel ? `abilitato a ${stationLabel} ` : ''}con questi filtri.
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
         {rows.map((row) => (
           <WorkerLoadBar
@@ -654,17 +747,24 @@ function WeeklyLoadSection({
   rows,
   assignments,
   weekStart,
+  stationFilter,
+  stationLabel,
   onDayClick,
 }: {
   rows: ReturnType<typeof aggregateWorkerLoadByWeek>
   assignments: WorkshopAssignment[]
   weekStart: string
+  stationFilter?: WorkshopAssignmentProcess
+  stationLabel?: string
   onDayClick: (date: string) => void
 }) {
   const days = getWeekDays(weekStart)
   return (
     <section className="space-y-3">
-      <SectionHeader title="Occupazione settimanale" subtitle={`Settimana dal ${formatItalianShort(weekStart)}`} />
+      <SectionHeader
+        title={stationLabel ? `Occupazione settimanale · ${stationLabel}` : 'Occupazione settimanale'}
+        subtitle={stationLabel ? `Settimana dal ${formatItalianShort(weekStart)} · solo skill ${stationLabel}` : `Settimana dal ${formatItalianShort(weekStart)}`}
+      />
       <div className="panel overflow-hidden">
         <div className="overflow-x-auto scroll-thin">
           <table className="w-full min-w-[980px] text-sm">
@@ -684,24 +784,103 @@ function WeeklyLoadSection({
                   </td>
                   {days.map((day) => {
                     const dayLoad = assignments
-                      .filter((assignment) => assignment.workerId === row.worker.id && assignment.plannedDate === day && assignment.status !== 'sospeso')
+                      .filter((assignment) => (
+                        assignment.workerId === row.worker.id &&
+                        assignment.plannedDate === day &&
+                        assignment.status !== 'sospeso' &&
+                        (!stationFilter || assignment.process === stationFilter)
+                      ))
                       .reduce((sum, assignment) => sum + assignment.loadPoints, 0)
                     const percent = row.worker.dailyCapacityPoints > 0 ? Math.round((dayLoad / row.worker.dailyCapacityPoints) * 100) : 0
                     const level = getWorkerLoadLevel(percent)
                     return (
                       <td key={day} className="px-3 py-2.5">
-                        <button className="w-full text-left" onClick={() => onDayClick(day)}>
+                        <button className="w-full text-left" onClick={() => onDayClick(day)} title={`${percent}%`}>
                           <MiniBar percent={percent} level={level} />
-                          <div className={`mt-1 text-[10px] tabular-nums ${LEVEL_TEXT[level]}`}>{percent}%</div>
+                          <div className={`mt-1 text-[10px] tabular-nums ${LEVEL_TEXT[level]}`}>{saturationScore10(percent).toFixed(1)}/10</div>
                         </button>
                       </td>
                     )
                   })}
                   <td className="px-3 py-2.5 text-right">
                     <div className={`font-semibold tabular-nums ${LEVEL_TEXT[row.level]}`}>
-                      {row.loadPoints} / {row.capacityPoints}
+                      {saturationScore10(row.percent).toFixed(1)}<span className="text-[10px] font-normal opacity-70">/10</span>
                     </div>
-                    <div className="text-[10px] text-slate-500">{row.percent}% sett.</div>
+                    <div className="text-[10px] text-slate-500">{row.loadPoints}/{row.capacityPoints} pt · {row.percent}%</div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function MonthlyLoadSection({
+  rows,
+  monthAnchor,
+  stationLabel,
+  onWeekClick,
+}: {
+  rows: ReturnType<typeof aggregateWorkerLoadByMonth>
+  monthAnchor: string
+  stationLabel?: string
+  onWeekClick: (weekStartISO: string) => void
+}) {
+  const weeks = getMonthWeeks(monthAnchor)
+  const anchor = parseISODate(monthAnchor)
+  const monthLabel = `${MONTH_LABELS[anchor.getMonth()]} ${anchor.getFullYear()}`
+  const title = stationLabel ? `Occupazione mensile · ${stationLabel}` : 'Occupazione mensile'
+  if (rows.length === 0) {
+    return (
+      <section className="space-y-3">
+        <SectionHeader title={title} subtitle={monthLabel} />
+        <div className="panel px-3 py-8 text-center text-[12px] text-slate-500">
+          Nessun operaio {stationLabel ? `abilitato a ${stationLabel} ` : 'attivo '}con questi filtri nel mese selezionato.
+        </div>
+      </section>
+    )
+  }
+  return (
+    <section className="space-y-3">
+      <SectionHeader title={title} subtitle={`${monthLabel} · ${weeks.length} settimane${stationLabel ? ` · solo skill ${stationLabel}` : ''}`} />
+      <div className="panel overflow-hidden">
+        <div className="overflow-x-auto scroll-thin">
+          <table className="w-full min-w-[980px] text-sm">
+            <thead className="table-head border-b border-slate-800">
+              <tr>
+                <th className="px-3 py-2.5 text-left">Operaio</th>
+                {weeks.map((weekStartISO, index) => (
+                  <th key={weekStartISO} className="px-3 py-2.5 text-left">
+                    S{rows[0]?.weeks[index]?.weekIso ?? ''}
+                    <span className="ml-1 font-normal normal-case text-slate-500">{formatItalianShort(weekStartISO)}</span>
+                  </th>
+                ))}
+                <th className="px-3 py-2.5 text-right">Totale mese</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60">
+              {rows.map((row) => (
+                <tr key={row.worker.id} className="table-row">
+                  <td className="px-3 py-2.5">
+                    <div className="font-medium text-slate-100">{row.worker.displayName}</div>
+                    <div className="mt-0.5 text-[10px] text-slate-500">{skillSummary(row.worker)}</div>
+                  </td>
+                  {row.weeks.map((cell) => (
+                    <td key={cell.weekStart} className="px-3 py-2.5">
+                      <button className="w-full text-left" onClick={() => onWeekClick(cell.weekStart)} title={`${cell.loadPoints} / ${cell.capacityPoints} punti · ${cell.percent}%`}>
+                        <MiniBar percent={cell.percent} level={cell.level} />
+                        <div className={`mt-1 text-[10px] tabular-nums ${LEVEL_TEXT[cell.level]}`}>{saturationScore10(cell.percent).toFixed(1)}/10</div>
+                      </button>
+                    </td>
+                  ))}
+                  <td className="px-3 py-2.5 text-right">
+                    <div className={`font-semibold tabular-nums ${LEVEL_TEXT[row.level]}`}>
+                      {saturationScore10(row.percent).toFixed(1)}<span className="text-[10px] font-normal opacity-70">/10</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500">{row.loadPoints}/{row.capacityPoints} pt · {row.percent}% mese</div>
                   </td>
                 </tr>
               ))}
@@ -860,8 +1039,10 @@ function WorkerLoadBar({
           <div className="mt-0.5 truncate text-[10px] text-slate-500">{skillSummary(worker)}</div>
         </div>
         <div className="text-right">
-          <div className="text-sm font-semibold tabular-nums text-slate-100">{loadPoints} / {capacityPoints}</div>
-          <div className={`text-[10px] ${LEVEL_TEXT[level]}`}>{percent}% - {level}</div>
+          <div className={`text-lg font-semibold leading-none tabular-nums ${LEVEL_TEXT[level]}`}>
+            {saturationScore10(percent).toFixed(1)}<span className="text-xs font-normal opacity-70">/10</span>
+          </div>
+          <div className="mt-0.5 text-[10px] text-slate-500">{percent}% · {loadPoints}/{capacityPoints} pt · {level}</div>
         </div>
       </div>
       <div className="mt-3">

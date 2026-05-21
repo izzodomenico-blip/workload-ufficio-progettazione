@@ -256,6 +256,17 @@ textarea:focus-visible,
     visibility: visible !important;
   }
 
+  /* L'overlay che avvolge il report (fixed + overflow-y:auto) ritaglierebbe il
+     contenuto piu alto della finestra durante la stampa, producendo un PDF
+     vuoto/incompleto. In stampa lo rendiamo statico e senza clipping cosi il
+     report puo distribuirsi su piu pagine. */
+  .report-print-root {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
   .report-print-area {
     position: absolute !important;
     left: 0 !important;
@@ -269,6 +280,7 @@ textarea:focus-visible,
     box-shadow: none !important;
     border: 0 !important;
     border-radius: 0 !important;
+    overflow: visible !important;
   }
 
   .print-keep {

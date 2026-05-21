@@ -10,6 +10,8 @@ const PROCESS_FIELDS = [
   { flag: 'defaultRequiresTubeLaser', weight: 'defaultTubeLaserWeightPercent', label: 'tubeLaser' },
   { flag: 'defaultRequiresBending', weight: 'defaultBendingWeightPercent', label: 'bending' },
   { flag: 'defaultRequiresWelding', weight: 'defaultWeldingWeightPercent', label: 'welding' },
+  { flag: 'defaultRequiresTurning', weight: 'defaultTurningWeightPercent', label: 'turning' },
+  { flag: 'defaultRequiresMilling', weight: 'defaultMillingWeightPercent', label: 'milling' },
   { flag: 'defaultRequiresAssembly', weight: 'defaultAssemblyWeightPercent', label: 'assembly' },
   { flag: 'defaultRequiresPainting', weight: 'defaultPaintingWeightPercent', label: 'painting' },
   { flag: 'defaultRequiresTesting', weight: 'defaultTestingWeightPercent', label: 'testing' },
@@ -56,6 +58,8 @@ function cleanProcessWeights(input: CreateMachineTypeInput) {
     | 'defaultTubeLaserWeightPercent'
     | 'defaultBendingWeightPercent'
     | 'defaultWeldingWeightPercent'
+    | 'defaultTurningWeightPercent'
+    | 'defaultMillingWeightPercent'
     | 'defaultAssemblyWeightPercent'
     | 'defaultPaintingWeightPercent'
     | 'defaultTestingWeightPercent'

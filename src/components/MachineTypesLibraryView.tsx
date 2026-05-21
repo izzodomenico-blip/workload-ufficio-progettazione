@@ -17,6 +17,8 @@ type ProcessKey =
   | 'defaultRequiresTubeLaser'
   | 'defaultRequiresBending'
   | 'defaultRequiresWelding'
+  | 'defaultRequiresTurning'
+  | 'defaultRequiresMilling'
   | 'defaultRequiresAssembly'
   | 'defaultRequiresPainting'
   | 'defaultRequiresTesting'
@@ -25,6 +27,8 @@ type ProcessWeightKey =
   | 'defaultTubeLaserWeightPercent'
   | 'defaultBendingWeightPercent'
   | 'defaultWeldingWeightPercent'
+  | 'defaultTurningWeightPercent'
+  | 'defaultMillingWeightPercent'
   | 'defaultAssemblyWeightPercent'
   | 'defaultPaintingWeightPercent'
   | 'defaultTestingWeightPercent'
@@ -35,6 +39,8 @@ const PROCESS_FIELDS: Array<{ key: ProcessKey; weight: ProcessWeightKey; label: 
   { key: 'defaultRequiresTubeLaser', weight: 'defaultTubeLaserWeightPercent', label: 'Laser tubo' },
   { key: 'defaultRequiresBending', weight: 'defaultBendingWeightPercent', label: 'Piegatura' },
   { key: 'defaultRequiresWelding', weight: 'defaultWeldingWeightPercent', label: 'Saldatura' },
+  { key: 'defaultRequiresTurning', weight: 'defaultTurningWeightPercent', label: 'Tornitura' },
+  { key: 'defaultRequiresMilling', weight: 'defaultMillingWeightPercent', label: 'Fresatura' },
   { key: 'defaultRequiresAssembly', weight: 'defaultAssemblyWeightPercent', label: 'Montaggio' },
   { key: 'defaultRequiresPainting', weight: 'defaultPaintingWeightPercent', label: 'Verniciatura' },
   { key: 'defaultRequiresTesting', weight: 'defaultTestingWeightPercent', label: 'Collaudo' },
@@ -51,6 +57,8 @@ const EMPTY_FORM: CreateMachineTypeInput = {
   defaultRequiresTubeLaser: false,
   defaultRequiresBending: true,
   defaultRequiresWelding: true,
+  defaultRequiresTurning: false,
+  defaultRequiresMilling: false,
   defaultRequiresAssembly: true,
   defaultRequiresPainting: false,
   defaultRequiresTesting: false,
@@ -58,6 +66,8 @@ const EMPTY_FORM: CreateMachineTypeInput = {
   defaultTubeLaserWeightPercent: 0,
   defaultBendingWeightPercent: 25,
   defaultWeldingWeightPercent: 25,
+  defaultTurningWeightPercent: 0,
+  defaultMillingWeightPercent: 0,
   defaultAssemblyWeightPercent: 25,
   defaultPaintingWeightPercent: 0,
   defaultTestingWeightPercent: 0,
@@ -475,7 +485,7 @@ function MachineTypeModal({
                     onChange={(event) => {
                       const checked = event.target.checked
                       onFieldChange(process.key, checked)
-                      if (checked && form[process.weight] <= 0) onFieldChange(process.weight, 20)
+                      if (checked && (form[process.weight] ?? 0) <= 0) onFieldChange(process.weight, 20)
                     }}
                     className="h-4 w-4 rounded border-slate-700 bg-slate-900"
                   />
@@ -487,7 +497,7 @@ function MachineTypeModal({
                   max={100}
                   step={5}
                   disabled={!form[process.key]}
-                  value={form[process.weight]}
+                  value={form[process.weight] ?? 0}
                   onChange={onNumberField(process.weight)}
                   className="input-base h-8 px-2 text-right text-xs disabled:opacity-45"
                   aria-label={`Incidenza ${process.label}`}
@@ -573,6 +583,8 @@ function normalizeFormProcessWeights(form: CreateMachineTypeInput): Pick<
   | 'defaultTubeLaserWeightPercent'
   | 'defaultBendingWeightPercent'
   | 'defaultWeldingWeightPercent'
+  | 'defaultTurningWeightPercent'
+  | 'defaultMillingWeightPercent'
   | 'defaultAssemblyWeightPercent'
   | 'defaultPaintingWeightPercent'
   | 'defaultTestingWeightPercent'
@@ -590,14 +602,16 @@ function normalizeFormProcessWeights(form: CreateMachineTypeInput): Pick<
     | 'defaultTubeLaserWeightPercent'
     | 'defaultBendingWeightPercent'
     | 'defaultWeldingWeightPercent'
+    | 'defaultTurningWeightPercent'
+    | 'defaultMillingWeightPercent'
     | 'defaultAssemblyWeightPercent'
     | 'defaultPaintingWeightPercent'
     | 'defaultTestingWeightPercent'
   >
 }
 
-function clampPercent(value: number, fallback = 0): number {
-  if (!Number.isFinite(value)) return fallback
+function clampPercent(value: number | undefined, fallback = 0): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
   return Math.max(0, Math.min(100, Math.round(value)))
 }
 

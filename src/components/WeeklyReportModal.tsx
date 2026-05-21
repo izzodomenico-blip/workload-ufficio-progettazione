@@ -78,7 +78,7 @@ export function WeeklyReportModal({ open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto"
+      className="report-print-root fixed inset-0 z-50 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="Anteprima report settimanale"

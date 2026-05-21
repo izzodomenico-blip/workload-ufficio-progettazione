@@ -97,7 +97,7 @@ export function WorkshopReportModal({ open, onClose, filters }: Props) {
   const flowHidden = report.flowTotalCount - flowVisible.length
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-label="Anteprima report flusso officina">
+    <div className="report-print-root fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-label="Anteprima report flusso officina">
       <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm print:hidden" onClick={onClose} aria-hidden />
 
       <div className="relative z-20 mx-auto flex max-w-[230mm] items-center justify-between gap-3 px-4 pt-4 print:hidden">

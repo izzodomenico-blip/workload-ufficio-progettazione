@@ -12,6 +12,8 @@ type WorkshopImpactInput = Pick<
   | 'requiresTubeLaser'
   | 'requiresBending'
   | 'requiresWelding'
+  | 'requiresTurning'
+  | 'requiresMilling'
   | 'requiresAssembly'
   | 'requiresPainting'
   | 'requiresTesting'
@@ -19,6 +21,8 @@ type WorkshopImpactInput = Pick<
   | 'tubeLaserWeightPercent'
   | 'bendingWeightPercent'
   | 'weldingWeightPercent'
+  | 'turningWeightPercent'
+  | 'millingWeightPercent'
   | 'assemblyWeightPercent'
   | 'paintingWeightPercent'
   | 'testingWeightPercent'
@@ -36,6 +40,8 @@ const PROCESS_FACTORS = [
   { flag: 'requiresTubeLaser', weight: 'tubeLaserWeightPercent', coefficient: 0.25 },
   { flag: 'requiresBending', weight: 'bendingWeightPercent', coefficient: 0.15 },
   { flag: 'requiresWelding', weight: 'weldingWeightPercent', coefficient: 0.30 },
+  { flag: 'requiresTurning', weight: 'turningWeightPercent', coefficient: 0.20 },
+  { flag: 'requiresMilling', weight: 'millingWeightPercent', coefficient: 0.20 },
   { flag: 'requiresAssembly', weight: 'assemblyWeightPercent', coefficient: 0.25 },
   { flag: 'requiresPainting', weight: 'paintingWeightPercent', coefficient: 0.10 },
   { flag: 'requiresTesting', weight: 'testingWeightPercent', coefficient: 0.10 },
@@ -59,8 +65,8 @@ export function calculateWorkshopImpact(
   return Math.round(base * complexityFactor * processFactor * assemblyFactor * partFactor * 10) / 10
 }
 
-function normalizePercent(value: number): number {
-  if (!Number.isFinite(value)) return 100
+function normalizePercent(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 100
   return Math.max(0, Math.min(100, value))
 }
 

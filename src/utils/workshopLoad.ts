@@ -23,6 +23,8 @@ export type WorkshopProcessKey =
   | 'requiresTubeLaser'
   | 'requiresBending'
   | 'requiresWelding'
+  | 'requiresTurning'
+  | 'requiresMilling'
   | 'requiresAssembly'
   | 'requiresPainting'
   | 'requiresTesting'
@@ -31,6 +33,8 @@ export type WorkshopProcessWeightKey =
   | 'tubeLaserWeightPercent'
   | 'bendingWeightPercent'
   | 'weldingWeightPercent'
+  | 'turningWeightPercent'
+  | 'millingWeightPercent'
   | 'assemblyWeightPercent'
   | 'paintingWeightPercent'
   | 'testingWeightPercent'
@@ -40,6 +44,8 @@ export const WORKSHOP_PROCESSES: Array<{ key: WorkshopProcessKey; weight: Worksh
   { key: 'requiresTubeLaser', weight: 'tubeLaserWeightPercent', label: 'Laser tubo', short: 'Tubo' },
   { key: 'requiresBending', weight: 'bendingWeightPercent', label: 'Piega', short: 'Piega' },
   { key: 'requiresWelding', weight: 'weldingWeightPercent', label: 'Saldatura', short: 'Saldat.' },
+  { key: 'requiresTurning', weight: 'turningWeightPercent', label: 'Tornitura', short: 'Torn.' },
+  { key: 'requiresMilling', weight: 'millingWeightPercent', label: 'Fresatura', short: 'Fres.' },
   { key: 'requiresAssembly', weight: 'assemblyWeightPercent', label: 'Montaggio', short: 'Mont.' },
   { key: 'requiresPainting', weight: 'paintingWeightPercent', label: 'Verniciatura', short: 'Vern.' },
   { key: 'requiresTesting', weight: 'testingWeightPercent', label: 'Collaudo', short: 'Coll.' },
@@ -375,7 +381,8 @@ export function buildProcessLoad(items: WorkshopFlowItem[]): WorkshopProcessLoad
 
 export function processImpact(output: WorkshopOutput, process: { key: WorkshopProcessKey; weight: WorkshopProcessWeightKey }): number {
   if (!output[process.key]) return 0
-  const weight = Number.isFinite(output[process.weight]) ? output[process.weight] : 100
+  const rawWeight = output[process.weight]
+  const weight = typeof rawWeight === 'number' && Number.isFinite(rawWeight) ? rawWeight : 100
   return output.impactScore * Math.max(0, Math.min(100, weight)) / 100
 }
 
