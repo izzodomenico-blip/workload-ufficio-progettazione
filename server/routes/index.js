@@ -3,9 +3,11 @@ import {
   deleteEntity,
   getAppData,
   getCollection,
+  getConsuntiviConfig,
   getDataRevision,
   getLastMutationAt,
   saveAppData,
+  saveConsuntiviConfig,
   upsertEntity,
 } from '../db.js'
 import { EMPTY_APP_DATA, normalizeAppData } from '../services/appData.js'
@@ -26,6 +28,7 @@ import {
   setAdminPassword,
   verifyAdminPassword,
 } from '../services/adminAuth.js'
+import { DEFAULT_CONSUNTIVI_CONFIG, normalizeConsuntiviConfig } from '../services/consuntiviConfig.js'
 
 const ADMIN_PASSWORD_HEADER = 'x-workload-admin-password'
 const DATA_REVISION_HEADER = 'x-workload-data-revision'
@@ -44,6 +47,8 @@ const APP_DATA_COLLECTIONS = [
   'workshopWorkers',
   'workshopAssignments',
   'calculatedStandardComponents',
+  'consuntivi',
+  'tubeProfiles',
 ]
 const PRESERVE_IF_EMPTY_COLLECTIONS = new Set(['businessPartners', 'machineTypes', 'workshopOutputs', 'workshopWorkers', 'workshopAssignments'])
 
@@ -240,6 +245,43 @@ export function createApiRouter() {
   registerCollectionRoutes(router, {
     apiName: 'workshop-assignments',
     collection: 'workshopAssignments',
+  })
+  registerCollectionRoutes(router, {
+    apiName: 'consuntivi',
+    collection: 'consuntivi',
+  })
+  registerCollectionRoutes(router, {
+    apiName: 'tube-profiles',
+    collection: 'tubeProfiles',
+  })
+
+  // Config prezzi: densità pubblica (serve al calcolo kg lato operaio), prezzi protetti.
+  router.get('/consuntivi-settings', (_req, res) => {
+    const cfg = getConsuntiviConfig() ?? DEFAULT_CONSUNTIVI_CONFIG
+    res.set('cache-control', 'no-store')
+    res.json({ densityFactorPerMaterial: cfg.densityFactorPerMaterial })
+  })
+
+  router.get('/consuntivi-pricing', (req, res, next) => {
+    try {
+      requireAdminPassword(req)
+      res.set('cache-control', 'no-store')
+      res.json(getConsuntiviConfig() ?? DEFAULT_CONSUNTIVI_CONFIG)
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
+  })
+
+  router.put('/consuntivi-pricing', (req, res, next) => {
+    try {
+      requireAdminPassword(req)
+      const cfg = normalizeConsuntiviConfig(req.body)
+      saveConsuntiviConfig(cfg)
+      scheduleAutoBackup('consuntivi-pricing-updated')
+      res.json(cfg)
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
   })
 
   router.put('/business-partners/:id/activate', (req, res, next) => {
@@ -521,6 +563,16 @@ function machineTypeProcessKey(machineType) {
     machineType.defaultRequiresPainting ? `painting:${machineType.defaultPaintingWeightPercent}%` : '',
     machineType.defaultRequiresTesting ? `testing:${machineType.defaultTestingWeightPercent}%` : '',
   ].filter(Boolean).join(',')
+}
+
+function requireAdminPassword(req) {
+  const provided = req.get(ADMIN_PASSWORD_HEADER)
+  if (!verifyAdminPassword(provided)) {
+    const err = new Error('Configurazione prezzi protetta: password admin richiesta o errata.')
+    err.statusCode = 403
+    err.detail = 'consuntivi-pricing-protected'
+    throw err
+  }
 }
 
 function peopleBaselineGuard({ req, current, incoming }) {

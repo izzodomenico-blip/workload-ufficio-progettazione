@@ -164,5 +164,7 @@ export function freshSeedData() {
     workshopWorkers: [],
     workshopAssignments: [],
     calculatedStandardComponents: [],
+    consuntivi: [],
+    tubeProfiles: [],
   }
 }

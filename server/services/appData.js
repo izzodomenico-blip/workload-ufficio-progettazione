@@ -55,6 +55,9 @@ const VALID_WORKSHOP_ASSIGNMENT_STATUSES = new Set([
   'completato',
   'sospeso',
 ])
+const VALID_CONSUNTIVO_MATERIALS = new Set(['ferro', 'inox', 'zincato', 'corten'])
+const VALID_CONSUNTIVO_GAS = new Set(['ossigeno', 'azoto'])
+const VALID_TUBE_CATEGORIES = new Set(['tubolari', 'tubi'])
 
 const DEFAULT_MACHINE_TYPES_BY_CODE = new Map(
   getDefaultMachineTypes().map((item) => [item.code.toUpperCase(), item]),
@@ -152,6 +155,8 @@ export const EMPTY_APP_DATA = {
   workshopWorkers: [],
   workshopAssignments: [],
   calculatedStandardComponents: [],
+  consuntivi: [],
+  tubeProfiles: [],
 }
 
 const VALID_STANDARD_COMPONENTS_MODES = new Set(['manual', 'calculated', 'mixed'])
@@ -213,6 +218,12 @@ export function normalizeAppData(input) {
   if (root.calculatedStandardComponents !== undefined && !Array.isArray(root.calculatedStandardComponents)) {
     throw new Error('calculatedStandardComponents deve essere un array oppure assente.')
   }
+  if (root.consuntivi !== undefined && !Array.isArray(root.consuntivi)) {
+    throw new Error('consuntivi deve essere un array oppure assente.')
+  }
+  if (root.tubeProfiles !== undefined && !Array.isArray(root.tubeProfiles)) {
+    throw new Error('tubeProfiles deve essere un array oppure assente.')
+  }
 
   return {
     people: root.people.map((item, index) => normalizePerson(item, index)),
@@ -227,6 +238,8 @@ export function normalizeAppData(input) {
     workshopWorkers: (root.workshopWorkers ?? []).map(normalizeWorkshopWorker).filter(Boolean),
     workshopAssignments: (root.workshopAssignments ?? []).map(normalizeWorkshopAssignment).filter(Boolean),
     calculatedStandardComponents: (root.calculatedStandardComponents ?? []).map(normalizeCalculatedStandardComponent).filter(Boolean),
+    consuntivi: (root.consuntivi ?? []).map(normalizeConsuntivo).filter(Boolean),
+    tubeProfiles: (root.tubeProfiles ?? []).map(normalizeTubeProfile).filter(Boolean),
   }
 }
 
@@ -244,6 +257,8 @@ export function countAppData(data) {
     workshopWorkers: data.workshopWorkers.length,
     workshopAssignments: data.workshopAssignments.length,
     calculatedStandardComponents: (data.calculatedStandardComponents ?? []).length,
+    consuntivi: (data.consuntivi ?? []).length,
+    tubeProfiles: (data.tubeProfiles ?? []).length,
   }
 }
 
@@ -588,6 +603,90 @@ function normalizeCalculatedStandardComponent(item) {
     impactScore: isNumber(o.impactScore) ? Math.max(0, Math.round(o.impactScore * 10) / 10) : 0,
     notes: isString(o.notes) ? o.notes : '',
     source,
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
+function normalizeConsuntivoMaterial(value) {
+  return VALID_CONSUNTIVO_MATERIALS.has(value) ? value : 'ferro'
+}
+
+function normalizeLaserCutRow(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id)) return null
+  return {
+    id: o.id,
+    lunghezzaMm: numberOrZero(o.lunghezzaMm),
+    larghezzaMm: numberOrZero(o.larghezzaMm),
+    spessoreMm: numberOrZero(o.spessoreMm),
+    materiale: normalizeConsuntivoMaterial(o.materiale),
+    tempoMin: numberOrZero(o.tempoMin),
+    gas: VALID_CONSUNTIVO_GAS.has(o.gas) ? o.gas : 'ossigeno',
+  }
+}
+
+function normalizeTubeLaserRow(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id)) return null
+  return {
+    id: o.id,
+    categoria: VALID_TUBE_CATEGORIES.has(o.categoria) ? o.categoria : 'tubolari',
+    profileId: isString(o.profileId) ? o.profileId : '',
+    profileLabel: isString(o.profileLabel) ? o.profileLabel : '',
+    kgPerMeter: numberOrZero(o.kgPerMeter),
+    materiale: normalizeConsuntivoMaterial(o.materiale),
+    lunghezzaMm: numberOrZero(o.lunghezzaMm),
+    nPezzi: nonNegativeInteger(o.nPezzi, 0),
+    tempoMin: numberOrZero(o.tempoMin),
+  }
+}
+
+function normalizeWeldingRow(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id)) return null
+  return { id: o.id, people: nonNegativeInteger(o.people, 0), hours: numberOrZero(o.hours) }
+}
+
+function normalizeBendingRow(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id)) return null
+  return { id: o.id, hours: numberOrZero(o.hours) }
+}
+
+function normalizeConsuntivo(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id) || !isNonEmptyString(o.workItemId)) return null
+  const now = new Date().toISOString()
+  return {
+    id: o.id,
+    workItemId: o.workItemId,
+    workItemCode: isString(o.workItemCode) ? o.workItemCode : '',
+    workItemTitle: isString(o.workItemTitle) ? o.workItemTitle : '',
+    customer: isString(o.customer) ? o.customer : '',
+    date: isNonEmptyString(o.date) ? o.date : now.slice(0, 10),
+    operatorName: isString(o.operatorName) ? o.operatorName : '',
+    laserRows: Array.isArray(o.laserRows) ? o.laserRows.map(normalizeLaserCutRow).filter(Boolean) : [],
+    tubeRows: Array.isArray(o.tubeRows) ? o.tubeRows.map(normalizeTubeLaserRow).filter(Boolean) : [],
+    weldingRows: Array.isArray(o.weldingRows) ? o.weldingRows.map(normalizeWeldingRow).filter(Boolean) : [],
+    bendingRows: Array.isArray(o.bendingRows) ? o.bendingRows.map(normalizeBendingRow).filter(Boolean) : [],
+    notes: isString(o.notes) ? o.notes : '',
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
+function normalizeTubeProfile(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id) || !isNonEmptyString(o.label)) return null
+  const now = new Date().toISOString()
+  return {
+    id: o.id,
+    categoria: VALID_TUBE_CATEGORIES.has(o.categoria) ? o.categoria : 'tubolari',
+    label: o.label.trim(),
+    kgPerMeter: numberOrZero(o.kgPerMeter),
+    active: typeof o.active === 'boolean' ? o.active : true,
+    notes: isString(o.notes) ? o.notes : '',
     createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
     updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
   }
