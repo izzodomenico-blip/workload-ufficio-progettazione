@@ -1,4 +1,4 @@
-import type { AppData, MachineType } from '../types'
+import type { AppData, ConsuntiviPricingConfig, ConsuntivoMaterial, MachineType } from '../types'
 
 export interface SaveAppDataOptions {
   risky?: boolean
@@ -242,6 +242,8 @@ function withAppDataDefaults(data: Partial<AppData>): AppData {
     workshopWorkers: Array.isArray(data.workshopWorkers) ? data.workshopWorkers : [],
     workshopAssignments: Array.isArray(data.workshopAssignments) ? data.workshopAssignments : [],
     calculatedStandardComponents: Array.isArray(data.calculatedStandardComponents) ? data.calculatedStandardComponents : [],
+    consuntivi: Array.isArray(data.consuntivi) ? data.consuntivi : [],
+    tubeProfiles: Array.isArray(data.tubeProfiles) ? data.tubeProfiles : [],
   }
 }
 
@@ -249,4 +251,26 @@ function readDataRevision(response: Response): number {
   const raw = response.headers.get('x-workload-data-revision')
   const value = raw ? Number(raw) : 0
   return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0
+}
+
+export interface ConsuntiviSettings {
+  densityFactorPerMaterial: Record<ConsuntivoMaterial, number>
+}
+
+export function fetchConsuntiviSettings(): Promise<ConsuntiviSettings> {
+  return request<ConsuntiviSettings>('/api/consuntivi-settings')
+}
+
+export function fetchConsuntiviPricing(password: string): Promise<ConsuntiviPricingConfig> {
+  return request<ConsuntiviPricingConfig>('/api/consuntivi-pricing', {
+    headers: { 'x-workload-admin-password': password },
+  })
+}
+
+export function saveConsuntiviPricing(config: ConsuntiviPricingConfig, password: string): Promise<ConsuntiviPricingConfig> {
+  return request<ConsuntiviPricingConfig>('/api/consuntivi-pricing', {
+    method: 'PUT',
+    headers: { 'x-workload-admin-password': password },
+    body: JSON.stringify(config),
+  })
 }

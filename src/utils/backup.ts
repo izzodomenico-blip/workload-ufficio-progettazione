@@ -123,6 +123,8 @@ export interface BackupCounts {
   workshopWorkers: number
   workshopAssignments: number
   calculatedStandardComponents: number
+  consuntivi: number
+  tubeProfiles: number
 }
 
 export interface BackupInfo {
@@ -193,6 +195,8 @@ export function createBackupPayload(data: AppData, exportedAt: Date = new Date()
     workshopWorkers: data.workshopWorkers ?? [],
     workshopAssignments: data.workshopAssignments ?? [],
     calculatedStandardComponents: data.calculatedStandardComponents ?? [],
+    consuntivi: data.consuntivi ?? [],
+    tubeProfiles: data.tubeProfiles ?? [],
   }
 
   return {
@@ -239,6 +243,8 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   const rawWorkshopWorkers = root.workshopWorkers
   const rawWorkshopAssignments = root.workshopAssignments
   const rawCalculatedStandardComponents = root.calculatedStandardComponents
+  const rawConsuntivi = root.consuntivi
+  const rawTubeProfiles = root.tubeProfiles
 
   if (!Array.isArray(rawPeople)) issues.push('people deve essere un array.')
   if (!Array.isArray(rawWorkItems)) issues.push('workItems deve essere un array.')
@@ -369,6 +375,8 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
     workshopWorkers,
     workshopAssignments,
     calculatedStandardComponents,
+    consuntivi: Array.isArray(rawConsuntivi) ? rawConsuntivi : [],
+    tubeProfiles: Array.isArray(rawTubeProfiles) ? rawTubeProfiles : [],
   } as AppData
   const summary = {
     source: source.kind,
@@ -843,7 +851,7 @@ function normalizeNotification(value: unknown): Notification | null {
   } as Notification
 }
 
-function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners' | 'machineTypes' | 'workshopOutputs' | 'workshopWorkers' | 'workshopAssignments' | 'calculatedStandardComponents'>): BackupCounts {
+function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners' | 'machineTypes' | 'workshopOutputs' | 'workshopWorkers' | 'workshopAssignments' | 'calculatedStandardComponents' | 'consuntivi' | 'tubeProfiles'>): BackupCounts {
   return {
     people: data.people.length,
     workItems: data.workItems.length,
@@ -857,6 +865,8 @@ function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'ab
     workshopWorkers: data.workshopWorkers.length,
     workshopAssignments: data.workshopAssignments.length,
     calculatedStandardComponents: (data.calculatedStandardComponents ?? []).length,
+    consuntivi: (data.consuntivi ?? []).length,
+    tubeProfiles: (data.tubeProfiles ?? []).length,
   }
 }
 

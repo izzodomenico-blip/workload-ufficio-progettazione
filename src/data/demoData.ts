@@ -453,6 +453,8 @@ export const demoData: AppData = {
   workshopWorkers: [],
   workshopAssignments: [],
   calculatedStandardComponents: [],
+  consuntivi: [],
+  tubeProfiles: [],
 }
 
 export function freshDemoData(): AppData {
