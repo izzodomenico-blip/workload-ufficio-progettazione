@@ -29,6 +29,8 @@ const TABLES = {
   workshopWorkers: 'workshop_workers',
   workshopAssignments: 'workshop_assignments',
   calculatedStandardComponents: 'calculated_standard_components',
+  consuntivi: 'consuntivi',
+  tubeProfiles: 'tube_profiles',
 }
 
 let dbInstance = null
@@ -82,6 +84,8 @@ export function getAppData(db = getDb()) {
     workshopWorkers: readJsonRows(db, TABLES.workshopWorkers, 'display_name COLLATE NOCASE ASC'),
     workshopAssignments: readJsonRows(db, TABLES.workshopAssignments, 'planned_date ASC, rowid ASC'),
     calculatedStandardComponents: readJsonRows(db, TABLES.calculatedStandardComponents, 'rowid ASC'),
+    consuntivi: readJsonRows(db, TABLES.consuntivi, 'date DESC, rowid ASC'),
+    tubeProfiles: readJsonRows(db, TABLES.tubeProfiles, 'label COLLATE NOCASE ASC'),
   })
 }
 
@@ -113,6 +117,8 @@ export function saveAppData(data, db = getDb()) {
     replaceWorkshopWorkers(db, safeData.workshopWorkers, now)
     replaceWorkshopAssignments(db, safeData.workshopAssignments, now)
     replaceCalculatedStandardComponents(db, safeData.calculatedStandardComponents ?? [], now)
+    replaceConsuntivi(db, safeData.consuntivi ?? [], now)
+    replaceTubeProfiles(db, safeData.tubeProfiles ?? [], now)
     bumpDataRevision(db, now)
     db.exec('COMMIT;')
   } catch (error) {
@@ -203,6 +209,23 @@ export function getDataRevision(db = getDb()) {
 export function getLastMutationAt(db = getDb()) {
   const row = db.prepare('SELECT value FROM meta WHERE key = ?').get('lastMutationAt')
   return typeof row?.value === 'string' ? row.value : null
+}
+
+const CONSUNTIVI_CONFIG_KEY = 'consuntiviConfig'
+
+export function getConsuntiviConfig(db = getDb()) {
+  const row = db.prepare('SELECT value FROM meta WHERE key = ?').get(CONSUNTIVI_CONFIG_KEY)
+  if (!row || typeof row.value !== 'string') return null
+  try {
+    return JSON.parse(row.value)
+  } catch {
+    return null
+  }
+}
+
+export function saveConsuntiviConfig(config, db = getDb()) {
+  db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run(CONSUNTIVI_CONFIG_KEY, JSON.stringify(config))
+  return config
 }
 
 function bumpDataRevision(db, now) {
@@ -385,6 +408,22 @@ function replaceCalculatedStandardComponents(db, rows, now) {
       JSON.stringify(row),
       now,
     )
+  }
+}
+
+function replaceConsuntivi(db, rows, now) {
+  db.prepare('DELETE FROM consuntivi').run()
+  const insert = db.prepare('INSERT INTO consuntivi (id, work_item_id, date, data, updated_at) VALUES (?, ?, ?, ?, ?)')
+  for (const row of rows) {
+    insert.run(row.id, row.workItemId || null, row.date || null, JSON.stringify(row), now)
+  }
+}
+
+function replaceTubeProfiles(db, rows, now) {
+  db.prepare('DELETE FROM tube_profiles').run()
+  const insert = db.prepare('INSERT INTO tube_profiles (id, categoria, label, active, data, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+  for (const row of rows) {
+    insert.run(row.id, row.categoria || null, row.label || null, row.active ? 1 : 0, JSON.stringify(row), now)
   }
 }
 
