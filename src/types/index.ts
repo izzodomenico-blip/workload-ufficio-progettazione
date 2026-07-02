@@ -670,10 +670,12 @@ export interface BendingRow {
 
 export interface Consuntivo {
   id: string
-  workItemId: string
-  workItemCode: string
-  workItemTitle: string
-  customer: string
+  /** Numero commessa a testo libero (non vincolato al registro lavori). */
+  commessaNumber: string
+  /** Id anagrafica fornitore se selezionato dal database; '' se testo libero. */
+  supplierId: string
+  /** Nome fornitore (da anagrafica o testo libero). */
+  supplierName: string
   date: string
   operatorName: string
   laserRows: LaserCutRow[]

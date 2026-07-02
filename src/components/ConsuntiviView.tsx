@@ -30,9 +30,8 @@ export function ConsuntiviView() {
     const q = filter.trim().toLowerCase()
     if (!q) return consuntivi
     return consuntivi.filter((c) =>
-      c.workItemCode.toLowerCase().includes(q) ||
-      c.workItemTitle.toLowerCase().includes(q) ||
-      c.customer.toLowerCase().includes(q) ||
+      c.commessaNumber.toLowerCase().includes(q) ||
+      c.supplierName.toLowerCase().includes(q) ||
       c.date.includes(q))
   }, [consuntivi, filter])
 
@@ -41,7 +40,7 @@ export function ConsuntiviView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-100">Consuntivi</h2>
         <div className="flex items-center gap-2">
-          <input className="input-base w-64" placeholder="Filtra per commessa, cliente, data…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <input className="input-base w-64" placeholder="Filtra per commessa, fornitore, data…" value={filter} onChange={(e) => setFilter(e.target.value)} />
           <button className="btn-ghost" onClick={() => setLibraryOpen(true)}>Libreria profili</button>
           <button className="btn-ghost" onClick={() => setPricingOpen(true)}>Prezzi 🔒</button>
           <button className="btn-ghost" onClick={() => setReportOpen(true)}>Report 🔒</button>
@@ -55,7 +54,7 @@ export function ConsuntiviView() {
             <tr>
               <th className="px-3 py-2">Data</th>
               <th className="px-3 py-2">Commessa</th>
-              <th className="px-3 py-2">Cliente</th>
+              <th className="px-3 py-2">Fornitore</th>
               <th className="px-3 py-2">Righe</th>
               <th className="px-3 py-2">Operatore</th>
               <th className="px-3 py-2" />
@@ -65,8 +64,8 @@ export function ConsuntiviView() {
             {filtered.map((c) => (
               <tr key={c.id} className="border-t border-slate-800/60 hover:bg-slate-800/30">
                 <td className="px-3 py-2">{c.date}</td>
-                <td className="px-3 py-2">{c.workItemCode} · {c.workItemTitle}</td>
-                <td className="px-3 py-2">{c.customer || '—'}</td>
+                <td className="px-3 py-2">{c.commessaNumber || '—'}</td>
+                <td className="px-3 py-2">{c.supplierName || '—'}</td>
                 <td className="px-3 py-2 text-slate-400">{c.laserRows.length} laser · {c.tubeRows.length} tubi · {c.weldingRows.length} sald. · {c.bendingRows.length} piega</td>
                 <td className="px-3 py-2 text-slate-400">{c.operatorName || '—'}</td>
                 <td className="px-3 py-2 text-right">

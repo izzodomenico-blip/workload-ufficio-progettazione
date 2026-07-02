@@ -50,8 +50,8 @@ export function ConsuntiviPricingModal({ open, onClose }: Props) {
       footer={unlocked ? (<><button className="btn-ghost" onClick={onClose}>Chiudi</button><button className="btn-primary" disabled={busy} onClick={save}>Salva</button></>) : undefined}>
       {!unlocked ? (
         <div className="space-y-3">
-          <p className="text-sm text-slate-400">Inserisci la password admin per accedere ai prezzi.</p>
-          <FormField label="Password admin">
+          <p className="text-sm text-slate-400">Inserisci la password della sezione Consuntivi per accedere ai prezzi.</p>
+          <FormField label="Password Consuntivi">
             <input type="password" className="input-base" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') unlock() }} />
           </FormField>
           <button className="btn-primary" disabled={busy} onClick={unlock}>Sblocca</button>

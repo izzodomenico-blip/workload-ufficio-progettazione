@@ -467,3 +467,210 @@ textarea:focus-visible,
     margin-top: 10px !important;
   }
 }
+
+/* ===========================================================================
+   Report Consuntivi — documento tecnico stampabile (portal su <body>).
+   On-screen: overlay scuro con "foglio" bianco centrato.
+   Stampa: si mostra solo il foglio, a piena pagina, senza clipping del modal.
+   =========================================================================== */
+.cons-report-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  background: rgba(3, 6, 18, 0.86);
+  backdrop-filter: blur(4px);
+}
+.cons-report-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  background: linear-gradient(180deg, rgba(9, 14, 32, 0.96), rgba(9, 14, 32, 0.82));
+  border-bottom: 1px solid var(--color-edge-soft);
+}
+.cons-report-lock {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.cons-report-sheet {
+  width: 100%;
+  max-width: 900px;
+  margin: 28px auto 60px;
+  background: #f7f7f4;
+  color: #14181f;
+  border: 1px solid #d9d7cf;
+  border-radius: 10px;
+  box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.9);
+  padding: 40px 44px 32px;
+  font-variant-numeric: tabular-nums;
+}
+.cons-report-sheet h1,
+.cons-report-sheet h2 { color: #0d1017; }
+
+/* Intestazione */
+.cons-doc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid #0d1017;
+}
+.cons-kicker {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #9a7b2e;
+}
+.cons-title {
+  margin-top: 6px;
+  font-size: 28px;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.cons-doc-meta { text-align: right; font-size: 12px; color: #4a4f5a; min-width: 190px; }
+.cons-doc-meta > div { display: flex; justify-content: space-between; gap: 16px; padding: 2px 0; }
+.cons-doc-meta span { color: #7b8290; }
+.cons-doc-meta strong { color: #14181f; font-weight: 600; }
+
+/* Sintesi globale */
+.cons-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin-top: 24px;
+}
+.cons-grandtotal {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 20px 22px;
+  background: #14181f;
+  color: #f7f7f4;
+  border-radius: 10px;
+}
+.cons-grandtotal > span { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #b9c0cf; }
+.cons-grandtotal > strong { font-size: 38px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
+.cons-grandtotal > em { font-style: normal; font-size: 13px; color: #9aa2b3; margin-top: 2px; }
+
+.cons-derivation { border: 1px solid #ded9c9; border-radius: 10px; padding: 14px 16px; background: #fffef9; }
+.cons-derivation-title { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #7b8290; margin-bottom: 8px; }
+.cons-derivation ul { list-style: none; margin: 0; padding: 0; }
+.cons-derivation li { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; font-size: 14px; }
+.cons-derivation li span { color: #3a4050; }
+.cons-derivation li b { font-weight: 600; }
+.cons-derivation-sum { border-top: 1.5px solid #14181f; margin-top: 6px; padding-top: 8px !important; font-weight: 800; }
+.cons-derivation-sum span, .cons-derivation-sum b { font-weight: 800; color: #14181f; }
+
+/* Banda kg per materiale */
+.cons-kgband { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.cons-kgchip {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  border: 1px solid #ded9c9;
+  border-left: 3px solid #9a7b2e;
+  border-radius: 8px;
+  background: #fffef9;
+}
+.cons-kgchip span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #7b8290; }
+.cons-kgchip strong { font-size: 18px; font-weight: 700; }
+
+/* Blocco commessa */
+.cons-commessa { margin-top: 30px; padding-top: 20px; border-top: 1px solid #d9d7cf; }
+.cons-commessa-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.cons-commessa-label { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #9a7b2e; }
+.cons-commessa-head h2 { font-size: 20px; font-weight: 800; line-height: 1.1; margin-top: 2px; }
+.cons-commessa-supplier { font-size: 13px; color: #4a4f5a; margin-top: 3px; }
+.cons-commessa-total { text-align: right; }
+.cons-commessa-total span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #7b8290; }
+.cons-commessa-total strong { font-size: 24px; font-weight: 800; }
+.cons-commessa-total em { font-style: normal; display: block; font-size: 12px; color: #7b8290; }
+
+.cons-session { margin-top: 16px; }
+.cons-session-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 12.5px; color: #4a4f5a; padding: 4px 0; border-bottom: 1px dashed #d9d7cf; }
+.cons-session-total { margin-left: auto; font-weight: 700; color: #14181f; }
+
+.cons-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.cons-table thead th {
+  text-align: left;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a6e2a;
+  font-weight: 700;
+  border-bottom: 1.5px solid #14181f;
+  padding: 5px 8px;
+}
+.cons-table th.r, .cons-table td.r { text-align: right; }
+.cons-table tbody td { padding: 5px 8px; border-bottom: 1px solid #e6e3da; vertical-align: top; }
+.cons-table tbody tr:last-child td { border-bottom: none; }
+.cons-table td.r { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Derivazione del totale commessa (perche si arriva al totale) */
+.cons-commessa-derivation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: #14181f;
+  color: #e9ecf3;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.cons-term { display: inline-flex; gap: 5px; align-items: baseline; }
+.cons-term b { font-weight: 700; color: #fff; }
+.cons-term-eq { margin-left: auto; font-size: 15px; }
+.cons-term-eq b { color: #7dd3fc; }
+
+.cons-doc-foot { margin-top: 34px; padding-top: 14px; border-top: 1px solid #d9d7cf; font-size: 11px; color: #7b8290; }
+
+@media (max-width: 720px) {
+  .cons-summary { grid-template-columns: 1fr; }
+  .cons-report-sheet { padding: 24px 18px; }
+}
+
+/* ---- Stampa: solo il foglio, senza clipping del modal ---- */
+@media print {
+  @page { size: A4; margin: 14mm; }
+  html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+  body > *:not(.cons-report-portal) { display: none !important; }
+  .no-print { display: none !important; }
+  .cons-report-portal { position: static !important; }
+  .cons-report-overlay {
+    position: static !important;
+    display: block !important;
+    overflow: visible !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+  }
+  .cons-report-sheet {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .cons-commessa, .cons-session, .cons-table { break-inside: avoid; }
+  .cons-grandtotal, .cons-commessa-derivation { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

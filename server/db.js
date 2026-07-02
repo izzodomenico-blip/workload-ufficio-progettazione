@@ -415,7 +415,8 @@ function replaceConsuntivi(db, rows, now) {
   db.prepare('DELETE FROM consuntivi').run()
   const insert = db.prepare('INSERT INTO consuntivi (id, work_item_id, date, data, updated_at) VALUES (?, ?, ?, ?, ?)')
   for (const row of rows) {
-    insert.run(row.id, row.workItemId || null, row.date || null, JSON.stringify(row), now)
+    // La colonna work_item_id ospita ora il numero commessa (solo hint di indice; il blob data e autoritativo).
+    insert.run(row.id, row.commessaNumber || null, row.date || null, JSON.stringify(row), now)
   }
 }
 

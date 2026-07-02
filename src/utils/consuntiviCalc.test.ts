@@ -73,7 +73,7 @@ describe('consuntivoTotals', () => {
   it('somma righe e ripartisce i kg per materiale', () => {
     const pricing = { ...P, densityFactorPerMaterial: { ...P.densityFactorPerMaterial, ferro: 8, zincato: 8 } }
     const c: Consuntivo = {
-      id: 'c1', workItemId: 'w1', workItemCode: 'CM-1', workItemTitle: 'x', customer: 'y', date: '2026-07-02', operatorName: '',
+      id: 'c1', commessaNumber: 'CM-1', supplierId: '', supplierName: 'Fornitore X', date: '2026-07-02', operatorName: '',
       laserRows: [
         { id: 'r1', lunghezzaMm: 1000, larghezzaMm: 1000, spessoreMm: 1, materiale: 'ferro', tempoMin: 10, gas: 'ossigeno' },
       ],

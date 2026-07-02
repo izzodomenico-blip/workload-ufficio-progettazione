@@ -29,6 +29,11 @@ import {
   verifyAdminPassword,
 } from '../services/adminAuth.js'
 import { DEFAULT_CONSUNTIVI_CONFIG, normalizeConsuntiviConfig } from '../services/consuntiviConfig.js'
+import {
+  getConsuntiviAuthStatus,
+  setConsuntiviPassword,
+  verifyConsuntiviPassword,
+} from '../services/consuntiviAuth.js'
 
 const ADMIN_PASSWORD_HEADER = 'x-workload-admin-password'
 const DATA_REVISION_HEADER = 'x-workload-data-revision'
@@ -264,7 +269,7 @@ export function createApiRouter() {
 
   router.get('/consuntivi-pricing', (req, res, next) => {
     try {
-      requireAdminPassword(req)
+      requireConsuntiviPassword(req)
       res.set('cache-control', 'no-store')
       res.json(getConsuntiviConfig() ?? DEFAULT_CONSUNTIVI_CONFIG)
     } catch (error) {
@@ -274,11 +279,39 @@ export function createApiRouter() {
 
   router.put('/consuntivi-pricing', (req, res, next) => {
     try {
-      requireAdminPassword(req)
+      requireConsuntiviPassword(req)
       const cfg = normalizeConsuntiviConfig(req.body)
       saveConsuntiviConfig(cfg)
       scheduleAutoBackup('consuntivi-pricing-updated')
       res.json(cfg)
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
+  })
+
+  // Password dedicata della sezione Consuntivi (separata dal gate admin globale).
+  router.get('/consuntivi-auth/status', (_req, res) => {
+    res.json({ protected: getConsuntiviAuthStatus().protected })
+  })
+
+  router.post('/consuntivi-auth/verify-password', (req, res, next) => {
+    try {
+      const body = req.body ?? {}
+      const ok = verifyConsuntiviPassword(typeof body.password === 'string' ? body.password : undefined)
+      res.json({ ok, protected: getConsuntiviAuthStatus().protected })
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  router.post('/consuntivi-auth/set-password', (req, res, next) => {
+    try {
+      const body = req.body ?? {}
+      const result = setConsuntiviPassword({
+        currentPassword: typeof body.currentPassword === 'string' ? body.currentPassword : undefined,
+        newPassword: typeof body.newPassword === 'string' ? body.newPassword : '',
+      })
+      res.json(result)
     } catch (error) {
       next(error.statusCode ? error : badRequest(error))
     }
@@ -565,10 +598,10 @@ function machineTypeProcessKey(machineType) {
   ].filter(Boolean).join(',')
 }
 
-function requireAdminPassword(req) {
+function requireConsuntiviPassword(req) {
   const provided = req.get(ADMIN_PASSWORD_HEADER)
-  if (!verifyAdminPassword(provided)) {
-    const err = new Error('Configurazione prezzi protetta: password admin richiesta o errata.')
+  if (!verifyConsuntiviPassword(provided)) {
+    const err = new Error('Sezione Consuntivi protetta: password richiesta o errata.')
     err.statusCode = 403
     err.detail = 'consuntivi-pricing-protected'
     throw err

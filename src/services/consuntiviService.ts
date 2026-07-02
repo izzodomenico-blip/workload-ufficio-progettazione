@@ -1,4 +1,4 @@
-import type { AppData, Consuntivo, WorkItem } from '../types'
+import type { AppData, Consuntivo } from '../types'
 import { logEntry } from '../utils/activityLog'
 import { uid } from '../utils/format'
 
@@ -10,15 +10,15 @@ function nowISO(): string {
 }
 
 function label(c: Consuntivo): string {
-  return `${c.workItemCode || c.workItemId} · ${c.date}`
+  return `${c.commessaNumber || 'senza commessa'} · ${c.date}`
 }
 
-export function consuntivoFromWorkItem(workItem: WorkItem, date: string, operatorName = ''): CreateConsuntivoInput {
+/** Input vuoto per un nuovo consuntivo (commessa e fornitore a testo libero). */
+export function emptyConsuntivoInput(date: string, operatorName = ''): CreateConsuntivoInput {
   return {
-    workItemId: workItem.id,
-    workItemCode: workItem.code,
-    workItemTitle: workItem.title,
-    customer: workItem.customer,
+    commessaNumber: '',
+    supplierId: '',
+    supplierName: '',
     date,
     operatorName,
     laserRows: [],

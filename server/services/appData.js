@@ -656,14 +656,15 @@ function normalizeBendingRow(item) {
 
 function normalizeConsuntivo(item) {
   const o = asObject(item)
-  if (!o || !isNonEmptyString(o.id) || !isNonEmptyString(o.workItemId)) return null
+  if (!o || !isNonEmptyString(o.id)) return null
   const now = new Date().toISOString()
   return {
     id: o.id,
-    workItemId: o.workItemId,
-    workItemCode: isString(o.workItemCode) ? o.workItemCode : '',
-    workItemTitle: isString(o.workItemTitle) ? o.workItemTitle : '',
-    customer: isString(o.customer) ? o.customer : '',
+    // commessa a testo libero; retrocompat: eredita dal vecchio workItemCode se presente
+    commessaNumber: isString(o.commessaNumber) ? o.commessaNumber : (isString(o.workItemCode) ? o.workItemCode : ''),
+    supplierId: isString(o.supplierId) ? o.supplierId : '',
+    // fornitore a testo libero; retrocompat: eredita dal vecchio customer se presente
+    supplierName: isString(o.supplierName) ? o.supplierName : (isString(o.customer) ? o.customer : ''),
     date: isNonEmptyString(o.date) ? o.date : now.slice(0, 10),
     operatorName: isString(o.operatorName) ? o.operatorName : '',
     laserRows: Array.isArray(o.laserRows) ? o.laserRows.map(normalizeLaserCutRow).filter(Boolean) : [],

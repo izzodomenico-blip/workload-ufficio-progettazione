@@ -8,7 +8,7 @@ interface ModalProps {
   subtitle?: string
   children: ReactNode
   footer?: ReactNode
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
 }
 
 const SIZES: Record<NonNullable<ModalProps['size']>, string> = {
@@ -16,6 +16,7 @@ const SIZES: Record<NonNullable<ModalProps['size']>, string> = {
   md: 'max-w-2xl',
   lg: 'max-w-4xl',
   xl: 'max-w-5xl',
+  full: 'max-w-[96vw]',
 }
 
 export function Modal({ open, onClose, title, subtitle, children, footer, size = 'md' }: ModalProps) {
