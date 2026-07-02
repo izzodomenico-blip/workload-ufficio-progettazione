@@ -21,9 +21,10 @@ const MachineTypesLibraryView = lazy(() => import('./MachineTypesLibraryView').t
 const WorkshopLoadView = lazy(() => import('./WorkshopLoadView').then((m) => ({ default: m.WorkshopLoadView })))
 const WorkshopPlanningView = lazy(() => import('./WorkshopPlanningView').then((m) => ({ default: m.WorkshopPlanningView })))
 const WorkshopWorkersView = lazy(() => import('./WorkshopWorkersView').then((m) => ({ default: m.WorkshopWorkersView })))
+const Consuntivi = lazy(() => import('./ConsuntiviView').then((m) => ({ default: m.ConsuntiviView })))
 
 type ViewMode = 'table' | 'kanban'
-type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche' | 'disegni' | 'officina' | 'operai' | 'officina-planning'
+type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche' | 'disegni' | 'officina' | 'operai' | 'officina-planning' | 'consuntivi'
 type TabGroup = 'ufficio' | 'tabelle' | 'officina' | 'sistema'
 
 interface TabDef {
@@ -46,6 +47,7 @@ const TABS: TabDef[] = [
   // Officina
   { id: 'officina', label: 'Carico officina', icon: 'M14.7 6.3a4 4 0 0 0-5.6 5.6L3 18v3h3l6.1-6.1a4 4 0 0 0 5.6-5.6l-2.5 2.5-2.1-2.1z', hint: 'Cosa arriva in officina dopo il rilascio progettazione', group: 'officina' },
   { id: 'officina-planning', label: 'Pianificazione officina', icon: 'M4 5h16M4 12h16M4 19h16M8 3v18M16 3v18', hint: 'Assegnazioni operai e saturazione punti', group: 'officina' },
+  { id: 'consuntivi', label: 'Consuntivi', icon: 'M9 17V7h6v10M5 21h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z', hint: 'Consuntivi lavorazioni officina', group: 'officina' },
   // Sistema
   { id: 'log', label: 'Storico', icon: 'M3 3v18h18M7 13l3-3 3 3 5-5', hint: 'Cronologia modifiche', group: 'sistema' },
 ]
@@ -221,6 +223,8 @@ export function Dashboard() {
         <WorkshopWorkersView />
       ) : tab === 'officina-planning' ? (
         <WorkshopPlanningView />
+      ) : tab === 'consuntivi' ? (
+        <Consuntivi />
       ) : (
         <ActivityLogView />
       )}
