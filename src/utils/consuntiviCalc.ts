@@ -1,0 +1,110 @@
+import type {
+  BendingRow,
+  Consuntivo,
+  ConsuntiviPricingConfig,
+  ConsuntivoMaterial,
+  LaserCutRow,
+  TubeLaserRow,
+  WeldingRow,
+} from '../types'
+import { ALL_CONSUNTIVO_MATERIALS } from '../types'
+
+export const DEFAULT_CONSUNTIVI_PRICING: ConsuntiviPricingConfig = {
+  materialPricePerKg: { ferro: 1.3, inox: 4.5, zincato: 2, corten: 3 },
+  gasCostPerMin: { ossigeno: 2.5, azoto: 3 },
+  tubeLaserRatePerMin: 2.5,
+  weldingRatePerHour: 35,
+  bendingRatePerHour: 60,
+  densityFactorPerMaterial: { ferro: 7.85, inox: 8.0, zincato: 7.85, corten: 7.85 },
+}
+
+export interface ConsuntivoTotals {
+  totalKg: number
+  materialCost: number
+  gasCost: number
+  timeCost: number
+  weldingCost: number
+  bendingCost: number
+  total: number
+  kgByMaterial: Record<ConsuntivoMaterial, number>
+}
+
+function num(value: number): number {
+  return Number.isFinite(value) ? value : 0
+}
+
+export function emptyKgByMaterial(): Record<ConsuntivoMaterial, number> {
+  return { ferro: 0, inox: 0, zincato: 0, corten: 0 }
+}
+
+export function sheetWeightKg(
+  row: Pick<LaserCutRow, 'lunghezzaMm' | 'larghezzaMm' | 'spessoreMm'>,
+  densityFactor: number,
+): number {
+  return (num(row.lunghezzaMm) / 1000) * (num(row.larghezzaMm) / 1000) * (num(row.spessoreMm) * num(densityFactor))
+}
+
+export function tubeWeightKg(row: Pick<TubeLaserRow, 'kgPerMeter' | 'lunghezzaMm' | 'nPezzi'>): number {
+  return num(row.kgPerMeter) * (num(row.lunghezzaMm) / 1000) * num(row.nPezzi)
+}
+
+export function laserRowCost(row: LaserCutRow, pricing: ConsuntiviPricingConfig) {
+  const kg = sheetWeightKg(row, pricing.densityFactorPerMaterial[row.materiale] ?? 7.85)
+  const materialCost = kg * (pricing.materialPricePerKg[row.materiale] ?? 0)
+  const gasCost = num(row.tempoMin) * (pricing.gasCostPerMin[row.gas] ?? 0)
+  return { kg, materialCost, gasCost, total: materialCost + gasCost }
+}
+
+export function tubeRowCost(row: TubeLaserRow, pricing: ConsuntiviPricingConfig) {
+  const kg = tubeWeightKg(row)
+  const materialCost = kg * (pricing.materialPricePerKg[row.materiale] ?? 0)
+  const timeCost = num(row.tempoMin) * num(pricing.tubeLaserRatePerMin)
+  return { kg, materialCost, timeCost, total: materialCost + timeCost }
+}
+
+export function weldingRowCost(row: WeldingRow, pricing: ConsuntiviPricingConfig): number {
+  return num(row.people) * num(row.hours) * num(pricing.weldingRatePerHour)
+}
+
+export function bendingRowCost(row: BendingRow, pricing: ConsuntiviPricingConfig): number {
+  return num(row.hours) * num(pricing.bendingRatePerHour)
+}
+
+export function consuntivoTotals(c: Consuntivo, pricing: ConsuntiviPricingConfig): ConsuntivoTotals {
+  const kgByMaterial = emptyKgByMaterial()
+  let totalKg = 0
+  let materialCost = 0
+  let gasCost = 0
+  let timeCost = 0
+
+  for (const row of c.laserRows ?? []) {
+    const r = laserRowCost(row, pricing)
+    totalKg += r.kg
+    kgByMaterial[row.materiale] += r.kg
+    materialCost += r.materialCost
+    gasCost += r.gasCost
+  }
+  for (const row of c.tubeRows ?? []) {
+    const r = tubeRowCost(row, pricing)
+    totalKg += r.kg
+    kgByMaterial[row.materiale] += r.kg
+    materialCost += r.materialCost
+    timeCost += r.timeCost
+  }
+  const weldingCost = (c.weldingRows ?? []).reduce((sum, row) => sum + weldingRowCost(row, pricing), 0)
+  const bendingCost = (c.bendingRows ?? []).reduce((sum, row) => sum + bendingRowCost(row, pricing), 0)
+
+  // Difesa: assicura che tutti i materiali siano presenti nella mappa.
+  for (const m of ALL_CONSUNTIVO_MATERIALS) if (!(m in kgByMaterial)) kgByMaterial[m] = 0
+
+  return {
+    totalKg,
+    materialCost,
+    gasCost,
+    timeCost,
+    weldingCost,
+    bendingCost,
+    total: materialCost + gasCost + timeCost + weldingCost + bendingCost,
+    kgByMaterial,
+  }
+}
