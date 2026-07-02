@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../state/DataProvider'
 import { ConsuntivoFormModal } from './ConsuntivoFormModal'
+import { ConsuntiviPricingModal } from './ConsuntiviPricingModal'
+import { TubeProfilesLibraryModal } from './TubeProfilesLibraryModal'
 import { fetchConsuntiviSettings } from '../services/apiClient'
 import { DEFAULT_CONSUNTIVI_PRICING } from '../utils/consuntiviCalc'
 import type { Consuntivo, ConsuntivoMaterial } from '../types'
@@ -11,6 +13,8 @@ export function ConsuntiviView() {
   const [editing, setEditing] = useState<Consuntivo | null>(null)
   const [filter, setFilter] = useState('')
   const [density, setDensity] = useState<Record<ConsuntivoMaterial, number>>(DEFAULT_CONSUNTIVI_PRICING.densityFactorPerMaterial)
+  const [pricingOpen, setPricingOpen] = useState(false)
+  const [libraryOpen, setLibraryOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -36,6 +40,8 @@ export function ConsuntiviView() {
         <h2 className="text-lg font-semibold text-slate-100">Consuntivi</h2>
         <div className="flex items-center gap-2">
           <input className="input-base w-64" placeholder="Filtra per commessa, cliente, data…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <button className="btn-ghost" onClick={() => setLibraryOpen(true)}>Libreria profili</button>
+          <button className="btn-ghost" onClick={() => setPricingOpen(true)}>Prezzi 🔒</button>
           <button className="btn-primary" onClick={() => { setEditing(null); setFormOpen(true) }}>+ Nuovo consuntivo</button>
         </div>
       </div>
@@ -81,6 +87,8 @@ export function ConsuntiviView() {
           densityFactorPerMaterial={density}
         />
       )}
+      {pricingOpen && <ConsuntiviPricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />}
+      {libraryOpen && <TubeProfilesLibraryModal open={libraryOpen} onClose={() => setLibraryOpen(false)} />}
     </div>
   )
 }
