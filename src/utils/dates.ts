@@ -22,6 +22,17 @@ export function addDays(date: Date, days: number): Date {
   return d
 }
 
+export function addWorkingDays(date: Date, workingDays: number): Date {
+  const d = new Date(date)
+  let remaining = Math.max(0, Math.floor(workingDays))
+  while (remaining > 0) {
+    d.setDate(d.getDate() + 1)
+    const dow = d.getDay()
+    if (dow !== 0 && dow !== 6) remaining--
+  }
+  return d
+}
+
 export function formatISODate(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')

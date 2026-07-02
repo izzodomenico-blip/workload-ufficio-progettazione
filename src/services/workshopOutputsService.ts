@@ -1,7 +1,22 @@
-import type { AppData, MachineType, WorkshopOutput, WorkshopOutputStatus, WorkshopWorkerSkill } from '../types'
+import type {
+  AppData,
+  CalculatedStandardComponent,
+  MachineType,
+  StandardComponentsMode,
+  StandardComponentsSubcategory,
+  WorkshopOutput,
+  WorkshopOutputStatus,
+  WorkshopWorkerSkill,
+} from '../types'
+import { ALL_STANDARD_COMPONENTS_SUBCATEGORIES } from '../types'
 import { logEntry, workItemLabel } from '../utils/activityLog'
 import { uid } from '../utils/format'
 import { calculateWorkshopImpact } from '../utils/workshopImpact'
+import {
+  calculateStandardComponentsPreview,
+  getStandardCalculationType,
+  validateStandardParameters,
+} from '../utils/standardComponentsCalculator'
 
 const STANDARD_COMPONENT_PROCESS_SET = new Set<WorkshopWorkerSkill>([
   'laser_piano',
@@ -81,6 +96,19 @@ function normalizeDraft(
     standardComponentsImpactScore: cleanNumber(draft.standardComponentsImpactScore ?? Math.round((draft.impactScore || 0) * 2.5) / 10, 0, 0),
     standardComponentsProcesses: cleanStandardProcesses(draft.standardComponentsProcesses),
     standardComponentsNotes: cleanString(draft.standardComponentsNotes),
+    machineLengthMm: cleanOptionalPositiveNumber(draft.machineLengthMm),
+    machineWidthMm: cleanOptionalPositiveNumber(draft.machineWidthMm),
+    machineHeightMm: cleanOptionalPositiveNumber(draft.machineHeightMm),
+    machineSpanMm: cleanOptionalPositiveNumber(draft.machineSpanMm),
+    machineModuleCount: cleanOptionalPositiveNumber(draft.machineModuleCount),
+    machineBayCount: cleanOptionalPositiveNumber(draft.machineBayCount),
+    machineSlopePercent: cleanOptionalPositiveNumber(draft.machineSlopePercent),
+    machineNotes: cleanString(draft.machineNotes),
+    standardComponentsMode: cleanStandardComponentsMode(draft.standardComponentsMode),
+    standardComponentsCalculationType: 'none',
+    standardComponentsSubcategory: cleanStandardComponentsSubcategory(draft.standardComponentsSubcategory),
+    standardComponentsCalculatedAt: cleanString(draft.standardComponentsCalculatedAt ?? '') || null,
+    standardComponentsCalculationStatus: 'not_configured',
     hasCommercialComponents: Boolean(draft.hasCommercialComponents),
     commercialComponentsDescription: cleanString(draft.commercialComponentsDescription),
     commercialComponentsOrderRequired: Boolean(draft.commercialComponentsOrderRequired),
@@ -100,10 +128,23 @@ function normalizeDraft(
   const standardImpact = base.hasStandardComponents
     ? cleanNumber(draft.standardComponentsImpactScore ?? Math.round(calculated * 2.5) / 10, Math.round(calculated * 2.5) / 10, 0)
     : 0
+  const calculationType = getStandardCalculationType(base.machineTypeCode)
+  const validation = validateStandardParameters({
+    machineTypeCode: base.machineTypeCode,
+    machineLengthMm: base.machineLengthMm,
+    machineWidthMm: base.machineWidthMm,
+    machineHeightMm: base.machineHeightMm,
+    machineSpanMm: base.machineSpanMm,
+    machineModuleCount: base.machineModuleCount,
+    machineBayCount: base.machineBayCount,
+    machineSlopePercent: base.machineSlopePercent,
+  })
   return {
     ...base,
     standardComponentsImpactScore: standardImpact,
     impactScore: calculated,
+    standardComponentsCalculationType: calculationType,
+    standardComponentsCalculationStatus: validation.status,
   }
 }
 
@@ -152,6 +193,43 @@ function cleanStandardProcesses(value: WorkshopOutputDraft['standardComponentsPr
   return Array.from(new Set((value ?? []).filter((process): process is WorkshopWorkerSkill => STANDARD_COMPONENT_PROCESS_SET.has(process))))
 }
 
+const STANDARD_MODES = new Set<StandardComponentsMode>(['manual', 'calculated', 'mixed'])
+
+function cleanStandardComponentsMode(value: StandardComponentsMode | undefined): StandardComponentsMode {
+  if (value && STANDARD_MODES.has(value)) return value
+  return 'manual'
+}
+
+const STANDARD_SUBCATEGORIES = new Set<StandardComponentsSubcategory>(ALL_STANDARD_COMPONENTS_SUBCATEGORIES)
+
+function cleanStandardComponentsSubcategory(value: StandardComponentsSubcategory | undefined): StandardComponentsSubcategory {
+  if (value && STANDARD_SUBCATEGORIES.has(value)) return value
+  return 'none'
+}
+
+function cleanOptionalPositiveNumber(value: number | null | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null
+  return value
+}
+
+const PARAMETER_FIELDS = [
+  'machineLengthMm',
+  'machineWidthMm',
+  'machineHeightMm',
+  'machineSpanMm',
+  'machineModuleCount',
+  'machineBayCount',
+  'machineSlopePercent',
+] as const
+
+export function parametersChanged(before: WorkshopOutput, after: WorkshopOutput): boolean {
+  for (const field of PARAMETER_FIELDS) {
+    if ((before[field] ?? null) !== (after[field] ?? null)) return true
+  }
+  if ((before.machineNotes ?? '') !== (after.machineNotes ?? '')) return true
+  return false
+}
+
 function sortOutputs(outputs: WorkshopOutput[]): WorkshopOutput[] {
   return outputs.slice().sort((a, b) => {
     const dateCompare = (a.plannedReleaseDate || '9999-99-99').localeCompare(b.plannedReleaseDate || '9999-99-99')
@@ -180,6 +258,10 @@ function describeChange(before: WorkshopOutput, after: WorkshopOutput): string {
   if (before.status !== after.status) parts.push(`stato ${statusLabel(before.status)} -> ${statusLabel(after.status)}`)
   if (before.impactScore !== after.impactScore) parts.push(`impatto ${before.impactScore} -> ${after.impactScore}`)
   if (before.hasStandardComponents !== after.hasStandardComponents) parts.push('componenti standard aggiornati')
+  if (parametersChanged(before, after)) parts.push('parametri macchina aggiornati')
+  if ((before.standardComponentsCalculationStatus ?? 'not_configured') !== (after.standardComponentsCalculationStatus ?? 'not_configured')) {
+    parts.push(`stato calcolo standard ${before.standardComponentsCalculationStatus ?? '—'} -> ${after.standardComponentsCalculationStatus ?? '—'}`)
+  }
   if (before.hasCommercialComponents !== after.hasCommercialComponents || before.commercialComponentsOrdered !== after.commercialComponentsOrdered) parts.push('componenti commerciali aggiornati')
   if (processKey(before) !== processKey(after)) parts.push('processi aggiornati')
   return parts.length > 0 ? parts.join(' - ') : 'modifica minore'
@@ -215,10 +297,10 @@ export function createWorkshopOutput(
 ): { data: AppData; id: string; output: WorkshopOutput } {
   const output = normalizeDraft(data, workItemId, input)
   const workItem = data.workItems.find((item) => item.id === workItemId)
-  const nextData = {
+  const nextData = regenerateCalculatedStandardsForOutput({
     ...data,
     workshopOutputs: sortOutputs([...data.workshopOutputs, output]),
-  }
+  }, output)
   return {
     id: output.id,
     output,
@@ -241,10 +323,10 @@ export function updateWorkshopOutput(
   const before = data.workshopOutputs.find((output) => output.id === id)
   if (!before) return data
   const after = normalizeDraft(data, before.workItemId, { ...before, ...patch }, before)
-  const nextData = {
+  const nextData = regenerateCalculatedStandardsForOutput({
     ...data,
     workshopOutputs: sortOutputs(data.workshopOutputs.map((output) => (output.id === id ? after : output))),
-  }
+  }, after)
   if (isSameOutput(before, after)) return nextData
   return logEntry(nextData, {
     entityType: 'workshopOutput',
@@ -265,6 +347,7 @@ export function deleteWorkshopOutput(data: AppData, id: string): AppData {
   const nextData = {
     ...data,
     workshopOutputs: data.workshopOutputs.filter((output) => output.id !== id),
+    calculatedStandardComponents: (data.calculatedStandardComponents ?? []).filter((c) => c.workshopOutputId !== id),
   }
   return logEntry(nextData, {
     entityType: 'workshopOutput',
@@ -331,8 +414,60 @@ export function replaceWorkshopOutputsForWorkItem(
     })
   }
 
-  return {
+  let merged: AppData = {
     ...nextData,
     workshopOutputs: sortOutputs([...nextData.workshopOutputs, ...nextOutputs]),
   }
+  // Rimuove i componenti calcolati per output non piu presenti, rigenera per i nuovi/aggiornati.
+  merged = {
+    ...merged,
+    calculatedStandardComponents: (merged.calculatedStandardComponents ?? []).filter(
+      (component) => component.workItemId !== workItemId || keptIds.has(component.workshopOutputId),
+    ),
+  }
+  for (const output of nextOutputs) {
+    merged = regenerateCalculatedStandardsForOutput(merged, output)
+  }
+  return merged
+}
+
+// ===== Componenti standard calcolati =====
+
+function nowOrFallback(value: string | null | undefined): string {
+  return value && value.trim().length > 0 ? value : new Date().toISOString()
+}
+
+export function regenerateCalculatedStandardsForOutput(
+  data: AppData,
+  output: WorkshopOutput,
+): AppData {
+  const existing = (data.calculatedStandardComponents ?? []).filter(
+    (component) => component.workshopOutputId !== output.id,
+  )
+  const preview = calculateStandardComponentsPreview({
+    machineTypeCode: output.machineTypeCode,
+    machineLengthMm: output.machineLengthMm,
+    machineWidthMm: output.machineWidthMm,
+    machineHeightMm: output.machineHeightMm,
+    machineSpanMm: output.machineSpanMm,
+    machineModuleCount: output.machineModuleCount,
+    machineBayCount: output.machineBayCount,
+    machineSlopePercent: output.machineSlopePercent,
+    standardComponentsSubcategory: output.standardComponentsSubcategory,
+  })
+  if (preview.status !== 'ready' || preview.components.length === 0) {
+    return { ...data, calculatedStandardComponents: existing }
+  }
+  const at = new Date().toISOString()
+  const created = preview.components.map((component, index) => ({
+    ...component,
+    id: uid(`csc_${output.id.replace(/^wo_?/, '')}_${index}`),
+    workshopOutputId: output.id,
+    workItemId: output.workItemId,
+    machineTypeCode: output.machineTypeCode,
+    readyFromDate: output.standardComponentsReadyFromDate || at.slice(0, 10),
+    createdAt: nowOrFallback(component.createdAt),
+    updatedAt: at,
+  })) satisfies CalculatedStandardComponent[]
+  return { ...data, calculatedStandardComponents: [...existing, ...created] }
 }

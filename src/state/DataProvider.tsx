@@ -219,6 +219,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const serverReadyRef = useRef(false)
   const serverRevisionRef = useRef<number | null>(null)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  // Numero di salvataggi ottimistici ancora in coda/in volo. Serve a NON
+  // sovrascrivere lo stato locale con la risposta di un salvataggio "vecchio"
+  // quando l'utente ha gia' fatto modifiche successive (vedi commitData).
+  const pendingCommitsRef = useRef(0)
   const toast = useToast()
 
   const applyRemoteData = useCallback((remoteData: AppData, revision: number) => {
@@ -269,6 +273,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     dataRef.current = next
     setData(next)
     saveToStorage(next)
+    pendingCommitsRef.current += 1
     saveQueueRef.current = saveQueueRef.current
       .then(async () => {
         const currentRevision = serverRevisionRef.current
@@ -277,28 +282,51 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ...options,
           dataRevision: currentRevision,
         })
-        applyRemoteData(response.data, response.revision)
+        // La revisione condivisa va sempre aggiornata, anche se nel frattempo
+        // sono arrivate altre modifiche.
+        serverReadyRef.current = true
+        serverRevisionRef.current = response.revision
+        // Adotta lo snapshot normalizzato dal server SOLO se questo e' l'ultimo
+        // salvataggio in coda: altrimenti sovrascriverebbe le modifiche
+        // ottimistiche piu' recenti con una risposta ormai stantia, facendo
+        // "tornare indietro" i campi appena modificati alla riapertura.
+        if (pendingCommitsRef.current <= 1) {
+          dataRef.current = response.data
+          setData(response.data)
+          saveToStorage(response.data)
+        }
       })
       .catch(async (err) => {
         if (err instanceof DataConflictError) {
-          try {
-            const response = await fetchAppData()
-            applyRemoteData(response.data, response.revision)
-          } catch (reloadError) {
-            serverReadyRef.current = false
-            serverRevisionRef.current = null
-            console.error('Ricarica dati condivisi fallita dopo conflitto', reloadError)
+          // Ricarica dal server solo se non ci sono modifiche locali piu'
+          // recenti in attesa: in caso contrario il salvataggio successivo
+          // riconcilia da solo e una ricarica perderebbe quelle modifiche.
+          if (pendingCommitsRef.current <= 1) {
+            try {
+              const response = await fetchAppData()
+              applyRemoteData(response.data, response.revision)
+            } catch (reloadError) {
+              serverReadyRef.current = false
+              serverRevisionRef.current = null
+              console.error('Ricarica dati condivisi fallita dopo conflitto', reloadError)
+            }
           }
           console.warn('Salvataggio rifiutato per revisione dati non aggiornata', err)
           toast.error('Salvataggio bloccato: i dati condivisi erano cambiati. Ho ricaricato il database server, ripeti la modifica se serve.')
           return
         }
-        // Rollback dello stato locale se il backend rifiuta (es. password mancante)
-        dataRef.current = previous
-        setData(previous)
-        saveToStorage(previous)
+        // Rollback dello stato locale se il backend rifiuta (es. password mancante),
+        // ma solo se nessuna modifica successiva ha gia' superato questo salvataggio.
+        if (pendingCommitsRef.current <= 1) {
+          dataRef.current = previous
+          setData(previous)
+          saveToStorage(previous)
+        }
         console.error('Salvataggio su database fallito', err)
         toast.error(`Salvataggio database fallito: ${err instanceof Error ? err.message : 'errore sconosciuto'}`)
+      })
+      .finally(() => {
+        pendingCommitsRef.current = Math.max(0, pendingCommitsRef.current - 1)
       })
   }, [applyRemoteData, restoreLocalData, toast])
 
@@ -663,6 +691,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       `${safeNext.workshopOutputs.length} output officina`,
       `${safeNext.workshopWorkers.length} operai officina`,
       `${safeNext.workshopAssignments.length} assegnazioni officina`,
+      `${(safeNext.calculatedStandardComponents ?? []).length} componenti standard calcolati`,
       options.fileName ? `file: ${options.fileName}` : '',
       options.exportedAt ? `esportato: ${options.exportedAt}` : '',
       options.version ? `versione: ${options.version}` : '',
@@ -810,6 +839,8 @@ export function useData(): DataContextValue {
 
 function mergeImportWithSharedCollections(next: AppData, current: AppData): AppData {
   const importedWorkItemIds = new Set(next.workItems.map((item) => item.id))
+  const currentCalculated = current.calculatedStandardComponents ?? []
+  const nextCalculated = next.calculatedStandardComponents ?? []
   return {
     ...next,
     businessPartners: next.businessPartners.length > 0 ? next.businessPartners : current.businessPartners,
@@ -821,6 +852,9 @@ function mergeImportWithSharedCollections(next: AppData, current: AppData): AppD
     workshopOutputs: next.workshopOutputs.length > 0
       ? next.workshopOutputs
       : current.workshopOutputs.filter((output) => importedWorkItemIds.has(output.workItemId)),
+    calculatedStandardComponents: nextCalculated.length > 0
+      ? nextCalculated
+      : currentCalculated.filter((component) => importedWorkItemIds.has(component.workItemId)),
   }
 }
 

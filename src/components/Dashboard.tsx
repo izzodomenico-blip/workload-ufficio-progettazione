@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Filters, WorkItem } from '../types'
-import { EMPTY_FILTERS, isOpen } from '../types'
+import { CLOSED_STATUSES, EMPTY_FILTERS, isOpen } from '../types'
 import { useData } from '../state/DataProvider'
 import { HeroStats } from './HeroStats'
 import { WorkloadPersonCard } from './WorkloadPersonCard'
@@ -72,8 +72,14 @@ export function Dashboard() {
 
   const filteredItems = useMemo<WorkItem[]>(() => {
     const q = filters.search.trim().toLowerCase()
+    // I lavori chiusi (Completato/Sospeso) non fanno parte del workload attivo:
+    // restano tracciati nello Storico (e nei report) ma spariscono dalla board.
+    // Eccezione: se l'utente seleziona esplicitamente uno stato chiuso nel filtro
+    // "Stato", li mostriamo per poterli consultare.
+    const showClosed = filters.status !== '' && CLOSED_STATUSES.includes(filters.status)
     return data.workItems
       .filter((w) => {
+        if (!showClosed && !isOpen(w.status)) return false
         if (filters.type && w.type !== filters.type) return false
         if (filters.priority && w.priority !== filters.priority) return false
         if (filters.status && w.status !== filters.status) return false

@@ -73,7 +73,7 @@ export function WorkItemsTable({ data, items, onSelect }: Props) {
           <thead>
             <tr className="table-head border-b border-slate-800">
               <Th>Tipo</Th>
-              <Th>Codice</Th>
+              <Th>Commessa</Th>
               <Th>Cliente</Th>
               <Th>Titolo</Th>
               <Th>Priorità</Th>

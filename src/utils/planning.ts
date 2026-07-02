@@ -31,9 +31,9 @@ export interface PersonWeekCell {
   weekEndISO: string
   weekLabel: string
   weekRangeLabel: string
-  /** Ore totali considerate per il carico (dichiarate + base) */
+  /** Ore totali considerate per il carico. Pavimento: max(dichiarate, base). */
   assignedHours: number
-  /** Solo ore da task/lavori dichiarati */
+  /** Solo ore da task/lavori dichiarati, con cap a capacita' reale per voce. */
   declaredHours: number
   /** Ore derivate dal carico base configurato sulla persona */
   baselineHours: number

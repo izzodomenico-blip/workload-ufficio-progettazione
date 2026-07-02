@@ -239,12 +239,12 @@ export function WorkItemFormModal({ open, onClose, mode, workItem, onCreated }: 
           </div>
         </FormField>
 
-        <FormField label="Codice" hint="Es. CM-2026-040 / ST-2026-007">
+        <FormField label="Commessa" hint="Es. CM-2026-040 / ST-2026-007">
           <input
             className="input-base"
             value={values.code}
             onChange={(e) => set('code', e.target.value)}
-            placeholder="Codice identificativo"
+            placeholder="Codice commessa"
           />
         </FormField>
 

@@ -297,6 +297,101 @@ export interface MachineType {
   updatedAt: string
 }
 
+// === Componenti standard calcolati da parametri macchina ===
+
+export type StandardComponentsMode = 'manual' | 'calculated' | 'mixed'
+
+export const ALL_STANDARD_COMPONENTS_MODES: StandardComponentsMode[] = ['manual', 'calculated', 'mixed']
+
+export type StandardComponentsCalculationType = 'none' | 'I_TS' | 'I_SC'
+
+export const ALL_STANDARD_COMPONENTS_CALCULATION_TYPES: StandardComponentsCalculationType[] = [
+  'none',
+  'I_TS',
+  'I_SC',
+]
+
+// Sottocategorie del calcolo standard. Cambiano le formule e gli standard generati.
+export type StandardComponentsSubcategory =
+  | 'none'
+  // I.TS — Tendostrutture
+  | 'TS_MONOPENDENZA'
+  | 'TS_MONOPENDENZA_DOPPIO_ZERO'
+  | 'TS_DOPPIA_PENDENZA'
+  | 'TS_DOPPIA_PENDENZA_COLONNE_MONO'
+  // I.SC — Scaffalature
+  | 'SC_CANTILEVER_MONOFRONTE'
+  | 'SC_CANTILEVER_BIFRONTE'
+
+export const ALL_STANDARD_COMPONENTS_SUBCATEGORIES: StandardComponentsSubcategory[] = [
+  'none',
+  'TS_MONOPENDENZA',
+  'TS_MONOPENDENZA_DOPPIO_ZERO',
+  'TS_DOPPIA_PENDENZA',
+  'TS_DOPPIA_PENDENZA_COLONNE_MONO',
+  'SC_CANTILEVER_MONOFRONTE',
+  'SC_CANTILEVER_BIFRONTE',
+]
+
+export const STANDARD_COMPONENTS_SUBCATEGORY_LABELS: Record<StandardComponentsSubcategory, string> = {
+  none: 'Non specificata',
+  TS_MONOPENDENZA: 'Monopendenza',
+  TS_MONOPENDENZA_DOPPIO_ZERO: 'Monopendenza doppio zero',
+  TS_DOPPIA_PENDENZA: 'Doppia pendenza',
+  TS_DOPPIA_PENDENZA_COLONNE_MONO: 'Doppia pendenza colonne mono',
+  SC_CANTILEVER_MONOFRONTE: 'Cantilever monofronte',
+  SC_CANTILEVER_BIFRONTE: 'Cantilever bifronte',
+}
+
+export const STANDARD_COMPONENTS_SUBCATEGORIES_BY_TYPE: Record<StandardComponentsCalculationType, StandardComponentsSubcategory[]> = {
+  none: [],
+  I_TS: [
+    'TS_MONOPENDENZA',
+    'TS_MONOPENDENZA_DOPPIO_ZERO',
+    'TS_DOPPIA_PENDENZA',
+    'TS_DOPPIA_PENDENZA_COLONNE_MONO',
+  ],
+  I_SC: [
+    'SC_CANTILEVER_MONOFRONTE',
+    'SC_CANTILEVER_BIFRONTE',
+  ],
+}
+
+export type StandardComponentsCalculationStatus =
+  | 'not_configured'
+  | 'missing_parameters'
+  | 'ready'
+  | 'calculated'
+  | 'manual_override'
+
+export const ALL_STANDARD_COMPONENTS_CALCULATION_STATUSES: StandardComponentsCalculationStatus[] = [
+  'not_configured',
+  'missing_parameters',
+  'ready',
+  'calculated',
+  'manual_override',
+]
+
+export type CalculatedStandardComponentSource = 'calculated' | 'manual'
+
+export interface CalculatedStandardComponent {
+  id: string
+  workshopOutputId: string
+  workItemId: string
+  machineTypeCode: string
+  componentCode: string
+  componentName: string
+  description: string
+  quantity: number
+  process: WorkshopWorkerSkill
+  readyFromDate: string
+  impactScore: number
+  notes: string
+  source: CalculatedStandardComponentSource
+  createdAt: string
+  updatedAt: string
+}
+
 // === Output verso officina ===
 
 export type WorkshopOutputStatus =
@@ -353,6 +448,22 @@ export interface WorkshopOutput {
   standardComponentsImpactScore?: number
   standardComponentsProcesses?: WorkshopWorkerSkill[]
   standardComponentsNotes?: string
+  // Parametri geometrici macchina (opzionali; valorizzati per I.TS / I.SC).
+  // Servono a un futuro calcolo dei componenti standard producibili in anticipo.
+  machineLengthMm?: number | null
+  machineWidthMm?: number | null
+  machineHeightMm?: number | null
+  machineSpanMm?: number | null
+  machineModuleCount?: number | null
+  machineBayCount?: number | null
+  machineSlopePercent?: number | null
+  machineNotes?: string
+  // Configurazione del calcolo standard
+  standardComponentsMode?: StandardComponentsMode
+  standardComponentsCalculationType?: StandardComponentsCalculationType
+  standardComponentsSubcategory?: StandardComponentsSubcategory
+  standardComponentsCalculatedAt?: string | null
+  standardComponentsCalculationStatus?: StandardComponentsCalculationStatus
   hasCommercialComponents?: boolean
   commercialComponentsDescription?: string
   commercialComponentsOrderRequired?: boolean
@@ -498,6 +609,7 @@ export interface AppData {
   workshopOutputs: WorkshopOutput[]
   workshopWorkers: WorkshopWorker[]
   workshopAssignments: WorkshopAssignment[]
+  calculatedStandardComponents: CalculatedStandardComponent[]
 }
 
 export interface Filters {

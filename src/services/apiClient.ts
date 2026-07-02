@@ -159,6 +159,7 @@ export interface BackupCountsSnapshot {
   workshopAssignments: number
   activityLog?: number
   notifications?: number
+  calculatedStandardComponents?: number
 }
 
 export interface BackupPreview {
@@ -240,6 +241,7 @@ function withAppDataDefaults(data: Partial<AppData>): AppData {
     workshopOutputs: Array.isArray(data.workshopOutputs) ? data.workshopOutputs : [],
     workshopWorkers: Array.isArray(data.workshopWorkers) ? data.workshopWorkers : [],
     workshopAssignments: Array.isArray(data.workshopAssignments) ? data.workshopAssignments : [],
+    calculatedStandardComponents: Array.isArray(data.calculatedStandardComponents) ? data.calculatedStandardComponents : [],
   }
 }
 

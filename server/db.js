@@ -28,6 +28,7 @@ const TABLES = {
   workshopOutputs: 'workshop_outputs',
   workshopWorkers: 'workshop_workers',
   workshopAssignments: 'workshop_assignments',
+  calculatedStandardComponents: 'calculated_standard_components',
 }
 
 let dbInstance = null
@@ -80,6 +81,7 @@ export function getAppData(db = getDb()) {
     workshopOutputs: readJsonRows(db, TABLES.workshopOutputs, 'planned_release_date ASC, rowid ASC'),
     workshopWorkers: readJsonRows(db, TABLES.workshopWorkers, 'display_name COLLATE NOCASE ASC'),
     workshopAssignments: readJsonRows(db, TABLES.workshopAssignments, 'planned_date ASC, rowid ASC'),
+    calculatedStandardComponents: readJsonRows(db, TABLES.calculatedStandardComponents, 'rowid ASC'),
   })
 }
 
@@ -88,6 +90,13 @@ export function saveAppData(data, db = getDb()) {
   const safeData = {
     ...normalized,
     machineTypes: preserveExistingMachineTypesIfEmpty(db, normalized.machineTypes),
+    // Rete di sicurezza: scarta i componenti standard calcolati il cui output
+    // non esiste piu. Garantisce la cancellazione a cascata anche se il client
+    // invia un payload con orfani (output eliminato senza pulire i componenti).
+    calculatedStandardComponents: dropOrphanCalculatedStandards(
+      normalized.calculatedStandardComponents,
+      normalized.workshopOutputs,
+    ),
   }
   const now = new Date().toISOString()
   db.exec('BEGIN IMMEDIATE TRANSACTION;')
@@ -103,6 +112,7 @@ export function saveAppData(data, db = getDb()) {
     replaceWorkshopOutputs(db, safeData.workshopOutputs, now)
     replaceWorkshopWorkers(db, safeData.workshopWorkers, now)
     replaceWorkshopAssignments(db, safeData.workshopAssignments, now)
+    replaceCalculatedStandardComponents(db, safeData.calculatedStandardComponents ?? [], now)
     bumpDataRevision(db, now)
     db.exec('COMMIT;')
   } catch (error) {
@@ -110,6 +120,13 @@ export function saveAppData(data, db = getDb()) {
     throw error
   }
   return safeData
+}
+
+function dropOrphanCalculatedStandards(components, workshopOutputs) {
+  const list = Array.isArray(components) ? components : []
+  if (list.length === 0) return list
+  const outputIds = new Set((Array.isArray(workshopOutputs) ? workshopOutputs : []).map((output) => output.id))
+  return list.filter((component) => outputIds.has(component.workshopOutputId))
 }
 
 export function savePeople(people, db = getDb()) {
@@ -159,11 +176,13 @@ export function deleteEntity(collection, id, db = getDb()) {
       tasks: nextData.tasks.filter((task) => task.workItemId !== id),
       workshopOutputs: nextData.workshopOutputs.filter((output) => output.workItemId !== id),
       workshopAssignments: nextData.workshopAssignments.filter((assignment) => assignment.workItemId !== id),
+      calculatedStandardComponents: (nextData.calculatedStandardComponents ?? []).filter((component) => component.workItemId !== id),
     }
   } else if (collection === 'workshopOutputs') {
     nextData = {
       ...nextData,
       workshopAssignments: nextData.workshopAssignments.filter((assignment) => assignment.workshopOutputId !== id),
+      calculatedStandardComponents: (nextData.calculatedStandardComponents ?? []).filter((component) => component.workshopOutputId !== id),
     }
   }
   saveAppData(nextData, db)
@@ -339,6 +358,30 @@ function replaceWorkshopAssignments(db, rows, now) {
       row.plannedWeek,
       row.status,
       row.loadPoints,
+      JSON.stringify(row),
+      now,
+    )
+  }
+}
+
+function replaceCalculatedStandardComponents(db, rows, now) {
+  db.prepare('DELETE FROM calculated_standard_components').run()
+  const insert = db.prepare(`
+    INSERT INTO calculated_standard_components
+      (id, workshop_output_id, work_item_id, machine_type_code, component_code, process, quantity, source, ready_from_date, data, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  for (const row of rows) {
+    insert.run(
+      row.id,
+      row.workshopOutputId,
+      row.workItemId,
+      row.machineTypeCode,
+      row.componentCode || null,
+      row.process,
+      Number.isFinite(row.quantity) ? Math.max(0, Math.round(row.quantity)) : 0,
+      row.source || 'manual',
+      row.readyFromDate || null,
       JSON.stringify(row),
       now,
     )

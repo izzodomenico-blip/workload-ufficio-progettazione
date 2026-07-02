@@ -11,8 +11,8 @@ import {
 } from '../utils/weeklyReport'
 import { computePlanningMatrix, type PlanningMatrix } from '../utils/planning'
 import type { Absence, AbsenceType, Person, Task, WorkItem } from '../types'
-import { formatItalianShort, workingDaysOverlap } from '../utils/dates'
-import { topWorkloadActivitiesForPerson } from '../utils/workload'
+import { endOfWeek, formatISODate, formatItalianShort, startOfWeek, workingDaysOverlap } from '../utils/dates'
+import { getWorkloadActivitiesForPerson } from '../utils/workload'
 
 interface Props {
   open: boolean
@@ -126,6 +126,7 @@ export function WeeklyReportModal({ open, onClose }: Props) {
               tasks={data.tasks}
               workItems={data.workItems}
               workItemById={workItemById}
+              generatedAt={generatedAt}
             />
           </div>
           <div className="executive-report-columns mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2 print:gap-4">
@@ -134,6 +135,7 @@ export function WeeklyReportModal({ open, onClose }: Props) {
               personById={personById}
               weekStart={current.weekStart}
               weekEnd={current.weekEnd}
+              generatedAt={generatedAt}
             />
             <CriticalSection issues={current.criticalIssues} />
           </div>
@@ -337,11 +339,13 @@ function PeopleSection({
   tasks,
   workItems,
   workItemById,
+  generatedAt,
 }: {
   workload: PersonWorkloadReport[]
   tasks: Task[]
   workItems: WorkItem[]
   workItemById: Map<string, WorkItem>
+  generatedAt: Date
 }) {
   if (workload.length === 0) {
     return (
@@ -356,7 +360,7 @@ function PeopleSection({
       <SectionTitle accent="bg-slate-700" meta={`${workload.length} persone`}>
         Carico di lavoro
       </SectionTitle>
-      <div className="executive-people-list mt-3 overflow-hidden rounded-lg border border-slate-200">
+      <div className="executive-people-list mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
         {workload.map((w, idx) => (
           <PersonRow
             key={w.person.id}
@@ -365,6 +369,7 @@ function PeopleSection({
             workItems={workItems}
             workItemById={workItemById}
             isLast={idx === workload.length - 1}
+            generatedAt={generatedAt}
           />
         ))}
       </div>
@@ -378,110 +383,157 @@ function PersonRow({
   workItems,
   workItemById,
   isLast,
+  generatedAt,
 }: {
   wl: PersonWorkloadReport
   tasks: Task[]
   workItems: WorkItem[]
   workItemById: Map<string, WorkItem>
   isLast: boolean
+  generatedAt: Date
 }) {
-  const top = topWorkloadActivitiesForPerson(tasks, workItems, wl.person, 1)
+  // Tutte le attivita' della settimana per questa persona, ordinate da
+  // getWorkloadActivitiesForPerson per scadenza crescente, residuo decrescente.
+  const ws = startOfWeek(generatedAt)
+  const we = endOfWeek(generatedAt)
+  const activities = getWorkloadActivitiesForPerson(wl.person, tasks, workItems, ws, we, generatedAt)
   const barWidth = wl.realCapacity > 0 ? Math.min(100, wl.loadPercent) : wl.weekHours > 0 ? 100 : 0
   const overflow = wl.loadPercent > 100 ? Math.min(40, (wl.loadPercent - 100) / 2) : 0
+  const todayISO = formatISODate(generatedAt)
 
   return (
     <div
-      className={`executive-person-row print-keep grid grid-cols-[auto_1fr_auto] items-center gap-x-3 px-3.5 py-3 ${
+      className={`executive-person-row print-keep px-3.5 py-3 ${
         isLast ? '' : 'border-b border-slate-100'
       }`}
     >
-      <div className="flex items-center gap-2">
-        <span className={`h-2.5 w-2.5 rounded-full ${LEVEL_DOT[wl.level]}`} aria-hidden />
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-700">
-          {getInitials(wl.person.name)}
+      <div className="grid grid-cols-[auto_1fr_auto] items-start gap-x-3">
+        <div className="flex items-center gap-2 pt-0.5">
+          <span className={`h-2.5 w-2.5 rounded-full ${LEVEL_DOT[wl.level]}`} aria-hidden />
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-700">
+            {getInitials(wl.person.name)}
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2">
+            <div className="truncate text-sm font-semibold text-slate-900">{wl.person.name}</div>
+            <div className="truncate text-[11px] text-slate-500">{wl.person.role}</div>
+          </div>
+          <div className="mt-1.5">
+            <div className="relative h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div className={`h-full ${LEVEL_BAR[wl.level]}`} style={{ width: `${barWidth}%` }} />
+              {overflow > 0 && (
+                <div
+                  className="absolute top-0 h-full bg-red-400/70"
+                  style={{ left: '100%', width: `${overflow}%`, transform: 'translateX(-1px)' }}
+                  aria-hidden
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="text-right">
+          <div className={`text-base font-semibold tabular-nums leading-none ${LEVEL_PCT_TEXT[wl.level]}`}>
+            {wl.level === 'absent' ? '—' : `${wl.loadPercent}%`}
+          </div>
+          <div className="mt-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+            {LEVEL_LABEL[wl.level]}
+          </div>
+          <div className="mt-0.5 text-[11px] tabular-nums text-slate-500">
+            {wl.weekHours}h <span className="text-slate-400">/ {wl.realCapacity}h</span>
+          </div>
         </div>
       </div>
 
-      <div className="min-w-0">
-        <div className="flex items-baseline gap-2">
-          <div className="truncate text-sm font-semibold text-slate-900">{wl.person.name}</div>
-          <div className="truncate text-[11px] text-slate-500">{wl.person.role}</div>
-        </div>
-        <div className="mt-1">
-          <div className="relative h-1.5 overflow-hidden rounded-full bg-slate-100">
-            <div className={`h-full ${LEVEL_BAR[wl.level]}`} style={{ width: `${barWidth}%` }} />
-            {overflow > 0 && (
-              <div
-                className="absolute top-0 h-full bg-red-400/70"
-                style={{ left: '100%', width: `${overflow}%`, transform: 'translateX(-1px)' }}
-                aria-hidden
-              />
-            )}
-          </div>
-        </div>
-        {top.length > 0 ? (
-          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-600">
-            {top.map((activity) => {
-              const wi = activity.workItem ?? workItemById.get(activity.workItemId)
-              const phase = wi?.technicalPhase
-              const commPrio = wi?.commercialPriority
-              const releaseSoon =
-                wi?.plannedProductionReleaseDate &&
-                !wi.actualProductionReleaseDate &&
-                isWithinDays(wi.plannedProductionReleaseDate, 21)
-              return (
-                <span key={`${activity.kind}-${activity.id}`} className="inline-flex min-w-0 items-center gap-1">
-                  <span className={`rounded px-1 py-px text-[9px] font-semibold ${
-                    activity.kind === 'task' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
-                  }`}>
-                    {activity.kind === 'task' ? 'Task' : 'Lavoro'}
-                  </span>
-                  <span className="text-slate-300">▸</span>
-                  {wi?.code && <span className="font-medium text-slate-700">{wi.code}</span>}
-                  {wi?.code && <span className="text-slate-300">·</span>}
-                  <span className="truncate text-slate-600">{activity.title}</span>
-                  <span className="text-slate-400">({formatItalianShort(activity.dueDate)})</span>
-                  {phase && (
-                    <span className="rounded bg-indigo-100 px-1 py-px text-[9px] font-semibold text-indigo-700">
-                      {phase}
-                    </span>
-                  )}
-                  {commPrio && (commPrio === 'alta' || commPrio === 'critica') && (
-                    <span
-                      className={`rounded px-1 py-px text-[9px] font-semibold ${
-                        commPrio === 'critica' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
-                      }`}
-                      title="Priorità commerciale"
-                    >
-                      comm.{commPrio === 'critica' ? '!' : ''}
-                    </span>
-                  )}
-                  {releaseSoon && wi?.plannedProductionReleaseDate && (
-                    <span className="rounded bg-sky-100 px-1 py-px text-[9px] font-semibold text-sky-700" title="Rilascio produzione previsto vicino">
-                      rel. {formatItalianShort(wi.plannedProductionReleaseDate)}
-                    </span>
-                  )}
-                </span>
-              )
-            })}
+      {/* Agenda della settimana: tutti i lavori della persona, lista compatta con rail. */}
+      <div className="mt-2.5 pl-[40px]">
+        {activities.length === 0 ? (
+          <div className="text-[11px] italic text-slate-400">
+            {wl.level === 'absent' ? 'Assente tutta la settimana' : 'Nessuna attività pianificata'}
           </div>
         ) : (
-          <div className="mt-1.5 text-[11px] italic text-slate-400">
-            {wl.level === 'absent' ? 'Assente tutta la settimana' : 'Nessuna attivita pianificata'}
-          </div>
+          <ul className="executive-person-activities border-l border-slate-200 pl-3">
+            {activities.map((activity) => (
+              <ActivityLine
+                key={`${activity.kind}-${activity.id}`}
+                activity={activity}
+                wi={activity.workItem ?? workItemById.get(activity.workItemId)}
+                todayISO={todayISO}
+              />
+            ))}
+          </ul>
         )}
       </div>
+    </div>
+  )
+}
 
-      <div className="text-right">
-        <div className={`text-base font-semibold tabular-nums leading-none ${LEVEL_PCT_TEXT[wl.level]}`}>
-          {wl.level === 'absent' ? '—' : `${wl.loadPercent}%`}
-        </div>
-        <div className="mt-1 text-[10px] font-medium text-slate-500">{LEVEL_LABEL[wl.level]}</div>
-        <div className="mt-0.5 text-[11px] tabular-nums text-slate-500">
-          {wl.weekHours}h / {wl.realCapacity}h
+function ActivityLine({
+  activity,
+  wi,
+  todayISO,
+}: {
+  activity: ReturnType<typeof getWorkloadActivitiesForPerson>[number]
+  wi: WorkItem | undefined
+  todayISO: string
+}) {
+  const phase = wi?.technicalPhase
+  const commPrio = wi?.commercialPriority
+  const overdue = activity.dueDate < todayISO
+  const releaseSoon =
+    wi?.plannedProductionReleaseDate &&
+    !wi.actualProductionReleaseDate &&
+    isWithinDays(wi.plannedProductionReleaseDate, 21)
+
+  return (
+    <li className="executive-activity-line grid grid-cols-[44px_1fr_auto] items-baseline gap-x-2 py-1 text-[11px] leading-snug">
+      <span className="font-semibold tabular-nums text-slate-700">
+        {activity.hoursInWeek}h
+      </span>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+          <span className={`rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide ${
+            activity.kind === 'task' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
+          }`}>
+            {activity.kind === 'task' ? 'Task' : 'Lavoro'}
+          </span>
+          {wi?.code && (
+            <span className="font-mono text-[10.5px] font-medium text-slate-800">{wi.code}</span>
+          )}
+          <span className="min-w-0 truncate text-slate-700">{activity.title}</span>
+          {phase && (
+            <span className="rounded bg-indigo-50 px-1 py-px text-[9px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200/60">
+              {phase}
+            </span>
+          )}
+          {commPrio && (commPrio === 'alta' || commPrio === 'critica') && (
+            <span
+              className={`rounded px-1 py-px text-[9px] font-semibold ${
+                commPrio === 'critica'
+                  ? 'bg-red-100 text-red-700 ring-1 ring-inset ring-red-200/60'
+                  : 'bg-orange-100 text-orange-700 ring-1 ring-inset ring-orange-200/60'
+              }`}
+              title="Priorità commerciale"
+            >
+              comm.{commPrio === 'critica' ? '!' : ''}
+            </span>
+          )}
+          {releaseSoon && wi?.plannedProductionReleaseDate && (
+            <span
+              className="rounded bg-sky-50 px-1 py-px text-[9px] font-medium text-sky-700 ring-1 ring-inset ring-sky-200/60"
+              title="Rilascio produzione previsto vicino"
+            >
+              rel. {formatItalianShort(wi.plannedProductionReleaseDate)}
+            </span>
+          )}
         </div>
       </div>
-    </div>
+      <span className={`shrink-0 tabular-nums text-[10.5px] ${overdue ? 'font-semibold text-red-700' : 'text-slate-500'}`}>
+        {overdue && '! '}{formatItalianShort(activity.dueDate)}
+      </span>
+    </li>
   )
 }
 
@@ -508,22 +560,32 @@ function AbsencesSection({
   personById,
   weekStart,
   weekEnd,
+  generatedAt,
 }: {
   absences: Absence[]
   personById: Map<string, Person>
   weekStart: Date
   weekEnd: Date
+  generatedAt: Date
 }) {
+  // Nasconde le assenze interamente concluse prima della data di stampa:
+  // ferie/permessi dei giorni passati della settimana non devono apparire.
+  const todayISO = formatISODate(generatedAt)
+  const upcoming = absences.filter((a) => a.endDate >= todayISO)
   return (
     <section className="executive-print-section print-keep">
-      <SectionTitle accent="bg-emerald-500" meta={absences.length}>
+      <SectionTitle accent="bg-emerald-500" meta={upcoming.length}>
         Ferie · permessi · malattie
       </SectionTitle>
-      {absences.length === 0 ? (
-        <p className="mt-3 text-[12px] text-slate-500">Nessuna assenza pianificata in settimana.</p>
+      {upcoming.length === 0 ? (
+        <p className="mt-3 text-[12px] text-slate-500">
+          {absences.length === 0
+            ? 'Nessuna assenza pianificata in settimana.'
+            : 'Nessuna assenza dalla data odierna a fine settimana.'}
+        </p>
       ) : (
         <ul className="mt-2.5 divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
-          {absences.slice(0, 8).map((a) => {
+          {upcoming.slice(0, 8).map((a) => {
             const name = personById.get(a.personId)?.name ?? '—'
             const days = workingDaysOverlap(a.startDate, a.endDate, weekStart, weekEnd)
             const period =
@@ -542,9 +604,9 @@ function AbsencesSection({
               </li>
             )
           })}
-          {absences.length > 8 && (
+          {upcoming.length > 8 && (
             <li className="px-3 py-1.5 text-center text-[10px] text-slate-400">
-              + altre {absences.length - 8}
+              + altre {upcoming.length - 8}
             </li>
           )}
         </ul>

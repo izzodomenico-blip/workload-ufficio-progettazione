@@ -1,8 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { MachineType, WorkshopAssignmentProcess, WorkshopOutputStatus } from '../types'
-import { ALL_MACHINE_COMPLEXITIES, ALL_WORKSHOP_OUTPUT_STATUSES, WORKSHOP_WORKER_SKILL_LABELS } from '../types'
+import type { MachineType, StandardComponentsSubcategory, WorkshopAssignmentProcess, WorkshopOutputStatus } from '../types'
+import {
+  ALL_MACHINE_COMPLEXITIES,
+  ALL_WORKSHOP_OUTPUT_STATUSES,
+  STANDARD_COMPONENTS_SUBCATEGORY_LABELS,
+  WORKSHOP_WORKER_SKILL_LABELS,
+} from '../types'
 import type { WorkshopOutputDraft } from '../services/workshopOutputsService'
 import { calculateWorkshopImpact, getWorkshopImpactLevel, WORKSHOP_IMPACT_EXPLANATION } from '../utils/workshopImpact'
+import {
+  STANDARD_CALCULATION_STATUS_LABELS,
+  STANDARD_CALCULATION_TYPE_LABELS,
+  calculateStandardComponentsPreview,
+  computeDoppiaPendenzaBase,
+  getAvailableSubcategories,
+  getStandardCalculationType,
+  isStandardCalculationSupported,
+  validateStandardParameters,
+} from '../utils/standardComponentsCalculator'
 import { Modal } from './Modal'
 import { FormField } from './FormField'
 
@@ -59,6 +74,19 @@ const EMPTY_OUTPUT: WorkshopOutputDraft = {
   commercialComponentsOrderedAt: '',
   commercialComponentsOrderedBy: '',
   commercialComponentsNotes: '',
+  machineLengthMm: null,
+  machineWidthMm: null,
+  machineHeightMm: null,
+  machineSpanMm: null,
+  machineModuleCount: null,
+  machineBayCount: null,
+  machineSlopePercent: null,
+  machineNotes: '',
+  standardComponentsMode: 'manual',
+  standardComponentsCalculationType: 'none',
+  standardComponentsSubcategory: 'none',
+  standardComponentsCalculatedAt: null,
+  standardComponentsCalculationStatus: 'not_configured',
   impactScore: 0,
   status: 'previsto',
   notes: '',
@@ -153,11 +181,22 @@ export function WorkshopOutputFormModal({
   }
 
   function selectMachineType(machineType: MachineType) {
+    const supportsStandardCalc = isStandardCalculationSupported(machineType.code)
+    const nextSubcategory: StandardComponentsSubcategory = supportsStandardCalc
+      ? (values.standardComponentsSubcategory && values.standardComponentsSubcategory !== 'none'
+          ? values.standardComponentsSubcategory
+          : 'none')
+      : 'none'
     const next: WorkshopOutputDraft = {
       ...values,
       machineTypeId: machineType.id,
       machineTypeCode: machineType.code,
       machineTypeName: machineType.name,
+      hasStandardComponents: supportsStandardCalc ? true : values.hasStandardComponents,
+      standardComponentsReadyFromDate: supportsStandardCalc && !values.standardComponentsReadyFromDate
+        ? new Date().toISOString().slice(0, 10)
+        : values.standardComponentsReadyFromDate,
+      standardComponentsSubcategory: nextSubcategory,
       description: values.description || machineType.name,
       quantity: 1,
       complexity: machineType.defaultComplexity,
@@ -284,6 +323,13 @@ export function WorkshopOutputFormModal({
         <p className="rounded-md border border-sky-500/25 bg-sky-500/8 px-3 py-2 text-[12px] text-sky-100">
           {WORKSHOP_IMPACT_EXPLANATION}
         </p>
+
+        {isStandardCalculationSupported(values.machineTypeCode) && (
+          <StandardParametersSection
+            values={values}
+            onChange={(patch) => setValues((current) => recalculate({ ...current, ...patch }, machineTypes))}
+          />
+        )}
 
         <button
           type="button"
@@ -493,6 +539,245 @@ export function WorkshopOutputFormModal({
         )}
       </div>
     </Modal>
+  )
+}
+
+interface StandardParametersSectionProps {
+  values: WorkshopOutputDraft
+  onChange: (patch: Partial<WorkshopOutputDraft>) => void
+}
+
+function StandardParametersSection({ values, onChange }: StandardParametersSectionProps) {
+  const supported = isStandardCalculationSupported(values.machineTypeCode)
+  if (!supported) return null
+  const calculationType = getStandardCalculationType(values.machineTypeCode)
+  const validation = validateStandardParameters({
+    machineTypeCode: values.machineTypeCode,
+    machineLengthMm: values.machineLengthMm,
+    machineWidthMm: values.machineWidthMm,
+    machineHeightMm: values.machineHeightMm,
+    machineSpanMm: values.machineSpanMm,
+    machineModuleCount: values.machineModuleCount,
+    machineBayCount: values.machineBayCount,
+    machineSlopePercent: values.machineSlopePercent,
+  })
+  const statusLabel = STANDARD_CALCULATION_STATUS_LABELS[validation.status]
+  const isTendostruttura = calculationType === 'I_TS'
+  const subcategories = getAvailableSubcategories(calculationType)
+  const subcategory = values.standardComponentsSubcategory ?? 'none'
+  const preview = useMemo(() => calculateStandardComponentsPreview({
+    machineTypeCode: values.machineTypeCode,
+    machineLengthMm: values.machineLengthMm,
+    machineWidthMm: values.machineWidthMm,
+    machineHeightMm: values.machineHeightMm,
+    machineSpanMm: values.machineSpanMm,
+    machineModuleCount: values.machineModuleCount,
+    machineBayCount: values.machineBayCount,
+    machineSlopePercent: values.machineSlopePercent,
+    standardComponentsSubcategory: subcategory,
+  }), [
+    values.machineTypeCode,
+    values.machineLengthMm,
+    values.machineWidthMm,
+    values.machineHeightMm,
+    values.machineSpanMm,
+    values.machineModuleCount,
+    values.machineBayCount,
+    values.machineSlopePercent,
+    subcategory,
+  ])
+  const doppiaPendenzaBase = useMemo(() => {
+    if (subcategory !== 'TS_DOPPIA_PENDENZA') return null
+    if (validation.status !== 'ready') return null
+    return computeDoppiaPendenzaBase({
+      lunghezza: Number(values.machineLengthMm) || 0,
+      larghezza: Number(values.machineWidthMm) || 0,
+      altezza: Number(values.machineHeightMm) || 0,
+    })
+  }, [subcategory, validation.status, values.machineLengthMm, values.machineWidthMm, values.machineHeightMm])
+  return (
+    <section className="md:col-span-2 rounded-xl border border-emerald-500/25 bg-emerald-500/8 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="text-sm font-medium text-emerald-100">Parametri macchina per standard</div>
+          <p className="mt-1 text-[11px] leading-relaxed text-emerald-100/80">
+            {STANDARD_CALCULATION_TYPE_LABELS[calculationType]}. Questi parametri servono al calcolo dei componenti standard producibili in anticipo.
+          </p>
+        </div>
+        <span className="chip-sm bg-emerald-500/10 text-emerald-200 ring-emerald-500/30">{statusLabel}</span>
+      </div>
+      {subcategories.length > 0 && (
+        <div className="mt-3">
+          <FormField label="Sottocategoria">
+            <select
+              className="input-base"
+              value={subcategory}
+              onChange={(event) => onChange({ standardComponentsSubcategory: event.target.value as StandardComponentsSubcategory })}
+            >
+              <option value="none">— Seleziona —</option>
+              {subcategories.map((option) => (
+                <option key={option} value={option}>{STANDARD_COMPONENTS_SUBCATEGORY_LABELS[option]}</option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+      )}
+      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <NumberFormField
+          label="Lunghezza (mm)"
+          value={values.machineLengthMm}
+          required
+          onChange={(value) => onChange({ machineLengthMm: value })}
+        />
+        <NumberFormField
+          label="Larghezza (mm)"
+          value={values.machineWidthMm}
+          required
+          onChange={(value) => onChange({ machineWidthMm: value })}
+        />
+        <NumberFormField
+          label="Altezza (mm)"
+          value={values.machineHeightMm}
+          required
+          onChange={(value) => onChange({ machineHeightMm: value })}
+        />
+        {isTendostruttura && (
+          <NumberFormField
+            label="Luce / span (mm)"
+            value={values.machineSpanMm}
+            onChange={(value) => onChange({ machineSpanMm: value })}
+          />
+        )}
+        <NumberFormField
+          label="Numero moduli"
+          value={values.machineModuleCount}
+          onChange={(value) => onChange({ machineModuleCount: value })}
+        />
+        <NumberFormField
+          label="Numero campate"
+          value={values.machineBayCount}
+          onChange={(value) => onChange({ machineBayCount: value })}
+        />
+        {isTendostruttura && (
+          <NumberFormField
+            label="Pendenza (%)"
+            value={values.machineSlopePercent}
+            step={0.5}
+            onChange={(value) => onChange({ machineSlopePercent: value })}
+          />
+        )}
+        <FormField label="Note parametri" className="md:col-span-3">
+          <textarea
+            rows={2}
+            className="input-base resize-y"
+            value={values.machineNotes ?? ''}
+            onChange={(event) => onChange({ machineNotes: event.target.value })}
+          />
+        </FormField>
+      </div>
+      {validation.missing.length > 0 && (
+        <p className="mt-2 rounded-md border border-amber-500/25 bg-amber-500/8 px-2.5 py-1.5 text-[11px] text-amber-100">
+          Parametri mancanti: {validation.missing.map((m) => m.label).join(', ')}.
+        </p>
+      )}
+      {validation.status === 'ready' && subcategory === 'none' && subcategories.length > 0 && (
+        <p className="mt-2 rounded-md border border-amber-500/25 bg-amber-500/8 px-2.5 py-1.5 text-[11px] text-amber-100">
+          Seleziona una sottocategoria per generare il calcolo standard.
+        </p>
+      )}
+      {doppiaPendenzaBase && (
+        <div className="mt-3 rounded-lg border border-emerald-500/25 bg-slate-950/40 p-3">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-200">Conteggi base (doppia pendenza)</div>
+          <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-200 sm:grid-cols-3 md:grid-cols-6">
+            <CountTile label="Colonne" value={doppiaPendenzaBase.colonne} />
+            <CountTile label="Collega colonne" value={doppiaPendenzaBase.collegaColonne} />
+            <CountTile label="Ruote colonne" value={doppiaPendenzaBase.ruoteColonne} />
+            <CountTile label="Collega capriate" value={doppiaPendenzaBase.collegaCapriate} />
+            <CountTile label="Binario a terra" value={doppiaPendenzaBase.binarioATerra} />
+            <CountTile label="Capriate" value={doppiaPendenzaBase.capriate} />
+          </div>
+        </div>
+      )}
+      {preview.components.length > 0 && (
+        <div className="mt-3 rounded-lg border border-emerald-500/25 bg-slate-950/40 p-3">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-200">Standard generati</div>
+            <div className="text-[10px] text-slate-400">{preview.components.length} righe</div>
+          </div>
+          <div className="max-h-64 overflow-y-auto scroll-thin">
+            <table className="w-full text-[11px]">
+              <thead className="text-left text-[10px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="py-1 pr-2">Codice</th>
+                  <th className="py-1 pr-2 text-right">Qt</th>
+                  <th className="py-1 pr-2">Processo</th>
+                  <th className="py-1 pr-2">Note</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {preview.components.map((component) => (
+                  <tr key={component.id}>
+                    <td className="py-1 pr-2 font-mono text-slate-200">{component.componentCode}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-slate-100">{component.quantity}</td>
+                    <td className="py-1 pr-2 text-slate-300">{WORKSHOP_WORKER_SKILL_LABELS[component.process] ?? component.process}</td>
+                    <td className="py-1 pr-2 text-[10px] text-slate-400">{component.notes || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {validation.status === 'ready' && subcategory !== 'none' && preview.components.length === 0 && (
+        <p className="mt-2 rounded-md border border-sky-500/25 bg-sky-500/8 px-2.5 py-1.5 text-[11px] text-sky-100">
+          Parametri completi. Formula di calcolo per "{STANDARD_COMPONENTS_SUBCATEGORY_LABELS[subcategory]}" non ancora configurata.
+        </p>
+      )}
+    </section>
+  )
+}
+
+function CountTile({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-900/60 px-2 py-1.5">
+      <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
+      <div className="mt-0.5 text-base font-semibold tabular-nums text-emerald-100">{value}</div>
+    </div>
+  )
+}
+
+function NumberFormField({
+  label,
+  value,
+  required,
+  step,
+  onChange,
+}: {
+  label: string
+  value: number | null | undefined
+  required?: boolean
+  step?: number
+  onChange: (value: number | null) => void
+}) {
+  return (
+    <FormField label={label} required={required}>
+      <input
+        type="number"
+        min={0}
+        step={step ?? 1}
+        className="input-base"
+        value={value ?? ''}
+        onChange={(event) => {
+          const raw = event.target.value
+          if (raw === '') {
+            onChange(null)
+            return
+          }
+          const parsed = Number(raw)
+          onChange(Number.isFinite(parsed) ? parsed : null)
+        }}
+      />
+    </FormField>
   )
 }
 

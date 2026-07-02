@@ -151,7 +151,27 @@ export const EMPTY_APP_DATA = {
   workshopOutputs: [],
   workshopWorkers: [],
   workshopAssignments: [],
+  calculatedStandardComponents: [],
 }
+
+const VALID_STANDARD_COMPONENTS_MODES = new Set(['manual', 'calculated', 'mixed'])
+const VALID_STANDARD_COMPONENTS_CALCULATION_TYPES = new Set(['none', 'I_TS', 'I_SC'])
+const VALID_STANDARD_COMPONENTS_CALCULATION_STATUSES = new Set([
+  'not_configured',
+  'missing_parameters',
+  'ready',
+  'calculated',
+  'manual_override',
+])
+const VALID_STANDARD_COMPONENTS_SUBCATEGORIES = new Set([
+  'none',
+  'TS_MONOPENDENZA',
+  'TS_MONOPENDENZA_DOPPIO_ZERO',
+  'TS_DOPPIA_PENDENZA',
+  'TS_DOPPIA_PENDENZA_COLONNE_MONO',
+  'SC_CANTILEVER_MONOFRONTE',
+  'SC_CANTILEVER_BIFRONTE',
+])
 
 export function extractAppData(payload) {
   const root = asObject(payload)
@@ -190,6 +210,9 @@ export function normalizeAppData(input) {
   if (root.workshopAssignments !== undefined && !Array.isArray(root.workshopAssignments)) {
     throw new Error('workshopAssignments deve essere un array oppure assente.')
   }
+  if (root.calculatedStandardComponents !== undefined && !Array.isArray(root.calculatedStandardComponents)) {
+    throw new Error('calculatedStandardComponents deve essere un array oppure assente.')
+  }
 
   return {
     people: root.people.map((item, index) => normalizePerson(item, index)),
@@ -203,6 +226,7 @@ export function normalizeAppData(input) {
     workshopOutputs: (root.workshopOutputs ?? []).map(normalizeWorkshopOutput).filter(Boolean),
     workshopWorkers: (root.workshopWorkers ?? []).map(normalizeWorkshopWorker).filter(Boolean),
     workshopAssignments: (root.workshopAssignments ?? []).map(normalizeWorkshopAssignment).filter(Boolean),
+    calculatedStandardComponents: (root.calculatedStandardComponents ?? []).map(normalizeCalculatedStandardComponent).filter(Boolean),
   }
 }
 
@@ -219,6 +243,7 @@ export function countAppData(data) {
     workshopOutputs: data.workshopOutputs.length,
     workshopWorkers: data.workshopWorkers.length,
     workshopAssignments: data.workshopAssignments.length,
+    calculatedStandardComponents: (data.calculatedStandardComponents ?? []).length,
   }
 }
 
@@ -442,6 +467,19 @@ function normalizeWorkshopOutput(item) {
     standardComponentsImpactScore: hasStandardComponents ? positiveNumber(o.standardComponentsImpactScore, 0) : 0,
     standardComponentsProcesses: stringArray(o.standardComponentsProcesses).filter((process) => VALID_WORKSHOP_WORKER_SKILLS.has(process)),
     standardComponentsNotes: isString(o.standardComponentsNotes) ? o.standardComponentsNotes : '',
+    machineLengthMm: optionalPositiveNumberOrNull(o.machineLengthMm),
+    machineWidthMm: optionalPositiveNumberOrNull(o.machineWidthMm),
+    machineHeightMm: optionalPositiveNumberOrNull(o.machineHeightMm),
+    machineSpanMm: optionalPositiveNumberOrNull(o.machineSpanMm),
+    machineModuleCount: optionalPositiveNumberOrNull(o.machineModuleCount),
+    machineBayCount: optionalPositiveNumberOrNull(o.machineBayCount),
+    machineSlopePercent: optionalPositiveNumberOrNull(o.machineSlopePercent),
+    machineNotes: isString(o.machineNotes) ? o.machineNotes : '',
+    standardComponentsMode: VALID_STANDARD_COMPONENTS_MODES.has(o.standardComponentsMode) ? o.standardComponentsMode : 'manual',
+    standardComponentsCalculationType: VALID_STANDARD_COMPONENTS_CALCULATION_TYPES.has(o.standardComponentsCalculationType) ? o.standardComponentsCalculationType : 'none',
+    standardComponentsSubcategory: VALID_STANDARD_COMPONENTS_SUBCATEGORIES.has(o.standardComponentsSubcategory) ? o.standardComponentsSubcategory : 'none',
+    standardComponentsCalculatedAt: isString(o.standardComponentsCalculatedAt) && o.standardComponentsCalculatedAt ? o.standardComponentsCalculatedAt : null,
+    standardComponentsCalculationStatus: VALID_STANDARD_COMPONENTS_CALCULATION_STATUSES.has(o.standardComponentsCalculationStatus) ? o.standardComponentsCalculationStatus : 'not_configured',
     hasCommercialComponents: toBoolean(o.hasCommercialComponents, false),
     commercialComponentsDescription: isString(o.commercialComponentsDescription) ? o.commercialComponentsDescription : '',
     commercialComponentsOrderRequired: toBoolean(o.commercialComponentsOrderRequired, false),
@@ -527,6 +565,38 @@ function normalizeWorkshopAssignment(item) {
     createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
     updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
   }
+}
+
+function normalizeCalculatedStandardComponent(item) {
+  const o = asObject(item)
+  if (!o || !isNonEmptyString(o.id) || !isNonEmptyString(o.workshopOutputId) || !isNonEmptyString(o.workItemId)) return null
+  if (!isNonEmptyString(o.machineTypeCode)) return null
+  const process = isString(o.process) && VALID_WORKSHOP_WORKER_SKILLS.has(o.process) ? o.process : 'altro'
+  const source = o.source === 'calculated' ? 'calculated' : 'manual'
+  const now = new Date().toISOString()
+  return {
+    id: o.id,
+    workshopOutputId: o.workshopOutputId,
+    workItemId: o.workItemId,
+    machineTypeCode: String(o.machineTypeCode).toUpperCase(),
+    componentCode: isString(o.componentCode) ? o.componentCode : '',
+    componentName: isString(o.componentName) ? o.componentName : '',
+    description: isString(o.description) ? o.description : '',
+    quantity: isNumber(o.quantity) ? Math.max(0, Math.round(o.quantity)) : 0,
+    process,
+    readyFromDate: isString(o.readyFromDate) ? o.readyFromDate : '',
+    impactScore: isNumber(o.impactScore) ? Math.max(0, Math.round(o.impactScore * 10) / 10) : 0,
+    notes: isString(o.notes) ? o.notes : '',
+    source,
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
+function optionalPositiveNumberOrNull(value) {
+  if (!isNumber(value)) return null
+  if (value <= 0) return null
+  return value
 }
 
 function normalizeNotification(item) {

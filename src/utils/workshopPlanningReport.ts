@@ -262,7 +262,15 @@ export function buildWorkshopPlanningReport(
     })
     .filter((row) => row.coverage.requiredProcesses.length > 0 && row.coverage.status !== 'assegnato')
     .filter((row) => (station ? row.coverage.requiredProcesses.includes(station) : true))
-    .filter((row) => (row.date ? row.date >= startISO && row.date <= endISO : true))
+    // Output di lavori completati ma non ancora assegnati restano sempre nel
+    // report finche' non li si assegna: non vengono filtrati per data, evitando
+    // che spariscano quando il workItem chiude al 100% con dueDate gia' passata.
+    .filter((row) => {
+      const isCompletedAwaitingAssignment =
+        row.workItem?.status === 'Completato' && row.coverage.status !== 'assegnato'
+      if (isCompletedAwaitingAssignment) return true
+      return row.date ? row.date >= startISO && row.date <= endISO : true
+    })
     .filter((row) => {
       if (filters.onlyUnassigned && row.coverage.status !== 'non_assegnato') return false
       if (q) {

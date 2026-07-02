@@ -7,6 +7,7 @@ import {
   WORKSHOP_WORKER_SKILL_LABELS,
 } from '../types'
 import type {
+  CalculatedStandardComponent,
   WorkItem,
   WorkshopAssignment,
   WorkshopAssignmentProcess,
@@ -39,8 +40,17 @@ import { Modal } from './Modal'
 import { ConfirmDialog } from './ConfirmDialog'
 import { WorkItemDetailDrawer } from './WorkItemDetailDrawer'
 import { WorkshopPlanningReportModal } from './WorkshopPlanningReportModal'
+import { StandardParametersReportModal } from './StandardParametersReportModal'
+import { CalculatedStandardComponentsReportModal } from './CalculatedStandardComponentsReportModal'
 import type { WorkshopPlanningReportFilters } from '../utils/workshopPlanningReport'
 import { sortWorkshopWorkers } from '../utils/workshopWorkers'
+import {
+  STANDARD_CALCULATION_STATUS_LABELS,
+  STANDARD_CALCULATION_TYPE_LABELS,
+  getStandardCalculationType,
+  isStandardCalculationSupported,
+  validateStandardParameters,
+} from '../utils/standardComponentsCalculator'
 
 type AssignmentStatusFilter = WorkshopAssignmentStatus | ''
 type ProcessFilter = WorkshopAssignmentProcess | ''
@@ -106,6 +116,8 @@ export function WorkshopPlanningView() {
   const [detailWorkerId, setDetailWorkerId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<WorkshopAssignment | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
+  const [standardReportOpen, setStandardReportOpen] = useState(false)
+  const [calculatedStandardsReportOpen, setCalculatedStandardsReportOpen] = useState(false)
 
   const workItemById = useMemo(() => new Map(data.workItems.map((workItem) => [workItem.id, workItem])), [data.workItems])
   const workerById = useMemo(() => new Map(workshopWorkers.map((worker) => [worker.id, worker])), [workshopWorkers])
@@ -125,6 +137,27 @@ export function WorkshopPlanningView() {
       coverage: getAssignmentCoverageForOutput(output, workshopAssignments, 'standard_component'),
     })), [workshopOutputs, workItemById, workshopAssignments])
 
+  const calculableStandards = useMemo(() => workshopOutputs
+    .filter((output) => isStandardCalculationSupported(output.machineTypeCode))
+    .map((output) => {
+      const validation = validateStandardParameters({
+        machineTypeCode: output.machineTypeCode,
+        machineLengthMm: output.machineLengthMm,
+        machineWidthMm: output.machineWidthMm,
+        machineHeightMm: output.machineHeightMm,
+        machineSpanMm: output.machineSpanMm,
+        machineModuleCount: output.machineModuleCount,
+        machineBayCount: output.machineBayCount,
+        machineSlopePercent: output.machineSlopePercent,
+      })
+      return {
+        output,
+        workItem: workItemById.get(output.workItemId),
+        calculationType: getStandardCalculationType(output.machineTypeCode),
+        validation,
+      }
+    }), [workshopOutputs, workItemById])
+
   const filteredOutputCards = useMemo(() => {
     const q = query.trim().toLowerCase()
     return outputCards.filter((card) => {
@@ -133,8 +166,15 @@ export function WorkshopPlanningView() {
       if (card.coverage.status === 'assegnato') return false
       if (onlyUnassigned && card.coverage.status !== 'non_assegnato') return false
       if (processFilter && !card.coverage.requiredProcesses.includes(processFilter)) return false
-      const outputDate = getOutputPlanningDate(card.output, card.workItem)
-      if (outputDate && formatISODate(startOfWeek(parseISODate(outputDate))) !== weekStart) return false
+      // Lavoro completato lato workload ma non ancora assegnato in officina
+      // (qui arriviamo solo se coverage.status !== 'assegnato'): resta visibile
+      // in qualsiasi settimana finche' non lo si assegna. Evita che un workItem
+      // chiuso al 100% sparisca dalla pianificazione officina solo perche' la
+      // sua dueDate e' caduta in una settimana passata.
+      if (card.workItem?.status !== 'Completato') {
+        const outputDate = getOutputPlanningDate(card.output, card.workItem)
+        if (outputDate && formatISODate(startOfWeek(parseISODate(outputDate))) !== weekStart) return false
+      }
       if (q) {
         const hay = `${card.workItem?.code ?? ''} ${card.workItem?.customer ?? ''} ${card.workItem?.title ?? ''} ${card.output.machineTypeCode} ${card.output.machineTypeName} ${card.output.description}`.toLowerCase()
         if (!hay.includes(q)) return false
@@ -150,8 +190,15 @@ export function WorkshopPlanningView() {
       if (card.coverage.requiredProcesses.length === 0) return false
       if (onlyUnassigned && card.coverage.status === 'assegnato') return false
       if (processFilter && !card.coverage.requiredProcesses.includes(processFilter)) return false
-      const readyDate = card.output.standardComponentsReadyFromDate || card.output.createdAt.slice(0, 10)
-      if (readyDate && formatISODate(startOfWeek(parseISODate(readyDate))) !== weekStart && viewMode === 'weekly') return false
+      // Stessa regola degli output: se il workItem e' completato ma i componenti
+      // standard non sono ancora assegnati, resta visibile a prescindere dalla
+      // settimana selezionata.
+      const isCompletedAwaitingAssignment =
+        card.workItem?.status === 'Completato' && card.coverage.status !== 'assegnato'
+      if (!isCompletedAwaitingAssignment) {
+        const readyDate = card.output.standardComponentsReadyFromDate || card.output.createdAt.slice(0, 10)
+        if (readyDate && formatISODate(startOfWeek(parseISODate(readyDate))) !== weekStart && viewMode === 'weekly') return false
+      }
       if (q) {
         const hay = `${card.workItem?.code ?? ''} ${card.workItem?.customer ?? ''} ${card.workItem?.title ?? ''} ${card.output.machineTypeCode} ${card.output.machineTypeName} ${card.output.standardComponentsDescription ?? ''}`.toLowerCase()
         if (!hay.includes(q)) return false
@@ -328,6 +375,20 @@ export function WorkshopPlanningView() {
         onWorkItemClick={setDrawerWorkItemId}
       />
 
+      <CalculableStandardsSection
+        rows={calculableStandards}
+        onWorkItemClick={setDrawerWorkItemId}
+        onOpenReport={() => setStandardReportOpen(true)}
+      />
+
+      <CalculatedStandardsDashboard
+        components={data.calculatedStandardComponents ?? []}
+        workItemById={workItemById}
+        outputById={outputById}
+        onWorkItemClick={setDrawerWorkItemId}
+        onOpenReport={() => setCalculatedStandardsReportOpen(true)}
+      />
+
       {viewMode === 'daily' && (
         <DailyLoadSection
           rows={dailyLoads}
@@ -425,8 +486,220 @@ export function WorkshopPlanningView() {
 
       <WorkItemDetailDrawer workItemId={drawerWorkItemId} onClose={() => setDrawerWorkItemId(null)} />
       <WorkshopPlanningReportModal open={reportOpen} onClose={() => setReportOpen(false)} filters={reportFilters} />
+      <StandardParametersReportModal open={standardReportOpen} onClose={() => setStandardReportOpen(false)} />
+      <CalculatedStandardComponentsReportModal open={calculatedStandardsReportOpen} onClose={() => setCalculatedStandardsReportOpen(false)} />
     </section>
   )
+}
+
+interface CalculableStandardRow {
+  output: WorkshopOutput
+  workItem?: WorkItem
+  calculationType: ReturnType<typeof getStandardCalculationType>
+  validation: ReturnType<typeof validateStandardParameters>
+}
+
+function CalculableStandardsSection({
+  rows,
+  onWorkItemClick,
+  onOpenReport,
+}: {
+  rows: CalculableStandardRow[]
+  onWorkItemClick: (workItemId: string) => void
+  onOpenReport: () => void
+}) {
+  const total = rows.length
+  const ready = rows.filter((row) => row.validation.status === 'ready').length
+  const missing = rows.filter((row) => row.validation.status === 'missing_parameters').length
+  return (
+    <section className="space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold tracking-tight text-slate-100">Componenti standard calcolabili</h3>
+          <p className="mt-0.5 max-w-3xl text-[11px] text-slate-500">
+            Questa sezione mostra gli output (I.TS / I.SC) che possono generare componenti standard in base a parametri macchina.
+            La produzione potrà anticipare parti note prima del rilascio completo del progetto. La formula di calcolo sarà configurata in una fase successiva.
+          </p>
+          <p className="mt-1 text-[11px] text-slate-500">
+            {total} output rilevati · {ready} con parametri completi · {missing} con parametri mancanti
+          </p>
+        </div>
+        <button type="button" className="btn-ghost text-xs" onClick={onOpenReport}>
+          <PrinterIcon /> Report standard da parametri
+        </button>
+      </div>
+      <div className="panel overflow-hidden">
+        <div className="overflow-x-auto scroll-thin">
+          <table className="w-full min-w-[1080px] text-sm">
+            <thead className="table-head border-b border-slate-800">
+              <tr>
+                <th className="px-3 py-2.5 text-left">Commessa</th>
+                <th className="px-3 py-2.5 text-left">Cliente</th>
+                <th className="px-3 py-2.5 text-left">Tipo</th>
+                <th className="px-3 py-2.5 text-left">Output</th>
+                <th className="px-3 py-2.5 text-right">Lung. (mm)</th>
+                <th className="px-3 py-2.5 text-right">Larg. (mm)</th>
+                <th className="px-3 py-2.5 text-right">Alt. (mm)</th>
+                <th className="px-3 py-2.5 text-left">Stato parametri</th>
+                <th className="px-3 py-2.5 text-left">Producibile da</th>
+                <th className="px-3 py-2.5 text-right">Azioni</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60">
+              {rows.map((row) => (
+                <tr key={row.output.id} className="table-row">
+                  <td className="px-3 py-2.5 font-mono text-xs text-slate-300">{row.workItem?.code ?? '-'}</td>
+                  <td className="px-3 py-2.5 text-slate-300">{row.workItem?.customer ?? '-'}</td>
+                  <td className="px-3 py-2.5 text-slate-300">{STANDARD_CALCULATION_TYPE_LABELS[row.calculationType]}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="font-medium text-slate-100">{row.output.machineTypeCode} – {row.output.machineTypeName}</div>
+                    <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-500">{row.output.description || '-'}</div>
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{row.output.machineLengthMm ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{row.output.machineWidthMm ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{row.output.machineHeightMm ?? '—'}</td>
+                  <td className="px-3 py-2.5">
+                    <StandardParamsStatusBadge status={row.validation.status} />
+                    {row.validation.missing.length > 0 && (
+                      <div className="mt-0.5 text-[10px] text-amber-200">
+                        Mancano: {row.validation.missing.map((m) => m.label).join(', ')}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-slate-300">{row.output.standardComponentsReadyFromDate || row.output.plannedReleaseDate || '—'}</td>
+                  <td className="px-3 py-2.5 text-right">
+                    {row.workItem && (
+                      <button className="btn-ghost text-xs" onClick={() => row.workItem && onWorkItemClick(row.workItem.id)}>
+                        Apri commessa
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="px-3 py-8 text-center text-sm text-slate-500">
+                    Nessun output I.TS o I.SC presente. Aggiungi un output di queste tipologie per raccogliere i parametri.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+interface CalculatedStandardsDashboardProps {
+  components: CalculatedStandardComponent[]
+  workItemById: Map<string, WorkItem>
+  outputById: Map<string, WorkshopOutput>
+  onWorkItemClick: (workItemId: string) => void
+  onOpenReport: () => void
+}
+
+function CalculatedStandardsDashboard({
+  components,
+  workItemById,
+  outputById,
+  onWorkItemClick,
+  onOpenReport,
+}: CalculatedStandardsDashboardProps) {
+  const rows = useMemo(() => components.slice().sort((a, b) => {
+    const codeA = workItemById.get(a.workItemId)?.code ?? ''
+    const codeB = workItemById.get(b.workItemId)?.code ?? ''
+    const byCode = codeA.localeCompare(codeB, 'it', { sensitivity: 'base' })
+    if (byCode !== 0) return byCode
+    return a.componentCode.localeCompare(b.componentCode, 'it', { sensitivity: 'base' })
+  }), [components, workItemById])
+  const totalQty = rows.reduce((sum, row) => sum + row.quantity, 0)
+  const uniqueCodes = new Set(rows.map((row) => row.componentCode)).size
+  const involvedOutputs = new Set(rows.map((row) => row.workshopOutputId)).size
+  return (
+    <section className="space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold tracking-tight text-amber-200">
+            <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-amber-300 align-middle" />
+            Componenti standard calcolati — anticipo produzione
+          </h3>
+          <p className="mt-0.5 max-w-3xl text-[11px] text-amber-100/70">
+            Particolari STS / ITS derivati dai parametri dimensionali degli output I.TS / I.SC con sottocategoria configurata.
+            Sono producibili in anticipo perche dipendono solo da misure note. Aggiornati automaticamente al salvataggio dell'output.
+          </p>
+          <p className="mt-1 text-[11px] text-amber-100/70">
+            {rows.length} righe · {uniqueCodes} codici distinti · {totalQty} pezzi totali · {involvedOutputs} output coinvolti
+          </p>
+        </div>
+        <button type="button" className="btn-primary text-xs" onClick={onOpenReport}>
+          <PrinterIcon /> Report standard calcolati
+        </button>
+      </div>
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3 ring-1 ring-amber-500/15">
+        <div className="overflow-x-auto scroll-thin">
+          <table className="w-full min-w-[960px] text-sm">
+            <thead className="text-left text-[10px] uppercase tracking-wide text-amber-200/80">
+              <tr>
+                <th className="px-3 py-2">Commessa</th>
+                <th className="px-3 py-2">Cliente</th>
+                <th className="px-3 py-2">Output</th>
+                <th className="px-3 py-2">Codice</th>
+                <th className="px-3 py-2">Nome</th>
+                <th className="px-3 py-2 text-right">Q.ta</th>
+                <th className="px-3 py-2">Processo</th>
+                <th className="px-3 py-2">Note</th>
+                <th className="px-3 py-2 text-right">Azioni</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-amber-500/10">
+              {rows.map((row) => {
+                const workItem = workItemById.get(row.workItemId)
+                const output = outputById.get(row.workshopOutputId)
+                return (
+                  <tr key={row.id} className="hover:bg-amber-500/5">
+                    <td className="px-3 py-2 font-mono text-xs text-amber-100">{workItem?.code ?? '-'}</td>
+                    <td className="px-3 py-2 text-slate-300">{workItem?.customer ?? '-'}</td>
+                    <td className="px-3 py-2 text-slate-300">{output ? `${output.machineTypeCode} - ${output.machineTypeName}` : row.machineTypeCode}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-amber-100">{row.componentCode}</td>
+                    <td className="px-3 py-2 text-slate-200">{row.componentName}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold text-amber-100">{row.quantity}</td>
+                    <td className="px-3 py-2 text-slate-300">{WORKSHOP_WORKER_SKILL_LABELS[row.process] ?? row.process}</td>
+                    <td className="px-3 py-2 text-[11px] text-slate-400">{row.notes || '—'}</td>
+                    <td className="px-3 py-2 text-right">
+                      {workItem && (
+                        <button className="btn-ghost text-xs" onClick={() => onWorkItemClick(workItem.id)}>
+                          Apri commessa
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-3 py-6 text-center text-sm text-amber-100/60">
+                    Nessun componente standard calcolato. Configura sottocategoria e dimensioni in un output I.TS / I.SC per popolare questa lista.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function StandardParamsStatusBadge({ status }: { status: ReturnType<typeof validateStandardParameters>['status'] }) {
+  const cls = status === 'ready'
+    ? 'bg-sky-500/10 text-sky-200 ring-sky-500/30'
+    : status === 'missing_parameters'
+      ? 'bg-amber-500/10 text-amber-200 ring-amber-500/30'
+      : status === 'calculated'
+        ? 'bg-emerald-500/10 text-emerald-200 ring-emerald-500/30'
+        : 'bg-slate-500/10 text-slate-300 ring-slate-500/30'
+  return <span className={`chip-sm ${cls}`}>{STANDARD_CALCULATION_STATUS_LABELS[status]}</span>
 }
 
 function FiltersPanel({

@@ -1,13 +1,20 @@
 import type { Absence, Person, Status, Task, WorkItem } from '../types'
 import { CLOSED_STATUSES } from '../types'
-import { endOfWeek, formatISODate, startOfWeek, workingDaysBetween, workingDaysOverlap } from './dates'
+import { addWorkingDays, endOfWeek, formatISODate, startOfWeek, workingDaysBetween, workingDaysOverlap } from './dates'
+
+/**
+ * Numero di giorni lavorativi su cui spalmare il residuo dei lavori scaduti.
+ * Evita che un singolo lavoro overdue scarichi tutta la sua urgenza sulla
+ * settimana corrente, gonfiando la % di carico oltre il realistico.
+ */
+const OVERDUE_RECOVERY_WORKING_DAYS = 5
 import { getAbsenceHoursForPersonInWeek } from './availability'
 
 export interface WorkloadResult {
   personId: string
-  /** Ore totali settimanali considerate (dichiarate + base) */
+  /** Ore totali settimanali considerate. Pavimento: max(dichiarate, base). */
   weekHours: number
-  /** Solo ore da task/lavori dichiarati */
+  /** Solo ore da task/lavori dichiarati, con cap a capacita' reale per voce. */
   declaredHours: number
   /** Ore derivate dal carico base configurato sulla persona */
   baselineHours: number
@@ -96,8 +103,9 @@ function isCountableForLoad(entity: Pick<Task | WorkItem, 'status'>): boolean {
  * task. Conseguenze:
  *  - un task con poco tempo residuo e poco avanzamento concentra molte ore
  *    nella settimana corrente (riflette l'urgenza reale)
- *  - un task scaduto con ore residue > 0 viene tutto attribuito alla settimana
- *    che contiene "oggi" (urgenza massima)
+ *  - un task scaduto con ore residue > 0 viene spalmato su una finestra di
+ *    recupero di 5 giorni lavorativi dalla data odierna: una settimana intera
+ *    di "ammortamento" evita che un singolo overdue gonfi da solo la %
  *  - per settimane future, le ore arrivano solo se la scadenza è oltre quella
  *    settimana e da oggi rimangono giorni sufficienti per attraversarla
  *
@@ -119,10 +127,16 @@ export function hoursAssignedInWeek(
   // Se il task inizia in futuro, si distribuiscono dal suo inizio.
   const effectiveStartISO = todayISO > item.startDate ? todayISO : item.startDate
 
-  // Task scaduto con residuo > 0: tutta l'urgenza ricade sulla settimana corrente.
+  // Task scaduto con residuo > 0: spalmiamo le ore sui prossimi N giorni
+  // lavorativi a partire da oggi (finestra di recupero), invece di scaricarle
+  // tutte sulla settimana corrente. Cosi' un overdue grosso non porta da solo
+  // il carico oltre il realistico.
   if (effectiveStartISO > item.dueDate) {
-    const isCurrentWeek = today >= weekStart && today <= weekEnd
-    return isCurrentWeek ? remainingHours : 0
+    const recoveryEnd = addWorkingDays(today, OVERDUE_RECOVERY_WORKING_DAYS - 1)
+    const recoveryEndISO = formatISODate(recoveryEnd)
+    const overlap = workingDaysOverlap(todayISO, recoveryEndISO, weekStart, weekEnd)
+    if (overlap === 0) return 0
+    return remainingHours * (overlap / OVERDUE_RECOVERY_WORKING_DAYS)
   }
 
   const overlap = workingDaysOverlap(effectiveStartISO, item.dueDate, weekStart, weekEnd)
@@ -222,25 +236,35 @@ export function computeWorkload(
   const ws = startOfWeek(reference)
   const we = endOfWeek(reference)
   const activities = getWorkloadActivitiesForPerson(person, tasks, workItems, ws, we, today)
-  let declaredHours = 0
-  let counted = 0
-  for (const activity of activities) {
-    if (activity.hoursInWeek > 0) {
-      declaredHours += activity.hoursInWeek
-      counted++
-    }
-  }
   const capacity = person.weeklyCapacityHours
   const absenceHours = getAbsenceHoursForPersonInWeek(person.id, absences, ws, we)
   const realCapacity = Math.max(0, capacity - absenceHours)
   const isFullyAbsent = realCapacity === 0 && absenceHours > 0
+
+  // Cap per voce: un singolo lavoro non puo' consumare in una settimana piu'
+  // della capacita' reale della persona. Se ne richiederebbe di piu' (es. tutto
+  // il residuo strizzato negli ultimi giorni), l'eccedenza non gonfia la % —
+  // resta visibile nello scadenzario come lavoro non fattibile in tempo.
+  const perItemCap = realCapacity > 0 ? realCapacity : Infinity
+  let declaredHours = 0
+  let counted = 0
+  for (const activity of activities) {
+    if (activity.hoursInWeek > 0) {
+      declaredHours += Math.min(activity.hoursInWeek, perItemCap)
+      counted++
+    }
+  }
 
   // Carico base: % della capacità REALE. Si scala automaticamente con le assenze:
   // capacità reale 0 → 0 ore base.
   const baselinePercent = clampPercent(person.baselineLoadPercent ?? 0)
   const baselineHours = isFullyAbsent ? 0 : (realCapacity * baselinePercent) / 100
 
-  const weekHours = declaredHours + baselineHours
+  // Il baseline e' un PAVIMENTO, non un addendo: garantisce un minimo di carico
+  // ricorrente non tracciato, ma se i lavori dichiarati lo superano gia',
+  // non si somma sopra (evita doppio conteggio: le attivita' di base sono spesso
+  // gia' rappresentate dai workItems).
+  const weekHours = Math.max(declaredHours, baselineHours)
 
   let percent = 0
   if (realCapacity > 0) {

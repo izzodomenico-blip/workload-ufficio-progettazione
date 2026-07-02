@@ -424,10 +424,27 @@ textarea:focus-visible,
   }
 
   .executive-person-row {
+    padding: 7px 9px !important;
+  }
+
+  .executive-person-row > .grid {
     grid-template-columns: 42px minmax(0, 1fr) 74px !important;
     align-items: start !important;
     gap: 8px !important;
-    padding: 7px 9px !important;
+  }
+
+  .executive-person-activities {
+    margin-left: 40px !important;
+    padding-left: 10px !important;
+  }
+
+  .executive-activity-line {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    grid-template-columns: 36px minmax(0, 1fr) auto !important;
+    column-gap: 6px !important;
+    padding: 1px 0 !important;
+    font-size: 10.5px !important;
   }
 
   .executive-report-print-area .truncate {

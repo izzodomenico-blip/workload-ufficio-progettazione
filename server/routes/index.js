@@ -43,6 +43,7 @@ const APP_DATA_COLLECTIONS = [
   'workshopOutputs',
   'workshopWorkers',
   'workshopAssignments',
+  'calculatedStandardComponents',
 ]
 const PRESERVE_IF_EMPTY_COLLECTIONS = new Set(['businessPartners', 'machineTypes', 'workshopOutputs', 'workshopWorkers', 'workshopAssignments'])
 

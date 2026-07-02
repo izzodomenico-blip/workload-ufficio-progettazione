@@ -4,6 +4,9 @@ import {
   ALL_ACTIVITY_ENTITY_TYPES,
   ALL_MACHINE_COMPLEXITIES,
   ALL_PRIORITIES,
+  ALL_STANDARD_COMPONENTS_CALCULATION_STATUSES,
+  ALL_STANDARD_COMPONENTS_CALCULATION_TYPES,
+  ALL_STANDARD_COMPONENTS_MODES,
   ALL_TYPES,
   ALL_WORKSHOP_ASSIGNMENT_STATUSES,
   ALL_WORKSHOP_OUTPUT_STATUSES,
@@ -18,12 +21,16 @@ import type {
   AppData,
   BusinessPartner,
   BusinessPartnerType,
+  CalculatedStandardComponent,
   MachineComplexity,
   MachineType,
   Notification,
   NotificationEntityType,
   Person,
   Priority,
+  StandardComponentsCalculationStatus,
+  StandardComponentsCalculationType,
+  StandardComponentsMode,
   Task,
   WorkItem,
   WorkItemType,
@@ -115,6 +122,7 @@ export interface BackupCounts {
   workshopOutputs: number
   workshopWorkers: number
   workshopAssignments: number
+  calculatedStandardComponents: number
 }
 
 export interface BackupInfo {
@@ -166,6 +174,9 @@ const MACHINE_COMPLEXITIES = new Set<string>(ALL_MACHINE_COMPLEXITIES)
 const WORKSHOP_OUTPUT_STATUSES = new Set<string>(ALL_WORKSHOP_OUTPUT_STATUSES)
 const WORKSHOP_WORKER_SKILLS = new Set<string>(ALL_WORKSHOP_WORKER_SKILLS)
 const WORKSHOP_ASSIGNMENT_STATUSES = new Set<string>(ALL_WORKSHOP_ASSIGNMENT_STATUSES)
+const STANDARD_COMPONENTS_MODES = new Set<string>(ALL_STANDARD_COMPONENTS_MODES)
+const STANDARD_COMPONENTS_CALCULATION_TYPES = new Set<string>(ALL_STANDARD_COMPONENTS_CALCULATION_TYPES)
+const STANDARD_COMPONENTS_CALCULATION_STATUSES = new Set<string>(ALL_STANDARD_COMPONENTS_CALCULATION_STATUSES)
 
 export function createBackupPayload(data: AppData, exportedAt: Date = new Date()): BackupPayload {
   const backupData: AppData = {
@@ -181,6 +192,7 @@ export function createBackupPayload(data: AppData, exportedAt: Date = new Date()
     workshopOutputs: data.workshopOutputs ?? [],
     workshopWorkers: data.workshopWorkers ?? [],
     workshopAssignments: data.workshopAssignments ?? [],
+    calculatedStandardComponents: data.calculatedStandardComponents ?? [],
   }
 
   return {
@@ -226,6 +238,7 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   const rawWorkshopOutputs = root.workshopOutputs
   const rawWorkshopWorkers = root.workshopWorkers
   const rawWorkshopAssignments = root.workshopAssignments
+  const rawCalculatedStandardComponents = root.calculatedStandardComponents
 
   if (!Array.isArray(rawPeople)) issues.push('people deve essere un array.')
   if (!Array.isArray(rawWorkItems)) issues.push('workItems deve essere un array.')
@@ -251,6 +264,9 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   }
   if (rawWorkshopAssignments !== undefined && !Array.isArray(rawWorkshopAssignments)) {
     issues.push('workshopAssignments deve essere un array oppure assente.')
+  }
+  if (rawCalculatedStandardComponents !== undefined && !Array.isArray(rawCalculatedStandardComponents)) {
+    issues.push('calculatedStandardComponents deve essere un array oppure assente.')
   }
 
   const people: Person[] = []
@@ -336,6 +352,9 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
   const businessPartners = Array.isArray(rawBusinessPartners)
     ? rawBusinessPartners.map(normalizeBusinessPartner).filter(isPresent)
     : []
+  const calculatedStandardComponents = Array.isArray(rawCalculatedStandardComponents)
+    ? rawCalculatedStandardComponents.map(normalizeCalculatedStandardComponent).filter(isPresent)
+    : []
   const data = {
     ...root,
     people,
@@ -349,6 +368,7 @@ export function validateBackupPayload(payload: unknown): BackupValidationResult 
     workshopOutputs,
     workshopWorkers,
     workshopAssignments,
+    calculatedStandardComponents,
   } as AppData
   const summary = {
     source: source.kind,
@@ -433,6 +453,7 @@ function normalizeBackupInfo(value: unknown): BackupMetadata | undefined {
           workshopOutputs: optionalNumber(counts.workshopOutputs),
           workshopWorkers: optionalNumber(counts.workshopWorkers),
           workshopAssignments: optionalNumber(counts.workshopAssignments),
+          calculatedStandardComponents: optionalNumber(counts.calculatedStandardComponents),
         }
       : undefined,
   }
@@ -687,6 +708,24 @@ function normalizeWorkshopOutput(value: unknown): WorkshopOutput | null {
     standardComponentsImpactScore: hasStandardComponents ? positiveNumber(o.standardComponentsImpactScore, 0) : 0,
     standardComponentsProcesses: stringArray(o.standardComponentsProcesses).filter((skill): skill is WorkshopWorkerSkill => WORKSHOP_WORKER_SKILLS.has(skill)),
     standardComponentsNotes: optionalString(o.standardComponentsNotes),
+    machineLengthMm: optionalPositiveNumberOrNull(o.machineLengthMm),
+    machineWidthMm: optionalPositiveNumberOrNull(o.machineWidthMm),
+    machineHeightMm: optionalPositiveNumberOrNull(o.machineHeightMm),
+    machineSpanMm: optionalPositiveNumberOrNull(o.machineSpanMm),
+    machineModuleCount: optionalPositiveNumberOrNull(o.machineModuleCount),
+    machineBayCount: optionalPositiveNumberOrNull(o.machineBayCount),
+    machineSlopePercent: optionalPositiveNumberOrNull(o.machineSlopePercent),
+    machineNotes: optionalString(o.machineNotes),
+    standardComponentsMode: STANDARD_COMPONENTS_MODES.has(o.standardComponentsMode as string)
+      ? (o.standardComponentsMode as StandardComponentsMode)
+      : 'manual',
+    standardComponentsCalculationType: STANDARD_COMPONENTS_CALCULATION_TYPES.has(o.standardComponentsCalculationType as string)
+      ? (o.standardComponentsCalculationType as StandardComponentsCalculationType)
+      : 'none',
+    standardComponentsCalculatedAt: optionalString(o.standardComponentsCalculatedAt) || null,
+    standardComponentsCalculationStatus: STANDARD_COMPONENTS_CALCULATION_STATUSES.has(o.standardComponentsCalculationStatus as string)
+      ? (o.standardComponentsCalculationStatus as StandardComponentsCalculationStatus)
+      : 'not_configured',
     hasCommercialComponents: booleanOr(o.hasCommercialComponents, false),
     commercialComponentsDescription: optionalString(o.commercialComponentsDescription),
     commercialComponentsOrderRequired: booleanOr(o.commercialComponentsOrderRequired, false),
@@ -804,7 +843,7 @@ function normalizeNotification(value: unknown): Notification | null {
   } as Notification
 }
 
-function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners' | 'machineTypes' | 'workshopOutputs' | 'workshopWorkers' | 'workshopAssignments'>): BackupCounts {
+function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'absences' | 'activityLog' | 'notifications' | 'businessPartners' | 'machineTypes' | 'workshopOutputs' | 'workshopWorkers' | 'workshopAssignments' | 'calculatedStandardComponents'>): BackupCounts {
   return {
     people: data.people.length,
     workItems: data.workItems.length,
@@ -817,7 +856,41 @@ function countAppData(data: Pick<AppData, 'people' | 'workItems' | 'tasks' | 'ab
     workshopOutputs: data.workshopOutputs.length,
     workshopWorkers: data.workshopWorkers.length,
     workshopAssignments: data.workshopAssignments.length,
+    calculatedStandardComponents: (data.calculatedStandardComponents ?? []).length,
   }
+}
+
+function normalizeCalculatedStandardComponent(value: unknown): CalculatedStandardComponent | null {
+  const o = asRecord(value)
+  if (!o) return null
+  if (!isNonEmptyString(o.id) || !isNonEmptyString(o.workshopOutputId) || !isNonEmptyString(o.workItemId)) return null
+  if (!isNonEmptyString(o.machineTypeCode)) return null
+  const process = isString(o.process) && WORKSHOP_WORKER_SKILLS.has(o.process) ? (o.process as WorkshopWorkerSkill) : 'altro'
+  const now = new Date().toISOString()
+  const source = o.source === 'calculated' ? 'calculated' : 'manual'
+  return {
+    id: o.id,
+    workshopOutputId: o.workshopOutputId,
+    workItemId: o.workItemId,
+    machineTypeCode: o.machineTypeCode.toUpperCase(),
+    componentCode: isString(o.componentCode) ? o.componentCode : '',
+    componentName: isString(o.componentName) ? o.componentName : '',
+    description: isString(o.description) ? o.description : '',
+    quantity: isNumber(o.quantity) ? Math.max(0, Math.round(o.quantity)) : 0,
+    process,
+    readyFromDate: isString(o.readyFromDate) ? o.readyFromDate : '',
+    impactScore: isNumber(o.impactScore) ? Math.max(0, Math.round(o.impactScore * 10) / 10) : 0,
+    notes: isString(o.notes) ? o.notes : '',
+    source,
+    createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
+    updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+  }
+}
+
+function optionalPositiveNumberOrNull(value: unknown): number | null {
+  if (!isNumber(value)) return null
+  if (value <= 0) return null
+  return value
 }
 
 function machineProcessWeights(
