@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Absence, AppData, BusinessPartner, MachineType, Person, Status, WorkshopAssignment, WorkshopAssignmentSourceType, WorkshopAssignmentStatus, WorkshopOutput, WorkshopWorker } from '../types'
+import type { Absence, AppData, BusinessPartner, Consuntivo, MachineType, Person, Status, TubeProfile, WorkshopAssignment, WorkshopAssignmentSourceType, WorkshopAssignmentStatus, WorkshopOutput, WorkshopWorker } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
 import {
@@ -113,6 +113,18 @@ import type {
   WorkshopAssignmentDraft,
 } from '../services/workshopAssignmentsService'
 import {
+  createConsuntivo as svcCreateConsuntivo,
+  deleteConsuntivo as svcDeleteConsuntivo,
+  updateConsuntivo as svcUpdateConsuntivo,
+} from '../services/consuntiviService'
+import type { CreateConsuntivoInput, UpdateConsuntivoInput } from '../services/consuntiviService'
+import {
+  createTubeProfile as svcCreateTubeProfile,
+  deleteTubeProfile as svcDeleteTubeProfile,
+  updateTubeProfile as svcUpdateTubeProfile,
+} from '../services/tubeProfilesService'
+import type { CreateTubeProfileInput, UpdateTubeProfileInput } from '../services/tubeProfilesService'
+import {
   pendingCommercialOutputsForOutput,
   pendingCommercialOutputsForWorkItem,
 } from '../utils/commercialComponents'
@@ -131,6 +143,8 @@ interface DataContextValue {
   workshopOutputs: WorkshopOutput[]
   workshopWorkers: WorkshopWorker[]
   workshopAssignments: WorkshopAssignment[]
+  consuntivi: Consuntivo[]
+  tubeProfiles: TubeProfile[]
   // workItems
   createWorkItem: (input: CreateWorkItemInput) => string
   updateWorkItem: (id: string, patch: UpdateWorkItemInput) => void
@@ -182,6 +196,14 @@ interface DataContextValue {
   deleteWorkshopAssignment: (id: string) => void
   setWorkshopAssignmentStatus: (id: string, status: WorkshopAssignmentStatus) => void
   replaceWorkshopAssignmentsForOutput: (workshopOutputId: string, assignments: WorkshopAssignmentDraft[], sourceType?: WorkshopAssignmentSourceType) => void
+  // consuntivi
+  createConsuntivo: (input: CreateConsuntivoInput) => string
+  updateConsuntivo: (id: string, patch: UpdateConsuntivoInput) => void
+  deleteConsuntivo: (id: string) => void
+  // tube profiles
+  createTubeProfile: (input: CreateTubeProfileInput) => string
+  updateTubeProfile: (id: string, patch: UpdateTubeProfileInput) => void
+  deleteTubeProfile: (id: string) => void
   // import/export
   importData: (next: AppData, options?: ImportDataOptions) => void
   exportData: () => BackupExportResult
@@ -679,6 +701,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
     commitData(svcReplaceWorkshopAssignmentsForOutput(dataRef.current, workshopOutputId, assignments, sourceType))
   }, [commitData])
 
+  const createConsuntivo = useCallback((input: CreateConsuntivoInput): string => {
+    const result = svcCreateConsuntivo(dataRef.current, input)
+    commitData(result.data)
+    return result.id
+  }, [commitData])
+
+  const updateConsuntivo = useCallback((id: string, patch: UpdateConsuntivoInput) => {
+    commitData(svcUpdateConsuntivo(dataRef.current, id, patch))
+  }, [commitData])
+
+  const deleteConsuntivo = useCallback((id: string) => {
+    commitData(svcDeleteConsuntivo(dataRef.current, id), { risky: true })
+  }, [commitData])
+
+  const createTubeProfile = useCallback((input: CreateTubeProfileInput): string => {
+    const result = svcCreateTubeProfile(dataRef.current, input)
+    commitData(result.data)
+    return result.id
+  }, [commitData])
+
+  const updateTubeProfile = useCallback((id: string, patch: UpdateTubeProfileInput) => {
+    commitData(svcUpdateTubeProfile(dataRef.current, id, patch))
+  }, [commitData])
+
+  const deleteTubeProfile = useCallback((id: string) => {
+    commitData(svcDeleteTubeProfile(dataRef.current, id), { risky: true })
+  }, [commitData])
+
   const importData = useCallback((next: AppData, options: ImportDataOptions = {}) => {
     const safeNext = mergeImportWithSharedCollections(next, dataRef.current)
     const description = [
@@ -760,6 +810,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     workshopOutputs: data.workshopOutputs,
     workshopWorkers: data.workshopWorkers,
     workshopAssignments: data.workshopAssignments,
+    consuntivi: data.consuntivi ?? [],
+    tubeProfiles: data.tubeProfiles ?? [],
     createWorkItem,
     updateWorkItem,
     createWorkItemWithWorkshopOutputs,
@@ -802,6 +854,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     deleteWorkshopAssignment,
     setWorkshopAssignmentStatus,
     replaceWorkshopAssignmentsForOutput,
+    createConsuntivo,
+    updateConsuntivo,
+    deleteConsuntivo,
+    createTubeProfile,
+    updateTubeProfile,
+    deleteTubeProfile,
     importData,
     exportData,
     reloadFromServer,
@@ -823,6 +881,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createWorkshopOutput, updateWorkshopOutput, updateWorkshopOutputAfterCommercialCheck, deleteWorkshopOutput, replaceWorkshopOutputsForWorkItem,
     createWorkshopWorker, updateWorkshopWorker, setWorkshopWorkerActive, applyWorkshopWorkerImport,
     createWorkshopAssignment, updateWorkshopAssignment, deleteWorkshopAssignment, setWorkshopAssignmentStatus, replaceWorkshopAssignmentsForOutput,
+    createConsuntivo, updateConsuntivo, deleteConsuntivo,
+    createTubeProfile, updateTubeProfile, deleteTubeProfile,
     importData, exportData, reloadFromServer,
     markNotificationAsRead, markAllNotificationsAsRead,
     clearReadNotifications, clearAllNotifications,
