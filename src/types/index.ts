@@ -610,6 +610,100 @@ export interface AppData {
   workshopWorkers: WorkshopWorker[]
   workshopAssignments: WorkshopAssignment[]
   calculatedStandardComponents: CalculatedStandardComponent[]
+  consuntivi: Consuntivo[]
+  tubeProfiles: TubeProfile[]
+}
+
+// === Consuntivi officina (taglio laser / laser tubi / saldatura / piega) ===
+
+export type ConsuntivoMaterial = 'ferro' | 'inox' | 'zincato' | 'corten'
+export const ALL_CONSUNTIVO_MATERIALS: ConsuntivoMaterial[] = ['ferro', 'inox', 'zincato', 'corten']
+export const CONSUNTIVO_MATERIAL_LABELS: Record<ConsuntivoMaterial, string> = {
+  ferro: 'Ferro',
+  inox: 'Inox',
+  zincato: 'Zincato',
+  corten: 'Corten',
+}
+
+export type ConsuntivoGas = 'ossigeno' | 'azoto'
+export const ALL_CONSUNTIVO_GAS: ConsuntivoGas[] = ['ossigeno', 'azoto']
+
+export type TubeCategory = 'tubolari' | 'tubi'
+export const ALL_TUBE_CATEGORIES: TubeCategory[] = ['tubolari', 'tubi']
+export const TUBE_CATEGORY_LABELS: Record<TubeCategory, string> = {
+  tubolari: 'Tubolari',
+  tubi: 'Tubi',
+}
+
+export interface LaserCutRow {
+  id: string
+  lunghezzaMm: number
+  larghezzaMm: number
+  spessoreMm: number
+  materiale: ConsuntivoMaterial
+  tempoMin: number
+  gas: ConsuntivoGas
+}
+
+export interface TubeLaserRow {
+  id: string
+  categoria: TubeCategory
+  profileId: string
+  profileLabel: string
+  kgPerMeter: number
+  materiale: ConsuntivoMaterial
+  lunghezzaMm: number
+  nPezzi: number
+  tempoMin: number
+}
+
+export interface WeldingRow {
+  id: string
+  people: number
+  hours: number
+}
+
+export interface BendingRow {
+  id: string
+  hours: number
+}
+
+export interface Consuntivo {
+  id: string
+  workItemId: string
+  workItemCode: string
+  workItemTitle: string
+  customer: string
+  date: string
+  operatorName: string
+  laserRows: LaserCutRow[]
+  tubeRows: TubeLaserRow[]
+  weldingRows: WeldingRow[]
+  bendingRows: BendingRow[]
+  notes: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TubeProfile {
+  id: string
+  categoria: TubeCategory
+  label: string
+  kgPerMeter: number
+  active: boolean
+  notes: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Config prezzi protetta — NON entra mai in AppData. Vive in meta.consuntiviConfig. */
+export interface ConsuntiviPricingConfig {
+  materialPricePerKg: Record<ConsuntivoMaterial, number>
+  gasCostPerMin: Record<ConsuntivoGas, number>
+  tubeLaserRatePerMin: number
+  weldingRatePerHour: number
+  bendingRatePerHour: number
+  densityFactorPerMaterial: Record<ConsuntivoMaterial, number>
 }
 
 export interface Filters {
