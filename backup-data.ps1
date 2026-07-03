@@ -10,8 +10,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
-$src = Join-Path $PSScriptRoot 'backups\verified'
-$receipt = Join-Path $PSScriptRoot 'backups\offsite-status.json'
+$stateRoot = if ($env:WORKLOAD_STATE_DIR) { $env:WORKLOAD_STATE_DIR } else { $PSScriptRoot }
+$src = Join-Path $stateRoot 'backups\verified'
+$receipt = Join-Path $stateRoot 'backups\offsite-status.json'
 $now = (Get-Date).ToString('o')
 
 function Write-Receipt($ok, $copied, $err) {

@@ -14,6 +14,7 @@ const svc = new Service({
     { name: 'PM2_BIN', value: process.env.PM2_BIN || '' },
     { name: 'PORT', value: '3000' },
     { name: 'HOST', value: '0.0.0.0' },
+    { name: 'WORKLOAD_STATE_DIR', value: process.env.WORKLOAD_STATE_DIR || '' },
   ],
 })
 
