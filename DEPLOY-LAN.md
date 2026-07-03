@@ -10,29 +10,29 @@ un'unica porta. I dati stanno in **un solo file** SQLite: `data/workload.db`.
 
 ---
 
-## ⚡ Percorso AUTOMATICO (pacchetto con lo stato attuale)
+## ⚡ Installazione in un colpo (consigliata)
 
-Se vuoi evitare i comandi a mano, ci sono due script pronti:
+1. **Su questo PC** (dove ci sono i dati): tasto destro su `make-package.ps1` →
+   **Esegui con PowerShell**. Ottieni `workload-server-<data>.zip` (contiene l'app + uno
+   snapshot coerente del database attuale come `seed/`).
+2. **Sul server**: copia lo zip, **estrailo in una cartella**, poi tasto destro su
+   `install-server.ps1` → **Esegui con PowerShell (come Amministratore)**. Fa tutto:
+   Node → build → cartella dati `C:\ProgramData\Flowrlink` → servizio Windows 24/7 →
+   firewall → (chiede se configurare il backup sul NAS) → stampa `http://IP:3000`.
+3. **Al primo avvio**: apri l'app e crea l'account amministratore (schermata setup).
+   Imposta le password sezioni (Passo 8) se servono.
 
-1. **Su questo PC** (dove ci sono i dati) crei il pacchetto — include una copia
-   coerente del database attuale:
-   ```
-   Tasto destro su  make-package.ps1  ->  "Esegui con PowerShell"
-   ```
-   Ottieni un file `workload-server-<data>.zip`.
+### Dove sono i dati
+Database, backup verificati e log stanno in **`C:\ProgramData\Flowrlink`** — SEPARATI dalla
+cartella del programma. Non vanno mai cancellati.
 
-2. **Sul server**: copia lo zip, estrailo in una cartella, poi:
-   ```
-   Tasto destro su  install-server.ps1  ->  "Esegui con PowerShell"  (come Amministratore)
-   ```
-   Lo script fa da solo: Node (se manca, via winget) → `npm ci` → build → PM2
-   (avvio automatico) → firewall → avvio. Alla fine stampa l'indirizzo `http://IP:3000`.
-
-3. Imposta le password (Passo 8) e programma il backup sul NAS (Passo 9).
-
-> Unico prerequisito non automatizzabile in sicurezza: se Node non c'è e `winget`
-> non è disponibile, installalo una volta da https://nodejs.org (2 minuti), poi rilancia.
-> I passi manuali qui sotto restano validi come riferimento/alternativa.
+### Aggiornare in sicurezza
+Per una nuova versione: rifai il pacchetto, estrai `install-server.ps1` nella **stessa
+cartella** (o una nuova) e rilancialo come Amministratore. I dati in `C:\ProgramData\Flowrlink`
+**non vengono toccati**: si aggiorna solo il codice e si riavvia il servizio. Se stai migrando
+da una vecchia installazione con i dati dentro la cartella app, passa
+`install-server.ps1 -MigrateFrom "C:\vecchia\cartella"`: copia i dati in ProgramData dopo una
+copia di sicurezza, lasciando intatta l'origine.
 
 ---
 
