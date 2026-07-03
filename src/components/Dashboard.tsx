@@ -1,8 +1,9 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Filters, WorkItem } from '../types'
 import { CLOSED_STATUSES, EMPTY_FILTERS, isOpen } from '../types'
 import { useData } from '../state/DataProvider'
+import { useAuth } from '../state/AuthProvider'
 import { HeroStats } from './HeroStats'
 import { WorkloadPersonCard } from './WorkloadPersonCard'
 import { FiltersBar } from './FiltersBar'
@@ -22,9 +23,10 @@ const WorkshopLoadView = lazy(() => import('./WorkshopLoadView').then((m) => ({ 
 const WorkshopPlanningView = lazy(() => import('./WorkshopPlanningView').then((m) => ({ default: m.WorkshopPlanningView })))
 const WorkshopWorkersView = lazy(() => import('./WorkshopWorkersView').then((m) => ({ default: m.WorkshopWorkersView })))
 const Consuntivi = lazy(() => import('./ConsuntiviView').then((m) => ({ default: m.ConsuntiviView })))
+const UsersView = lazy(() => import('./UsersView').then((m) => ({ default: m.UsersView })))
 
 type ViewMode = 'table' | 'kanban'
-type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche' | 'disegni' | 'officina' | 'operai' | 'officina-planning' | 'consuntivi'
+type MainTab = 'dashboard' | 'planning' | 'agenda' | 'log' | 'anagrafiche' | 'disegni' | 'officina' | 'operai' | 'officina-planning' | 'consuntivi' | 'utenti'
 type TabGroup = 'ufficio' | 'tabelle' | 'officina' | 'sistema'
 
 interface TabDef {
@@ -50,6 +52,7 @@ const TABS: TabDef[] = [
   { id: 'consuntivi', label: 'Consuntivi', icon: 'M9 17V7h6v10M5 21h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z', hint: 'Consuntivi lavorazioni officina', group: 'officina' },
   // Sistema
   { id: 'log', label: 'Storico', icon: 'M3 3v18h18M7 13l3-3 3 3 5-5', hint: 'Cronologia modifiche', group: 'sistema' },
+  { id: 'utenti', label: 'Utenti', icon: 'M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 0a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-2.67 0-8 1.34-8 4v3h10v-3a4.7 4.7 0 0 1 2-3.74A12.7 12.7 0 0 0 8 13Z', hint: 'Gestione utenti e permessi', group: 'sistema' },
 ]
 
 const GROUP_LABEL: Record<TabGroup, string> = {
@@ -66,6 +69,16 @@ export function Dashboard() {
   const [view, setView] = useState<ViewMode>('table')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [agendaPersonId, setAgendaPersonId] = useState<string | null>(null)
+
+  const { user } = useAuth()
+  const sections = user?.permissions.sections
+  const visibleTabs = useMemo(() => {
+    const allowed = new Set(sections ?? [])
+    return TABS.filter((t) => allowed.has(t.id))
+  }, [sections])
+  useEffect(() => {
+    if (visibleTabs.length && !visibleTabs.some((t) => t.id === tab)) setTab(visibleTabs[0].id)
+  }, [visibleTabs, tab])
 
   function jumpToAgenda(personId: string) {
     setAgendaPersonId(personId)
@@ -114,9 +127,9 @@ export function Dashboard() {
             aria-label="Sezione principale"
             className="tabs-track overflow-x-auto scroll-thin"
           >
-            {TABS.map((t, i) => {
+            {visibleTabs.map((t, i) => {
               const active = tab === t.id
-              const newGroup = i > 0 && TABS[i - 1].group !== t.group
+              const newGroup = i > 0 && visibleTabs[i - 1].group !== t.group
               return (
                 <div key={t.id} className="flex items-center">
                   {newGroup && (
@@ -225,6 +238,8 @@ export function Dashboard() {
         <WorkshopPlanningView />
       ) : tab === 'consuntivi' ? (
         <Consuntivi />
+      ) : tab === 'utenti' ? (
+        <UsersView />
       ) : (
         <ActivityLogView />
       )}

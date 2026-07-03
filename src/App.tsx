@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { DataProvider } from './state/DataProvider'
 import { ToastProvider } from './state/ToastProvider'
+import { AuthProvider, useAuth } from './state/AuthProvider'
+import { LoginScreen } from './components/LoginScreen'
 import { Dashboard } from './components/Dashboard'
 import { WorkItemFormModal } from './components/WorkItemFormModal'
 import { PeopleSettingsModal } from './components/PeopleSettingsModal'
@@ -10,14 +12,27 @@ import { NotificationsBell } from './components/NotificationsBell'
 export function App() {
   return (
     <ToastProvider>
-      <DataProvider>
-        <Shell />
-      </DataProvider>
+      <AuthProvider>
+        <AppGate />
+      </AuthProvider>
     </ToastProvider>
   )
 }
 
+function AppGate() {
+  const { status } = useAuth()
+  if (status === 'loading') return <div className="flex min-h-screen items-center justify-center text-slate-500">Caricamento…</div>
+  if (status !== 'loggedIn') return <LoginScreen />
+  return (
+    <DataProvider>
+      <Shell />
+    </DataProvider>
+  )
+}
+
 function Shell() {
+  const { user } = useAuth()
+  const perm = user?.permissions
   const [createOpen, setCreateOpen] = useState(false)
   const [peopleOpen, setPeopleOpen] = useState(false)
   const [absencesOpen, setAbsencesOpen] = useState(false)
@@ -42,52 +57,64 @@ function Shell() {
             <div className="hidden items-center gap-1.5 rounded-lg border border-slate-800/80 bg-[color:var(--color-surface-1)]/80 px-1.5 py-1 md:flex">
               <NotificationsBell />
               <span className="h-5 w-px bg-slate-800" aria-hidden />
-              <button
-                onClick={() => setAbsencesOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-300 transition hover:bg-slate-800/70 hover:text-slate-100"
-                title="Calendario ferie, permessi, malattie e trasferte"
-              >
-                <Icon path="M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" />
-                Ferie e permessi
-              </button>
-              <button
-                onClick={() => setPeopleOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-300 transition hover:bg-slate-800/70 hover:text-slate-100"
-                title="Modifica persone, capacità e skill"
-              >
-                <Icon path="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 0a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-2.67 0-8 1.34-8 4v3h10v-3a4.7 4.7 0 0 1 2-3.74A12.7 12.7 0 0 0 8 13Zm8 0c-.29 0-.62 0-1 .05A5.65 5.65 0 0 1 18 17v3h6v-3c0-2.66-5.33-4-8-4Z" />
-                Persone
-              </button>
+              {perm?.managePeople && (
+                <button
+                  onClick={() => setAbsencesOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-300 transition hover:bg-slate-800/70 hover:text-slate-100"
+                  title="Calendario ferie, permessi, malattie e trasferte"
+                >
+                  <Icon path="M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" />
+                  Ferie e permessi
+                </button>
+              )}
+              {perm?.managePeople && (
+                <button
+                  onClick={() => setPeopleOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-300 transition hover:bg-slate-800/70 hover:text-slate-100"
+                  title="Modifica persone, capacità e skill"
+                >
+                  <Icon path="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 0a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-2.67 0-8 1.34-8 4v3h10v-3a4.7 4.7 0 0 1 2-3.74A12.7 12.7 0 0 0 8 13Zm8 0c-.29 0-.62 0-1 .05A5.65 5.65 0 0 1 18 17v3h6v-3c0-2.66-5.33-4-8-4Z" />
+                  Persone
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 md:hidden">
               <NotificationsBell />
-              <button
-                onClick={() => setAbsencesOpen(true)}
-                className="btn-ghost"
-                title="Calendario ferie, permessi, malattie e trasferte"
-                aria-label="Ferie e permessi"
-              >
-                <Icon path="M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" />
-              </button>
-              <button
-                onClick={() => setPeopleOpen(true)}
-                className="btn-ghost"
-                title="Persone, capacità e skill"
-                aria-label="Persone"
-              >
-                <Icon path="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 0a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-2.67 0-8 1.34-8 4v3h10v-3a4.7 4.7 0 0 1 2-3.74A12.7 12.7 0 0 0 8 13Zm8 0c-.29 0-.62 0-1 .05A5.65 5.65 0 0 1 18 17v3h6v-3c0-2.66-5.33-4-8-4Z" />
-              </button>
+              {perm?.managePeople && (
+                <button
+                  onClick={() => setAbsencesOpen(true)}
+                  className="btn-ghost"
+                  title="Calendario ferie, permessi, malattie e trasferte"
+                  aria-label="Ferie e permessi"
+                >
+                  <Icon path="M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" />
+                </button>
+              )}
+              {perm?.managePeople && (
+                <button
+                  onClick={() => setPeopleOpen(true)}
+                  className="btn-ghost"
+                  title="Persone, capacità e skill"
+                  aria-label="Persone"
+                >
+                  <Icon path="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 0a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-2.67 0-8 1.34-8 4v3h10v-3a4.7 4.7 0 0 1 2-3.74A12.7 12.7 0 0 0 8 13Zm8 0c-.29 0-.62 0-1 .05A5.65 5.65 0 0 1 18 17v3h6v-3c0-2.66-5.33-4-8-4Z" />
+                </button>
+              )}
             </div>
 
-            <button
-              onClick={() => setCreateOpen(true)}
-              className="btn-primary"
-              title="Crea un nuovo lavoro (commessa, studio o interno)"
-            >
-              <Icon path="M12 5v14M5 12h14" />
-              Nuovo lavoro
-            </button>
+            {perm?.canCreateWork && (
+              <button
+                onClick={() => setCreateOpen(true)}
+                className="btn-primary"
+                title="Crea un nuovo lavoro (commessa, studio o interno)"
+              >
+                <Icon path="M12 5v14M5 12h14" />
+                Nuovo lavoro
+              </button>
+            )}
+
+            <UserMenu />
           </div>
         </div>
       </header>
@@ -133,5 +160,17 @@ function Icon({ path }: { path: string }) {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d={path} />
     </svg>
+  )
+}
+
+function UserMenu() {
+  const { user, logout } = useAuth()
+  if (!user) return null
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-slate-800/80 bg-[color:var(--color-surface-1)]/80 px-2.5 py-1.5">
+      <span className="text-sm text-slate-300">{user.username}</span>
+      <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase text-slate-400">{user.role}</span>
+      <button className="btn-ghost text-xs" onClick={() => void logout()} title="Esci">Logout</button>
+    </div>
   )
 }

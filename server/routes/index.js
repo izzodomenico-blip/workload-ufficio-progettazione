@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import {
-  deleteEntity,
   getAppData,
   getCollection,
   getConsuntiviConfig,
@@ -34,6 +33,12 @@ import {
   setConsuntiviPassword,
   verifyConsuntiviPassword,
 } from '../services/consuntiviAuth.js'
+import {
+  createSession, createUser, deleteSession, deleteUser, getSessionUser,
+  getUserByUsername, hasAnyUser, listUsers, setUserPassword, updateUser, verifyPassword,
+} from '../services/authService.js'
+import { permissionsForRole, requirePermission } from '../services/permissions.js'
+import { authorizeAppDataChange, filterAppDataForUser } from '../services/appDataAuthz.js'
 
 const ADMIN_PASSWORD_HEADER = 'x-workload-admin-password'
 const DATA_REVISION_HEADER = 'x-workload-data-revision'
@@ -95,12 +100,65 @@ function extractAppDataPreservingExisting(body, options = {}) {
 export function createApiRouter() {
   const router = Router()
 
+  // Endpoint pubblici (senza sessione): health, login, setup-admin, stato-setup.
+  const PUBLIC = new Set(['/health', '/auth/login', '/auth/setup-admin', '/auth/setup-status'])
+
+  router.get('/auth/setup-status', (_req, res) => {
+    res.json({ needsSetup: !hasAnyUser() })
+  })
+
+  router.post('/auth/setup-admin', (req, res, next) => {
+    try {
+      if (hasAnyUser()) { const e = new Error('Setup già eseguito.'); e.statusCode = 409; throw e }
+      const { username, password } = req.body ?? {}
+      const user = createUser({ username, password, role: 'amministratore', linkedPersonId: '' })
+      const { token } = createSession(user.id)
+      setSessionCookie(res, token)
+      res.status(201).json({ user: { ...user, permissions: permissionsForRole(user.role) } })
+    } catch (error) { next(error.statusCode ? error : badRequest(error)) }
+  })
+
+  router.post('/auth/login', (req, res, next) => {
+    try {
+      const { username, password } = req.body ?? {}
+      const row = getUserByUsername(username)
+      if (!row || !row.active || !verifyPassword(String(password ?? ''), row)) {
+        const e = new Error('Credenziali non valide.'); e.statusCode = 401; throw e
+      }
+      const { token } = createSession(row.id)
+      setSessionCookie(res, token)
+      res.json({ user: { id: row.id, username: row.username, role: row.role, linkedPersonId: row.linkedPersonId, permissions: permissionsForRole(row.role) } })
+    } catch (error) { next(error.statusCode ? error : badRequest(error)) }
+  })
+
+  router.post('/auth/logout', (req, res) => {
+    deleteSession(parseCookies(req)[SESSION_COOKIE])
+    res.clearCookie(SESSION_COOKIE, { path: '/' })
+    res.json({ ok: true })
+  })
+
+  router.get('/auth/me', (req, res) => {
+    const user = currentUser(req)
+    if (!user) { res.status(401).json({ error: 'Non autenticato.' }); return }
+    res.json({ user })
+  })
+
+  // Guardia: tutte le altre rotte /api richiedono sessione valida.
+  router.use((req, res, next) => {
+    // il path qui è relativo al mount /api (es. '/app-data')
+    if (PUBLIC.has(req.path)) return next()
+    const user = currentUser(req)
+    if (!user) { res.status(401).json({ error: 'Sessione richiesta.', detail: 'auth-required' }); return }
+    req.user = user
+    next()
+  })
+
   router.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'workload-ufficio-progettazione', storage: 'sqlite' })
   })
 
-  router.get('/app-data', (_req, res) => {
-    sendAppData(res, getAppData())
+  router.get('/app-data', (req, res) => {
+    sendAppData(res, filterAppDataForUser(getAppData(), req.user.permissions))
   })
 
   router.put('/app-data', (req, res, next) => {
@@ -115,8 +173,9 @@ export function createApiRouter() {
       const data = extractAppDataPreservingExisting(req.body, {
         preserveEmptySharedCollections: reason.startsWith('import-'),
       })
+      const authorized = authorizeAppDataChange(getAppData(), data, req.user)
       const currentPeople = getCollection('people')
-      if (hasBaselineChanges(currentPeople, data.people)) {
+      if (hasBaselineChanges(currentPeople, authorized.people)) {
         const provided = req.get(ADMIN_PASSWORD_HEADER)
         if (!verifyAdminPassword(provided)) {
           const err = new Error('Carico base protetto: password admin richiesta o errata.')
@@ -127,15 +186,15 @@ export function createApiRouter() {
       }
       const isNormalCommit = req.get('x-workload-mutation-kind') === 'normal'
       if (isNormalCommit) {
-        const saved = saveAppData(data)
+        const saved = saveAppData(authorized)
         scheduleAutoBackup(reason)
-        sendAppData(res, saved)
+        sendAppData(res, filterAppDataForUser(saved, req.user.permissions))
         return
       }
       const backup = createPreMutationBackup(reason)
-      const saved = saveAppData(data)
+      const saved = saveAppData(authorized)
       if (backup) recordAutomaticBackupActivity(backup.reason, new Date(backup.createdAt))
-      sendAppData(res, saved)
+      sendAppData(res, filterAppDataForUser(saved, req.user.permissions))
     } catch (error) {
       next(error.statusCode ? error : badRequest(error))
     }
@@ -169,22 +228,58 @@ export function createApiRouter() {
     }
   })
 
-  router.get('/backup/status', (_req, res) => {
-    res.json(getBackupStatus())
+  // === Gestione utenti (solo amministratori) ===
+  router.get('/users', (req, res, next) => {
+    try { requirePermission(req.user.permissions, 'manageUsers'); res.json(listUsers()) } catch (e) { next(e.statusCode ? e : badRequest(e)) }
+  })
+  router.post('/users', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'manageUsers')
+      const { username, password, role, linkedPersonId } = req.body ?? {}
+      res.status(201).json(createUser({ username, password, role, linkedPersonId: linkedPersonId || '' }))
+    } catch (e) { next(e.statusCode ? e : badRequest(e)) }
+  })
+  router.put('/users/:id', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'manageUsers')
+      const { role, active, linkedPersonId } = req.body ?? {}
+      res.json(updateUser(req.params.id, { role, active, linkedPersonId }))
+    } catch (e) { next(e.statusCode ? e : badRequest(e)) }
+  })
+  router.post('/users/:id/reset-password', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'manageUsers')
+      setUserPassword(req.params.id, String((req.body ?? {}).newPassword ?? ''))
+      res.json({ ok: true })
+    } catch (e) { next(e.statusCode ? e : badRequest(e)) }
+  })
+  router.delete('/users/:id', (req, res, next) => {
+    try { requirePermission(req.user.permissions, 'manageUsers'); deleteUser(req.params.id); res.status(204).end() } catch (e) { next(e.statusCode ? e : badRequest(e)) }
+  })
+
+  router.get('/backup/status', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'manageBackups')
+      res.json(getBackupStatus())
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
   })
 
   // === Gestione / ripristino backup ===
-  router.get('/backups', (_req, res, next) => {
+  router.get('/backups', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'manageBackups')
       res.set('cache-control', 'no-store')
       res.json(listBackupArchives())
     } catch (error) {
-      next(error)
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
   router.get('/backups/preview', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'manageBackups')
       const preview = readBackupPreview(String(req.query.kind || ''), String(req.query.file || ''))
       res.json(preview)
     } catch (error) {
@@ -194,6 +289,7 @@ export function createApiRouter() {
 
   router.get('/backups/download', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'manageBackups')
       const full = resolveBackupFile(String(req.query.kind || ''), String(req.query.file || ''))
       if (!full) {
         res.status(404).json({ error: 'Backup non trovato.' })
@@ -201,12 +297,13 @@ export function createApiRouter() {
       }
       res.download(full)
     } catch (error) {
-      next(error)
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
   router.post('/backups/restore', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'manageBackups')
       const body = req.body ?? {}
       const result = restoreFromBackup(String(body.kind || ''), String(body.file || ''))
       sendDataRevisionHeaders(res)
@@ -217,48 +314,6 @@ export function createApiRouter() {
   })
 
   registerMachineTypeRoutes(router)
-
-  registerCollectionRoutes(router, {
-    apiName: 'people',
-    collection: 'people',
-    guard: peopleBaselineGuard,
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'work-items',
-    collection: 'workItems',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'tasks',
-    collection: 'tasks',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'absences',
-    collection: 'absences',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'business-partners',
-    collection: 'businessPartners',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'workshop-outputs',
-    collection: 'workshopOutputs',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'workshop-workers',
-    collection: 'workshopWorkers',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'workshop-assignments',
-    collection: 'workshopAssignments',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'consuntivi',
-    collection: 'consuntivi',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'tube-profiles',
-    collection: 'tubeProfiles',
-  })
 
   // Config prezzi: densità pubblica (serve al calcolo kg lato operaio), prezzi protetti.
   router.get('/consuntivi-settings', (_req, res) => {
@@ -319,6 +374,7 @@ export function createApiRouter() {
 
   router.put('/business-partners/:id/activate', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'canEditWork')
       const current = getCollection('businessPartners').find((p) => p.id === req.params.id)
       if (!current) {
         res.status(404).json({ error: 'Anagrafica non trovata.' })
@@ -328,12 +384,13 @@ export function createApiRouter() {
       scheduleAutoBackup('business-partner-activated')
       res.json(saved)
     } catch (error) {
-      next(badRequest(error))
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
   router.put('/business-partners/:id/deactivate', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'canEditWork')
       const current = getCollection('businessPartners').find((p) => p.id === req.params.id)
       if (!current) {
         res.status(404).json({ error: 'Anagrafica non trovata.' })
@@ -343,12 +400,13 @@ export function createApiRouter() {
       scheduleAutoBackup('business-partner-deactivated')
       res.json(saved)
     } catch (error) {
-      next(badRequest(error))
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
   router.post('/business-partners/parse-xml', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'canEditWork')
       const body = req.body ?? {}
       const xml = typeof body.xml === 'string' ? body.xml : null
       if (!xml || xml.trim().length === 0) {
@@ -367,12 +425,17 @@ export function createApiRouter() {
         records: result.records,
       })
     } catch (error) {
-      next(badRequest(error))
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
-  router.get('/activity-log', (_req, res) => {
-    res.json(getAppData().activityLog)
+  router.get('/activity-log', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'viewLog')
+      res.json(getAppData().activityLog)
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
   })
 
   router.get('/notifications', (_req, res) => {
@@ -381,6 +444,7 @@ export function createApiRouter() {
 
   router.put('/notifications/:id/read', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'deleteAny')
       const appData = getAppData()
       let updated = null
       const notifications = appData.notifications.map((notification) => {
@@ -400,8 +464,9 @@ export function createApiRouter() {
     }
   })
 
-  router.put('/notifications/read-all', (_req, res, next) => {
+  router.put('/notifications/read-all', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'deleteAny')
       const appData = getAppData()
       const notifications = appData.notifications.map((notification) => ({ ...notification, read: true }))
       saveAppData({ ...appData, notifications })
@@ -423,53 +488,6 @@ export function createApiRouter() {
   return router
 }
 
-function registerCollectionRoutes(router, { apiName, collection, guard, allowDelete = true }) {
-  router.get(`/${apiName}`, (_req, res) => {
-    res.json(getCollection(collection))
-  })
-
-  router.post(`/${apiName}`, (req, res, next) => {
-    try {
-      if (guard) guard({ req, current: null, incoming: req.body })
-      const saved = upsertEntity(collection, req.body)
-      scheduleAutoBackup(`${collection}-created`)
-      res.status(201).json(saved)
-    } catch (error) {
-      next(error.statusCode ? error : badRequest(error))
-    }
-  })
-
-  router.put(`/${apiName}/:id`, (req, res, next) => {
-    try {
-      const current = getCollection(collection).find((item) => item.id === req.params.id)
-      if (!current) {
-        res.status(404).json({ error: 'Elemento non trovato.' })
-        return
-      }
-      const incoming = { ...current, ...req.body, id: req.params.id }
-      if (guard) guard({ req, current, incoming })
-      const saved = upsertEntity(collection, incoming)
-      scheduleAutoBackup(`${collection}-updated`)
-      res.json(saved)
-    } catch (error) {
-      next(error.statusCode ? error : badRequest(error))
-    }
-  })
-
-  if (allowDelete) {
-    router.delete(`/${apiName}/:id`, (req, res, next) => {
-      try {
-        if (collection === 'workItems') createPreMutationBackup('delete-work-item')
-        deleteEntity(collection, req.params.id)
-        if (collection !== 'workItems') scheduleAutoBackup(`${collection}-deleted`)
-        res.status(204).end()
-      } catch (error) {
-        next(error)
-      }
-    })
-  }
-}
-
 function registerMachineTypeRoutes(router) {
   router.get('/machine-types', (_req, res) => {
     res.set('cache-control', 'no-store')
@@ -478,6 +496,7 @@ function registerMachineTypeRoutes(router) {
 
   router.post('/machine-types', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'canEditWork')
       const appData = getAppData()
       const incoming = normalizeMachineTypeEntity(req.body)
       ensureUniqueMachineTypeCode(appData.machineTypes, incoming)
@@ -502,6 +521,7 @@ function registerMachineTypeRoutes(router) {
 
   router.put('/machine-types/:id', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'canEditWork')
       const appData = getAppData()
       const before = appData.machineTypes.find((item) => item.id === req.params.id)
       if (!before) {
@@ -608,26 +628,6 @@ function requireConsuntiviPassword(req) {
   }
 }
 
-function peopleBaselineGuard({ req, current, incoming }) {
-  const before = normalizeBaseline(current?.baselineLoadPercent)
-  const after = normalizeBaseline(incoming?.baselineLoadPercent)
-  if (before === after) return
-  const provided = req.get(ADMIN_PASSWORD_HEADER)
-  if (!verifyAdminPassword(provided)) {
-    const err = new Error('Carico base protetto: password admin richiesta o errata.')
-    err.statusCode = 403
-    err.detail = 'baseline-load-protected'
-    throw err
-  }
-}
-
-function normalizeBaseline(v) {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return 0
-  if (v < 0) return 0
-  if (v > 100) return 100
-  return v
-}
-
 function mutationReason(req, fallback) {
   const headerReason = req.get('x-workload-mutation-reason')
   return headerReason && headerReason.trim().length > 0 ? headerReason.trim() : fallback
@@ -649,4 +649,31 @@ function badRequest(error) {
   const err = new Error(error instanceof Error ? error.message : 'Richiesta non valida.')
   err.statusCode = 400
   return err
+}
+
+const SESSION_COOKIE = 'flowrlink_session'
+
+function parseCookies(req) {
+  const raw = req.headers.cookie
+  const out = {}
+  if (!raw) return out
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=')
+    if (i > -1) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim())
+  }
+  return out
+}
+
+function currentUser(req) {
+  const token = parseCookies(req)[SESSION_COOKIE]
+  const user = getSessionUser(token)
+  if (!user) return null
+  return { ...user, permissions: permissionsForRole(user.role) }
+}
+
+function setSessionCookie(res, token) {
+  const secure = process.env.WORKLOAD_HTTPS === '1'
+  res.cookie(SESSION_COOKIE, token, {
+    httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 12 * 60 * 60 * 1000,
+  })
 }
