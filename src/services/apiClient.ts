@@ -1,4 +1,4 @@
-import type { AppData, ConsuntiviPricingConfig, ConsuntivoMaterial, MachineType } from '../types'
+import type { AppData, AuthUser, ConsuntiviPricingConfig, ConsuntivoMaterial, MachineType, Role } from '../types'
 
 export interface SaveAppDataOptions {
   risky?: boolean
@@ -74,6 +74,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 async function requestWithResponse<T>(url: string, options?: RequestInit): Promise<{ body: T; response: Response }> {
   const response = await fetch(url, {
+    credentials: 'same-origin',
     ...options,
     headers: {
       'content-type': 'application/json',
@@ -273,4 +274,30 @@ export function saveConsuntiviPricing(config: ConsuntiviPricingConfig, password:
     headers: { 'x-workload-admin-password': password },
     body: JSON.stringify(config),
   })
+}
+
+export interface SetupStatus { needsSetup: boolean }
+export function fetchSetupStatus(): Promise<SetupStatus> { return request<SetupStatus>('/api/auth/setup-status') }
+export function fetchMe(): Promise<{ user: AuthUser }> { return request<{ user: AuthUser }>('/api/auth/me') }
+export function apiLogin(username: string, password: string): Promise<{ user: AuthUser }> {
+  return request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) })
+}
+export function apiSetupAdmin(username: string, password: string): Promise<{ user: AuthUser }> {
+  return request('/api/auth/setup-admin', { method: 'POST', body: JSON.stringify({ username, password }) })
+}
+export function apiLogout(): Promise<{ ok: boolean }> { return request('/api/auth/logout', { method: 'POST', body: '{}' }) }
+
+export interface AdminUserRow { id: string; username: string; role: Role; linkedPersonId: string; active: boolean }
+export function fetchUsers(): Promise<AdminUserRow[]> { return request('/api/users') }
+export function createUserApi(input: { username: string; password: string; role: Role; linkedPersonId?: string }): Promise<AdminUserRow> {
+  return request('/api/users', { method: 'POST', body: JSON.stringify(input) })
+}
+export function updateUserApi(id: string, patch: { role?: Role; active?: boolean; linkedPersonId?: string }): Promise<AdminUserRow> {
+  return request(`/api/users/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) })
+}
+export function resetUserPasswordApi(id: string, newPassword: string): Promise<{ ok: boolean }> {
+  return request(`/api/users/${encodeURIComponent(id)}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword }) })
+}
+export function deleteUserApi(id: string): Promise<void> {
+  return request(`/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' }) as unknown as Promise<void>
 }
