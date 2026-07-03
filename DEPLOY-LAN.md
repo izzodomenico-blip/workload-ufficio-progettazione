@@ -10,6 +10,32 @@ un'unica porta. I dati stanno in **un solo file** SQLite: `data/workload.db`.
 
 ---
 
+## ⚡ Percorso AUTOMATICO (pacchetto con lo stato attuale)
+
+Se vuoi evitare i comandi a mano, ci sono due script pronti:
+
+1. **Su questo PC** (dove ci sono i dati) crei il pacchetto — include una copia
+   coerente del database attuale:
+   ```
+   Tasto destro su  make-package.ps1  ->  "Esegui con PowerShell"
+   ```
+   Ottieni un file `workload-server-<data>.zip`.
+
+2. **Sul server**: copia lo zip, estrailo in una cartella, poi:
+   ```
+   Tasto destro su  install-server.ps1  ->  "Esegui con PowerShell"  (come Amministratore)
+   ```
+   Lo script fa da solo: Node (se manca, via winget) → `npm ci` → build → PM2
+   (avvio automatico) → firewall → avvio. Alla fine stampa l'indirizzo `http://IP:3000`.
+
+3. Imposta le password (Passo 8) e programma il backup (sezione "Sicurezza dei dati").
+
+> Unico prerequisito non automatizzabile in sicurezza: se Node non c'è e `winget`
+> non è disponibile, installalo una volta da https://nodejs.org (2 minuti), poi rilancia.
+> I passi manuali qui sotto restano validi come riferimento/alternativa.
+
+---
+
 ## Passo 0 — Scegli il PC-server
 - Un PC Windows che resta **sempre acceso** (non va in sospensione).
 - Consigliato: **IP fisso** in rete locale (lo imposti sul router o nelle impostazioni di rete).
@@ -126,6 +152,32 @@ pm2 restart workload-ufficio-progettazione
 ```
 
 ---
+
+## Sicurezza dei dati — stato attuale e come perfezionarla
+
+**Com'è ora:** i dati stanno in un solo file (`data\workload.db`) e l'app fa già
+**backup automatici** (DB + JSON) nella cartella `backups\`. Questo protegge da:
+salvataggi errati, crash dell'app, chiusure improvvise (il database usa WAL).
+✅ Buono per l'operatività quotidiana.
+
+**Cosa NON copre:** i backup automatici sono **sullo stesso disco** del database.
+Un guasto del disco, un ransomware o la cancellazione della cartella
+**perderebbero tutto**. ⚠️ Questo va perfezionato.
+
+**Come perfezionarla (consigliato):** copia automatica **fuori dal PC** ogni giorno.
+Lo script `backup-data.ps1` crea uno snapshot coerente del DB + i backup dell'app e
+li mette in una destinazione esterna (share di rete / NAS / cloud), tenendo le ultime 30 copie.
+
+Programmalo una volta (come Amministratore), impostando la TUA destinazione esterna:
+```
+schtasks /Create /SC DAILY /ST 20:00 /RL HIGHEST /F /TN "Workload Backup" /TR "powershell -ExecutionPolicy Bypass -File \"%CD%\backup-data.ps1\" -Dest \"\\NAS\backup\workload\""
+```
+Consigli extra: **UPS** sul PC-server (evita spegnimenti bruschi) e, ogni tanto,
+prova a ripristinare un backup per verificare che sia integro.
+
+**Serve un database "vero" (Postgres)?** Per un piccolo ufficio **no**: SQLite con un
+solo processo server (scrittura serializzata) è adeguato. Si valuterebbe solo con molti
+utenti che scrivono in contemporanea.
 
 ## Problemi comuni
 - **"node non è riconosciuto"** → Node non installato o Prompt da riaprire dopo l'installazione (Passo 1).

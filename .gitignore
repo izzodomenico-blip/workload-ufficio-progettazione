@@ -31,3 +31,7 @@ server/consuntivi.config.json
 
 # Output cache del tool graphify (generato, non sorgente)
 graphify-out/
+
+# Pacchetti server generati e backup off-site (non vanno nel repo)
+workload-server-*.zip
+backups/offsite/
