@@ -102,6 +102,7 @@ Verifiche rapide:
 | Perché ha riavviato? | file `logs\watchdog.log` e `logs\crash.log` |
 | Salute dal browser | apri `http://localhost:3000/api/health` → `"ok": true`, `"db": "ok"` |
 | Riparte dopo reboot? | riavvia il PC senza fare login, poi da un altro PC apri `http://IP:3000` |
+| `pm2 status` non mostra nulla? | Riapri il terminale (PM2_HOME è a livello Machine, serve una shell nuova) |
 
 Comandi utili: `pm2 logs` (log live), `pm2 restart workload-ufficio-progettazione`.
 Gestione servizio: `services.msc` → **Flowrlink** (Avvia/Arresta/Automatico).

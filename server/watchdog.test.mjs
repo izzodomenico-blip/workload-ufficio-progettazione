@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createWatchdog } from './watchdog.js'
+import { createWatchdog, resolvePm2Bin } from './watchdog.js'
 
 function make(overrides = {}) {
   const restartApp = vi.fn(async () => {})
@@ -37,5 +37,19 @@ describe('createWatchdog.pollOnce', () => {
     const r = await wd.pollOnce(10000) // dentro la grazia
     expect(r.skipped).toBe(true)
     expect(check.mock.calls.length).toBe(callsBefore) // non ha ricontrollato
+  })
+})
+
+describe('resolvePm2Bin', () => {
+  it('usa PM2_BIN se assoluto ed esistente', () => {
+    const env = { PM2_BIN: 'C:/x/pm2' }
+    expect(resolvePm2Bin(env, (p) => p === 'C:/x/pm2')).toBe('C:/x/pm2')
+  })
+  it('deriva pm2 accanto a PM2_RUNTIME_PATH', () => {
+    const env = { PM2_RUNTIME_PATH: '/g/node_modules/pm2/bin/pm2-runtime' }
+    expect(resolvePm2Bin(env, (p) => p === '/g/node_modules/pm2/bin/pm2')).toBe('/g/node_modules/pm2/bin/pm2')
+  })
+  it('fallback a pm2 sul PATH se nulla risolve', () => {
+    expect(resolvePm2Bin({}, () => false)).toBe('pm2')
   })
 })

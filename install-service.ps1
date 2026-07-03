@@ -41,6 +41,14 @@ $pm2Runtime = Join-Path $prefix 'node_modules/pm2/bin/pm2-runtime'
 if (-not (Test-Path $pm2Runtime)) { throw "pm2-runtime non trovato in $pm2Runtime" }
 $env:PM2_RUNTIME_PATH = $pm2Runtime
 
+# PM2_HOME condiviso (servizio LocalSystem + shell operatore) e percorso pm2 assoluto
+$pm2Home = 'C:\ProgramData\flowrlink\.pm2'
+New-Item -ItemType Directory -Force -Path $pm2Home | Out-Null
+[Environment]::SetEnvironmentVariable('PM2_HOME', $pm2Home, 'Machine')  # tutte le shell + servizio
+$env:PM2_HOME = $pm2Home
+$pm2Bin = Join-Path $prefix 'node_modules/pm2/bin/pm2'
+if (Test-Path $pm2Bin) { $env:PM2_BIN = $pm2Bin }
+
 # 6. Registra il servizio (idempotente lato node-windows)
 Write-Host 'Registro il servizio Windows "Flowrlink"…'
 node (Join-Path $PSScriptRoot 'scripts/install-windows-service.cjs')

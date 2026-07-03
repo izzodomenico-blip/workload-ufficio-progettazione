@@ -1,4 +1,5 @@
-import { exec } from 'node:child_process'
+import { exec, execFile } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { recordResult, shouldRestart } from './watchdogLogic.js'
@@ -25,9 +26,36 @@ async function defaultCheckHealth() {
   }
 }
 
+// Risolve il binario pm2 da usare per il restart.
+// Preferisce PM2_BIN assoluto (impostato dal servizio); in fallback deriva il "pm2"
+// accanto a PM2_RUNTIME_PATH; ultimo fallback: 'pm2' sul PATH.
+export function resolvePm2Bin(env = process.env, exists = fs.existsSync) {
+  if (env.PM2_BIN && exists(env.PM2_BIN)) return env.PM2_BIN
+  if (env.PM2_RUNTIME_PATH) {
+    const sibling = env.PM2_RUNTIME_PATH.replace(/pm2-runtime$/, 'pm2')
+    if (sibling !== env.PM2_RUNTIME_PATH && exists(sibling)) return sibling
+  }
+  return 'pm2'
+}
+
 function defaultRestart() {
   return new Promise((resolve) => {
-    exec(`pm2 restart ${APP_NAME}`, () => resolve())
+    const bin = resolvePm2Bin()
+    const stamp = () => new Date().toISOString()
+    const done = (err, stdout, stderr) => {
+      if (err) {
+        defaultLog(`${stamp()} pm2 restart FALLITO (${bin}): ${err.message} ${String(stderr || '').trim()}`)
+      } else {
+        defaultLog(`${stamp()} pm2 restart eseguito (${bin}) ${String(stdout || '').trim()}`.trim())
+      }
+      resolve()
+    }
+    if (bin === 'pm2') {
+      exec(`pm2 restart ${APP_NAME}`, done)
+    } else {
+      // bin è un percorso assoluto al file JS di pm2: eseguilo con node
+      execFile(process.execPath, [bin, 'restart', APP_NAME], done)
+    }
   })
 }
 

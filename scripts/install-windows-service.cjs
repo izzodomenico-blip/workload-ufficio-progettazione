@@ -10,6 +10,8 @@ const svc = new Service({
   script: path.join(projectDir, 'scripts', 'service-launcher.cjs'),
   env: [
     { name: 'PM2_RUNTIME_PATH', value: process.env.PM2_RUNTIME_PATH || '' },
+    { name: 'PM2_HOME', value: process.env.PM2_HOME || '' },
+    { name: 'PM2_BIN', value: process.env.PM2_BIN || '' },
     { name: 'PORT', value: '3000' },
     { name: 'HOST', value: '0.0.0.0' },
   ],
