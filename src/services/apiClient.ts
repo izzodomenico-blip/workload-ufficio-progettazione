@@ -24,6 +24,15 @@ export interface BackupStatus {
   lastAutoBackupError?: string | null
 }
 
+export interface BackupHealth {
+  status: 'ok' | 'warn' | 'error'
+  reasons: string[]
+  details: {
+    latestVerified: { createdAt: string; integrityOk: boolean; total: number } | null
+    offsiteReceipt: { lastOffsiteAt: string; lastOffsiteOk: boolean; dest?: string } | null
+  }
+}
+
 export interface AdminStatus {
   protected: boolean
 }
@@ -135,6 +144,10 @@ export async function saveAppData(data: AppData, options: SaveAppDataOptions = {
 
 export function fetchBackupStatus(): Promise<BackupStatus> {
   return request<BackupStatus>('/api/backup/status')
+}
+
+export function fetchBackupHealth(): Promise<BackupHealth> {
+  return request<BackupHealth>('/api/backup/health')
 }
 
 export type BackupKind = 'manual' | 'auto'

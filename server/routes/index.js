@@ -41,6 +41,8 @@ import {
 import { permissionsForRole, requirePermission } from '../services/permissions.js'
 import { authorizeAppDataChange, filterAppDataForUser } from '../services/appDataAuthz.js'
 import { buildHealthPayload } from '../health.js'
+import { computeBackupHealth } from '../backupHealth.js'
+import { readLatestVerified, readOffsiteReceipt } from '../verifiedBackup.js'
 
 const SERVER_STARTED_AT = new Date().toISOString()
 
@@ -283,6 +285,21 @@ export function createApiRouter() {
       res.json(getBackupStatus())
     } catch (error) {
       next(error.statusCode ? error : badRequest(error))
+    }
+  })
+
+  router.get('/backup/health', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'manageBackups')
+      const health = computeBackupHealth({
+        latestVerified: readLatestVerified(),
+        offsiteReceipt: readOffsiteReceipt(),
+        now: Date.now(),
+      })
+      res.set('cache-control', 'no-store')
+      res.json(health)
+    } catch (e) {
+      next(e.statusCode ? e : badRequest(e))
     }
   })
 

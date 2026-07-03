@@ -12,6 +12,7 @@ import { generateWeeklyAdminReport } from '../utils/weeklyReport'
 import { ImportPreviewModal } from './ImportPreviewModal'
 import { WeeklyReportModal } from './WeeklyReportModal'
 import { BackupManagerModal } from './BackupManagerModal'
+import { BackupHealthBadge } from './BackupHealthBadge'
 
 interface PendingImport {
   fileName: string
@@ -115,7 +116,8 @@ export function ImportExportPanel() {
   }
 
   return (
-    <div ref={wrapperRef} className="relative">
+    <div ref={wrapperRef} className="relative flex items-center gap-2">
+      <BackupHealthBadge />
       <button
         onClick={() => setOpen((o) => !o)}
         className="btn-ghost"
