@@ -192,7 +192,7 @@ export function StandardParametersReportModal({ open, onClose }: Props) {
           </section>
 
           <footer className="mt-8 border-t border-slate-200 pt-3 text-[10px] text-slate-500">
-            Report generato dall'app Workload Ufficio Progettazione. I parametri sono stati raccolti per predisporre il calcolo automatico dei componenti standard.
+            Report generato dall'app Flowrlink. I parametri sono stati raccolti per predisporre il calcolo automatico dei componenti standard.
           </footer>
         </div>
       </article>

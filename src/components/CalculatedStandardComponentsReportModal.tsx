@@ -190,7 +190,7 @@ export function CalculatedStandardComponentsReportModal({ open, onClose }: Props
           </section>
 
           <footer className="mt-8 border-t border-slate-200 pt-3 text-[10px] text-slate-500">
-            Report generato dall'app Workload Ufficio Progettazione. Le quantita sono calcolate dai parametri dimensionali degli output.
+            Report generato dall'app Flowrlink. Le quantita sono calcolate dai parametri dimensionali degli output.
           </footer>
         </div>
       </article>

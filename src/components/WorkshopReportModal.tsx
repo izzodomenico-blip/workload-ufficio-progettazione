@@ -430,7 +430,7 @@ function Footer({ report }: { report: WorkshopReportModel }) {
   return (
     <footer className="mt-8 border-t border-slate-200 pt-4 text-[10px] text-slate-400">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span>Workload · Ufficio Progettazione Meccanica · Report flusso officina</span>
+        <span>Flowrlink · Ufficio Progettazione Meccanica · Report flusso officina</span>
         <span>Periodo {formatReportRange(report.periodStartISO, report.periodEndISO)} · generato {fmtGenerated(report.generatedAt)}</span>
       </div>
       <p className="mt-1.5">{WORKSHOP_REPORT_IMPACT_NOTE}</p>

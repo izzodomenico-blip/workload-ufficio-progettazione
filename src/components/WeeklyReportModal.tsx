@@ -775,7 +775,7 @@ function NextTile({ value, label, tone }: { value: number; label: string; tone: 
 function ReportFooter({ generatedAt }: { generatedAt: Date }) {
   return (
     <footer className="mt-7 border-t border-slate-200 pt-3 text-[10px] text-slate-400">
-      Workload · Ufficio Progettazione Meccanica · Report generato il {fmtDayMonth(generatedAt)}{' '}
+      Flowrlink · CRM &amp; Workload · Report generato il {fmtDayMonth(generatedAt)}{' '}
       {generatedAt.getFullYear()} alle {fmtTime(generatedAt)}
     </footer>
   )

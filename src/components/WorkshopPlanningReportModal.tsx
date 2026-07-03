@@ -388,7 +388,7 @@ function Footer({ report }: { report: WorkshopPlanningReport }) {
   return (
     <footer className="mt-8 border-t border-slate-200 pt-4 text-[10px] text-slate-400">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span>Workload · Officina · Report pianificazione</span>
+        <span>Flowrlink · Officina · Report pianificazione</span>
         <span>{report.scopeLabel} · {formatItalianShort(report.periodStartISO)} → {formatItalianShort(report.periodEndISO)} · generato {fmtGenerated(report.generatedAt)}</span>
       </div>
       <p className="mt-1.5">I punti carico non rappresentano ore. Saturazione su scala 0–10 (10 = piena).</p>
