@@ -28,7 +28,7 @@ Se vuoi evitare i comandi a mano, ci sono due script pronti:
    Lo script fa da solo: Node (se manca, via winget) → `npm ci` → build → PM2
    (avvio automatico) → firewall → avvio. Alla fine stampa l'indirizzo `http://IP:3000`.
 
-3. Imposta le password (Passo 8) e programma il backup (sezione "Sicurezza dei dati").
+3. Imposta le password (Passo 8) e programma il backup sul NAS (Passo 9).
 
 > Unico prerequisito non automatizzabile in sicurezza: se Node non c'è e `winget`
 > non è disponibile, installalo una volta da https://nodejs.org (2 minuti), poi rilancia.
@@ -141,9 +141,24 @@ Invoke-RestMethod -Uri http://localhost:3000/api/admin/set-password -Method Post
 ```
 Finché non le imposti, quelle sezioni sono aperte senza password.
 
-## Passo 9 — Backup dei dati
-Tutto sta in **`data\workload.db`** (l'app fa anche backup automatici in `data\`).
-Copia periodicamente la cartella **`data\`** su una share di rete o cloud. È l'unico dato da salvare.
+## Passo 9 — Backup automatici verificati + copia sul NAS
+L'app crea da sola, ogni giorno, uno **snapshot verificato** del database in
+`backups\verified\` (controlla l'integrità e calcola un checksum) e tiene una storia
+GFS (14 giornalieri, 8 settimanali, 12 mensili). Per portarli **fuori dal PC** (NAS):
+
+1. Tasto destro su `install-backup-task.ps1` → **Esegui con PowerShell (Amministratore)**:
+   ```
+   .\install-backup-task.ps1 -Dest "\\NAS\backup\flowrlink"
+   ```
+   Chiede un utente con accesso al NAS (le credenziali le tiene Windows, non il repo) e
+   registra un task giornaliero che copia i backup verificati sul NAS.
+2. Controllo salute: nell'app (admin) compare un **semaforo backup**. Verde = al sicuro.
+   Giallo/Rosso = qualcosa non va (snapshot vecchio, integrità fallita, o copia NAS mancante):
+   apri `http://localhost:3000/api/backup/health` o guarda `logs\backup.log`.
+
+**Ripristino:** nell'app (admin) sezione backup → scegli un backup → Ripristina (crea prima
+un backup di sicurezza). Da un backup sul NAS: copia il `verified_*.db` desiderato in
+`data\workload.db` a server fermo, oppure importane il `.json` dall'app.
 
 ## Passo 10 — Aggiornare l'app in futuro
 Quando c'è una nuova versione:
@@ -155,32 +170,6 @@ pm2 restart workload-ufficio-progettazione
 ```
 
 ---
-
-## Sicurezza dei dati — stato attuale e come perfezionarla
-
-**Com'è ora:** i dati stanno in un solo file (`data\workload.db`) e l'app fa già
-**backup automatici** (DB + JSON) nella cartella `backups\`. Questo protegge da:
-salvataggi errati, crash dell'app, chiusure improvvise (il database usa WAL).
-✅ Buono per l'operatività quotidiana.
-
-**Cosa NON copre:** i backup automatici sono **sullo stesso disco** del database.
-Un guasto del disco, un ransomware o la cancellazione della cartella
-**perderebbero tutto**. ⚠️ Questo va perfezionato.
-
-**Come perfezionarla (consigliato):** copia automatica **fuori dal PC** ogni giorno.
-Lo script `backup-data.ps1` crea uno snapshot coerente del DB + i backup dell'app e
-li mette in una destinazione esterna (share di rete / NAS / cloud), tenendo le ultime 30 copie.
-
-Programmalo una volta (come Amministratore), impostando la TUA destinazione esterna:
-```
-schtasks /Create /SC DAILY /ST 20:00 /RL HIGHEST /F /TN "Workload Backup" /TR "powershell -ExecutionPolicy Bypass -File \"%CD%\backup-data.ps1\" -Dest \"\\NAS\backup\workload\""
-```
-Consigli extra: **UPS** sul PC-server (evita spegnimenti bruschi) e, ogni tanto,
-prova a ripristinare un backup per verificare che sia integro.
-
-**Serve un database "vero" (Postgres)?** Per un piccolo ufficio **no**: SQLite con un
-solo processo server (scrittura serializzata) è adeguato. Si valuterebbe solo con molti
-utenti che scrivono in contemporanea.
 
 ## Problemi comuni
 - **"node non è riconosciuto"** → Node non installato o Prompt da riaprire dopo l'installazione (Passo 1).
