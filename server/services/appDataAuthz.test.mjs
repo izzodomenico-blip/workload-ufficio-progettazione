@@ -101,3 +101,45 @@ describe('authorizeAppDataChange — sezioni riservate', () => {
     expect(out.people[0].baselineLoadPercent).toBe(25)
   })
 })
+
+describe('authorizeAppDataChange — coperture adversariali aggiuntive', () => {
+  it('non-admin NON può eliminare task altrui', () => {
+    const current = { ...EMPTY, tasks: [{ id: 't1', workItemId: 'w', title: 't', assigneeId: 'a', status: 'In corso', dueDate: '2026-01-01', createdByUserId: 'u2' }] }
+    expect(() => authorizeAppDataChange(current, { ...EMPTY, tasks: [] }, progettista)).toThrow(/permess/i)
+  })
+  it('non-admin NON può eliminare consuntivo altrui', () => {
+    const current = { ...EMPTY, consuntivi: [{ id: 'c1', commessaNumber: 'x', date: '2026-01-01', createdByUserId: 'u2', laserRows: [], tubeRows: [], weldingRows: [], bendingRows: [] }] }
+    expect(() => authorizeAppDataChange(current, { ...EMPTY, consuntivi: [] }, progettista)).toThrow(/permess/i)
+  })
+  it('sola_lettura NON può modificare un tubeProfile; officina si', () => {
+    const soloLettura = { id: 'r1', permissions: permissionsForRole('sola_lettura') }
+    const officina = { id: 'o1', permissions: permissionsForRole('officina') }
+    const current = { ...EMPTY, tubeProfiles: [{ id: 'tp1', label: '40x40x3', kgPerMeter: 3.49 }] }
+    const incoming = { ...EMPTY, tubeProfiles: [{ id: 'tp1', label: '40x40x3', kgPerMeter: 9 }] }
+    expect(() => authorizeAppDataChange(current, incoming, soloLettura)).toThrow(/permess/i)
+    expect(authorizeAppDataChange(current, incoming, officina).tubeProfiles[0].kgPerMeter).toBe(9)
+  })
+  it('editor senza managePeople NON può sovrascrivere i campi finanziari (reintegrati dal DB)', () => {
+    const current = { ...EMPTY, businessPartners: [{ id: 'bp1', name: 'C', balance: 100, creditLimit: 50 }] }
+    const incoming = { ...EMPTY, businessPartners: [{ id: 'bp1', name: 'C', balance: 999999 }] }
+    const out = authorizeAppDataChange(current, incoming, progettista)
+    expect(out.businessPartners[0].balance).toBe(100)
+    expect(out.businessPartners[0].creditLimit).toBe(50)
+  })
+  it('non-managePeople NON può modificare un\'assenza', () => {
+    const current = { ...EMPTY, absences: [{ id: 'ab1', personId: 'p1', type: 'ferie', startDate: '2026-01-01', endDate: '2026-01-02', hoursPerDay: 8 }] }
+    const incoming = { ...EMPTY, absences: [{ id: 'ab1', personId: 'p1', type: 'permesso', startDate: '2026-01-01', endDate: '2026-01-02', hoursPerDay: 8 }] }
+    expect(() => authorizeAppDataChange(current, incoming, progettista)).toThrow(/permess/i)
+  })
+  it('notifications: non-admin puo aggiungere ma NON azzerare/modificare le esistenti', () => {
+    const curN = { id: 'n1', timestamp: 't', type: 'status_changed', entityType: 'workItem', entityId: 'w', title: 'x', message: 'x', read: false }
+    const current = { ...EMPTY, notifications: [curN] }
+    expect(authorizeAppDataChange(current, { ...EMPTY, notifications: [] }, progettista).notifications.length).toBe(1)
+    const out = authorizeAppDataChange(current, { ...EMPTY, notifications: [{ ...curN, id: 'n2' }] }, progettista)
+    expect(out.notifications.map((n) => n.id).sort()).toEqual(['n1', 'n2'])
+  })
+  it('notifications: admin ha pieno controllo (puo azzerare)', () => {
+    const current = { ...EMPTY, notifications: [{ id: 'n1', timestamp: 't', type: 'status_changed', entityType: 'workItem', entityId: 'w', title: 'x', message: 'x', read: false }] }
+    expect(authorizeAppDataChange(current, { ...EMPTY, notifications: [] }, admin).notifications.length).toBe(0)
+  })
+})

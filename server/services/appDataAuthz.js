@@ -124,5 +124,16 @@ export function authorizeAppDataChange(current, incoming, user) {
     out.activityLog = [...additions, ...curLog]
   }
 
+  // 6) notifications: admin (deleteAny) pieno controllo; gli altri append-only
+  //    (possono generare nuove notifiche dalle proprie azioni, non modificare/azzerare le esistenti).
+  if (perms.deleteAny) {
+    out.notifications = incoming.notifications || []
+  } else {
+    const curN = current.notifications || []
+    const seenN = new Set(curN.map((n) => n.id))
+    const addN = (incoming.notifications || []).filter((n) => n && n.id && !seenN.has(n.id))
+    out.notifications = [...addN, ...curN]
+  }
+
   return out
 }
