@@ -5,12 +5,15 @@ import { fileURLToPath } from 'node:url'
 import { DB_PATH, closeDb, getDb, isDatabaseEmpty, saveAppData } from './db.js'
 import { createApiRouter } from './routes/index.js'
 import { freshSeedData } from './services/seedData.js'
+import { appendLine } from './logging.js'
+import { formatCrash, installProcessGuards } from './hardening.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const ROOT_DIR = path.resolve(__dirname, '..')
 const DIST_DIR = path.join(ROOT_DIR, 'dist')
 const DIST_INDEX = path.join(DIST_DIR, 'index.html')
+const CRASH_LOG = path.join(ROOT_DIR, 'logs', 'crash.log')
 const PORT = Number(process.env.PORT || 3000)
 const HOST = process.env.HOST || '0.0.0.0'
 
@@ -63,14 +66,26 @@ if (HOST === '0.0.0.0' && process.env.WORKLOAD_DISABLE_IPV6_LOCALHOST !== '1') {
   servers.push(localhostServer)
 }
 
-function shutdown() {
+function gracefulExit(code) {
+  const safety = setTimeout(() => {
+    closeDb()
+    process.exit(code)
+  }, 3000)
+  safety.unref()
   let pending = servers.length
   const done = () => {
     pending--
     if (pending <= 0) {
+      clearTimeout(safety)
       closeDb()
-      process.exit(0)
+      process.exit(code)
     }
+  }
+  if (pending === 0) {
+    clearTimeout(safety)
+    closeDb()
+    process.exit(code)
+    return
   }
   for (const activeServer of servers) {
     if (!activeServer.listening) {
@@ -81,5 +96,16 @@ function shutdown() {
   }
 }
 
-process.on('SIGINT', shutdown)
-process.on('SIGTERM', shutdown)
+process.on('SIGINT', () => gracefulExit(0))
+process.on('SIGTERM', () => gracefulExit(0))
+
+installProcessGuards(process, {
+  onFatal: (kind, err) => {
+    try {
+      appendLine(CRASH_LOG, formatCrash(kind, err, new Date().toISOString()))
+    } catch {
+      // logging non deve impedire l'uscita
+    }
+    gracefulExit(1)
+  },
+})
