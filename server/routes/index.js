@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import {
-  deleteEntity,
   getAppData,
   getCollection,
   getConsuntiviConfig,
@@ -38,7 +37,7 @@ import {
   createSession, createUser, deleteSession, getSessionUser,
   getUserByUsername, hasAnyUser, verifyPassword,
 } from '../services/authService.js'
-import { permissionsForRole } from '../services/permissions.js'
+import { permissionsForRole, requirePermission } from '../services/permissions.js'
 import { authorizeAppDataChange, filterAppDataForUser } from '../services/appDataAuthz.js'
 
 const ADMIN_PASSWORD_HEADER = 'x-workload-admin-password'
@@ -229,22 +228,29 @@ export function createApiRouter() {
     }
   })
 
-  router.get('/backup/status', (_req, res) => {
-    res.json(getBackupStatus())
+  router.get('/backup/status', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'manageBackups')
+      res.json(getBackupStatus())
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
   })
 
   // === Gestione / ripristino backup ===
-  router.get('/backups', (_req, res, next) => {
+  router.get('/backups', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'manageBackups')
       res.set('cache-control', 'no-store')
       res.json(listBackupArchives())
     } catch (error) {
-      next(error)
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
   router.get('/backups/preview', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'manageBackups')
       const preview = readBackupPreview(String(req.query.kind || ''), String(req.query.file || ''))
       res.json(preview)
     } catch (error) {
@@ -254,6 +260,7 @@ export function createApiRouter() {
 
   router.get('/backups/download', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'manageBackups')
       const full = resolveBackupFile(String(req.query.kind || ''), String(req.query.file || ''))
       if (!full) {
         res.status(404).json({ error: 'Backup non trovato.' })
@@ -261,12 +268,13 @@ export function createApiRouter() {
       }
       res.download(full)
     } catch (error) {
-      next(error)
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
   router.post('/backups/restore', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'manageBackups')
       const body = req.body ?? {}
       const result = restoreFromBackup(String(body.kind || ''), String(body.file || ''))
       sendDataRevisionHeaders(res)
@@ -277,48 +285,6 @@ export function createApiRouter() {
   })
 
   registerMachineTypeRoutes(router)
-
-  registerCollectionRoutes(router, {
-    apiName: 'people',
-    collection: 'people',
-    guard: peopleBaselineGuard,
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'work-items',
-    collection: 'workItems',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'tasks',
-    collection: 'tasks',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'absences',
-    collection: 'absences',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'business-partners',
-    collection: 'businessPartners',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'workshop-outputs',
-    collection: 'workshopOutputs',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'workshop-workers',
-    collection: 'workshopWorkers',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'workshop-assignments',
-    collection: 'workshopAssignments',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'consuntivi',
-    collection: 'consuntivi',
-  })
-  registerCollectionRoutes(router, {
-    apiName: 'tube-profiles',
-    collection: 'tubeProfiles',
-  })
 
   // Config prezzi: densità pubblica (serve al calcolo kg lato operaio), prezzi protetti.
   router.get('/consuntivi-settings', (_req, res) => {
@@ -379,6 +345,7 @@ export function createApiRouter() {
 
   router.put('/business-partners/:id/activate', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'managePeople')
       const current = getCollection('businessPartners').find((p) => p.id === req.params.id)
       if (!current) {
         res.status(404).json({ error: 'Anagrafica non trovata.' })
@@ -394,6 +361,7 @@ export function createApiRouter() {
 
   router.put('/business-partners/:id/deactivate', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'managePeople')
       const current = getCollection('businessPartners').find((p) => p.id === req.params.id)
       if (!current) {
         res.status(404).json({ error: 'Anagrafica non trovata.' })
@@ -409,6 +377,7 @@ export function createApiRouter() {
 
   router.post('/business-partners/parse-xml', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'managePeople')
       const body = req.body ?? {}
       const xml = typeof body.xml === 'string' ? body.xml : null
       if (!xml || xml.trim().length === 0) {
@@ -431,8 +400,13 @@ export function createApiRouter() {
     }
   })
 
-  router.get('/activity-log', (_req, res) => {
-    res.json(getAppData().activityLog)
+  router.get('/activity-log', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'viewLog')
+      res.json(getAppData().activityLog)
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
   })
 
   router.get('/notifications', (_req, res) => {
@@ -441,6 +415,7 @@ export function createApiRouter() {
 
   router.put('/notifications/:id/read', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'deleteAny')
       const appData = getAppData()
       let updated = null
       const notifications = appData.notifications.map((notification) => {
@@ -460,8 +435,9 @@ export function createApiRouter() {
     }
   })
 
-  router.put('/notifications/read-all', (_req, res, next) => {
+  router.put('/notifications/read-all', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'deleteAny')
       const appData = getAppData()
       const notifications = appData.notifications.map((notification) => ({ ...notification, read: true }))
       saveAppData({ ...appData, notifications })
@@ -483,53 +459,6 @@ export function createApiRouter() {
   return router
 }
 
-function registerCollectionRoutes(router, { apiName, collection, guard, allowDelete = true }) {
-  router.get(`/${apiName}`, (_req, res) => {
-    res.json(getCollection(collection))
-  })
-
-  router.post(`/${apiName}`, (req, res, next) => {
-    try {
-      if (guard) guard({ req, current: null, incoming: req.body })
-      const saved = upsertEntity(collection, req.body)
-      scheduleAutoBackup(`${collection}-created`)
-      res.status(201).json(saved)
-    } catch (error) {
-      next(error.statusCode ? error : badRequest(error))
-    }
-  })
-
-  router.put(`/${apiName}/:id`, (req, res, next) => {
-    try {
-      const current = getCollection(collection).find((item) => item.id === req.params.id)
-      if (!current) {
-        res.status(404).json({ error: 'Elemento non trovato.' })
-        return
-      }
-      const incoming = { ...current, ...req.body, id: req.params.id }
-      if (guard) guard({ req, current, incoming })
-      const saved = upsertEntity(collection, incoming)
-      scheduleAutoBackup(`${collection}-updated`)
-      res.json(saved)
-    } catch (error) {
-      next(error.statusCode ? error : badRequest(error))
-    }
-  })
-
-  if (allowDelete) {
-    router.delete(`/${apiName}/:id`, (req, res, next) => {
-      try {
-        if (collection === 'workItems') createPreMutationBackup('delete-work-item')
-        deleteEntity(collection, req.params.id)
-        if (collection !== 'workItems') scheduleAutoBackup(`${collection}-deleted`)
-        res.status(204).end()
-      } catch (error) {
-        next(error)
-      }
-    })
-  }
-}
-
 function registerMachineTypeRoutes(router) {
   router.get('/machine-types', (_req, res) => {
     res.set('cache-control', 'no-store')
@@ -538,6 +467,7 @@ function registerMachineTypeRoutes(router) {
 
   router.post('/machine-types', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'canEditWork')
       const appData = getAppData()
       const incoming = normalizeMachineTypeEntity(req.body)
       ensureUniqueMachineTypeCode(appData.machineTypes, incoming)
@@ -562,6 +492,7 @@ function registerMachineTypeRoutes(router) {
 
   router.put('/machine-types/:id', (req, res, next) => {
     try {
+      requirePermission(req.user.permissions, 'canEditWork')
       const appData = getAppData()
       const before = appData.machineTypes.find((item) => item.id === req.params.id)
       if (!before) {
@@ -666,26 +597,6 @@ function requireConsuntiviPassword(req) {
     err.detail = 'consuntivi-pricing-protected'
     throw err
   }
-}
-
-function peopleBaselineGuard({ req, current, incoming }) {
-  const before = normalizeBaseline(current?.baselineLoadPercent)
-  const after = normalizeBaseline(incoming?.baselineLoadPercent)
-  if (before === after) return
-  const provided = req.get(ADMIN_PASSWORD_HEADER)
-  if (!verifyAdminPassword(provided)) {
-    const err = new Error('Carico base protetto: password admin richiesta o errata.')
-    err.statusCode = 403
-    err.detail = 'baseline-load-protected'
-    throw err
-  }
-}
-
-function normalizeBaseline(v) {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return 0
-  if (v < 0) return 0
-  if (v > 100) return 100
-  return v
 }
 
 function mutationReason(req, fallback) {

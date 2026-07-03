@@ -25,6 +25,15 @@ function base() {
   }
 }
 
+export function requirePermission(permissions, key) {
+  if (!permissions || permissions[key] !== true) {
+    const err = new Error('Permesso negato.')
+    err.statusCode = 403
+    err.detail = 'forbidden'
+    throw err
+  }
+}
+
 export function permissionsForRole(role) {
   const p = base()
   if (role === 'amministratore') {

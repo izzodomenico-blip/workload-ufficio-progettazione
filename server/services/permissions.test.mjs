@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { permissionsForRole } from './permissions.js'
+import { permissionsForRole, requirePermission } from './permissions.js'
 
 describe('permissionsForRole', () => {
   it('amministratore: tutto', () => {
@@ -34,5 +34,38 @@ describe('permissionsForRole', () => {
     const p = permissionsForRole('xxx')
     expect(p.canEditWork).toBe(false)
     expect(p.sections).toEqual([])
+  })
+})
+
+describe('requirePermission', () => {
+  it('permesso concesso: non lancia', () => {
+    expect(() => requirePermission({ manageBackups: true }, 'manageBackups')).not.toThrow()
+  })
+  it('permesso esplicitamente false: lancia 403 forbidden', () => {
+    try {
+      requirePermission({ manageBackups: false }, 'manageBackups')
+      throw new Error('avrebbe dovuto lanciare')
+    } catch (err) {
+      expect(err.statusCode).toBe(403)
+      expect(err.detail).toBe('forbidden')
+    }
+  })
+  it('chiave mancante nell\'oggetto permessi: nega (403)', () => {
+    try {
+      requirePermission({}, 'manageBackups')
+      throw new Error('avrebbe dovuto lanciare')
+    } catch (err) {
+      expect(err.statusCode).toBe(403)
+      expect(err.detail).toBe('forbidden')
+    }
+  })
+  it('permissions null: nega (403)', () => {
+    try {
+      requirePermission(null, 'x')
+      throw new Error('avrebbe dovuto lanciare')
+    } catch (err) {
+      expect(err.statusCode).toBe(403)
+      expect(err.detail).toBe('forbidden')
+    }
   })
 })
