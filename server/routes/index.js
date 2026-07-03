@@ -4,6 +4,7 @@ import {
   getCollection,
   getConsuntiviConfig,
   getDataRevision,
+  getDb,
   getLastMutationAt,
   saveAppData,
   saveConsuntiviConfig,
@@ -39,6 +40,9 @@ import {
 } from '../services/authService.js'
 import { permissionsForRole, requirePermission } from '../services/permissions.js'
 import { authorizeAppDataChange, filterAppDataForUser } from '../services/appDataAuthz.js'
+import { buildHealthPayload } from '../health.js'
+
+const SERVER_STARTED_AT = new Date().toISOString()
 
 const ADMIN_PASSWORD_HEADER = 'x-workload-admin-password'
 const DATA_REVISION_HEADER = 'x-workload-data-revision'
@@ -154,7 +158,23 @@ export function createApiRouter() {
   })
 
   router.get('/health', (_req, res) => {
-    res.json({ ok: true, service: 'workload-ufficio-progettazione', storage: 'sqlite' })
+    let dbOk = false
+    let error
+    try {
+      getDb().prepare('SELECT 1 AS ok').get()
+      dbOk = true
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e)
+    }
+    const { status, body } = buildHealthPayload({
+      dbOk,
+      uptimeSec: Math.round(process.uptime()),
+      startedAt: SERVER_STARTED_AT,
+      pid: process.pid,
+      error,
+    })
+    res.set('cache-control', 'no-store')
+    res.status(status).json(body)
   })
 
   router.get('/app-data', (req, res) => {

@@ -1,12 +1,8 @@
 // PM2 — modalità PRODUZIONE.
-// Avvia il server Node che serve la BUILD (dist/) + le API su un'unica porta.
-// Prerequisito: aver eseguito `npm ci` e `npm run build` almeno una volta.
-//
-//   pm2 start ecosystem.config.cjs
-//   pm2 save
-//
-// NB: NON usa `npm run dev` (quella è la modalità sviluppo con Vite, non adatta
-// a restare sempre online).
+// Avvia due app: il server (build + API) e il watchdog salute.
+// Sotto un servizio Windows vero (vedi install-service.ps1) via:
+//   pm2-runtime start ecosystem.config.cjs
+// Non serve `pm2 save`/`pm2 resurrect`: questo file è l'unica fonte dei processi.
 module.exports = {
   apps: [
     {
@@ -21,8 +17,28 @@ module.exports = {
       },
       autorestart: true,
       watch: false,
-      restart_delay: 5000,
-      max_restarts: 30,
+      exp_backoff_restart_delay: 200,
+      max_memory_restart: "400M",
+      kill_timeout: 5000,
+      out_file: "logs/server-out.log",
+      error_file: "logs/server-err.log",
+    },
+    {
+      name: "workload-watchdog",
+      script: "server/watchdog.js",
+      cwd: __dirname,
+      interpreter: "node",
+      env: {
+        NODE_ENV: "production",
+        PORT: "3000",
+        APP_NAME: "workload-ufficio-progettazione",
+      },
+      autorestart: true,
+      watch: false,
+      exp_backoff_restart_delay: 200,
+      max_memory_restart: "150M",
+      out_file: "logs/watchdog-out.log",
+      error_file: "logs/watchdog-err.log",
     },
   ],
 };

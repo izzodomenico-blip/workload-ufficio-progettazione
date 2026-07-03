@@ -86,26 +86,29 @@ Poi ferma con **CTRL+C** (il prossimo passo la fa ripartire da sola e sempre).
 
 > Scorciatoia per i passi 3–4: doppio click su **`serve-prod.cmd`** (fa tutto lui).
 
-## Passo 5 — Tenerla SEMPRE online (PM2)
-PM2 riavvia l'app se crolla e la fa ripartire all'accensione del PC.
-```
-npm i -g pm2 pm2-windows-startup
-pm2-startup install
-pm2 start ecosystem.config.cjs
-pm2 save
-```
-Verifica: `pm2 status` (deve essere **online**). Log in tempo reale: `pm2 logs`.
+## Passo 5 — Tenerla SEMPRE online (servizio Windows)
+Un **servizio Windows** tiene su l'app 24/7: parte all'accensione del PC **prima del
+login**, riavvia se l'app crolla, e un **watchdog** la riavvia anche se si "impalla"
+(processo vivo ma non risponde).
 
-Comandi utili:
-| Cosa | Comando |
+Dalla cartella del progetto, **tasto destro su `install-service.ps1` → Esegui con
+PowerShell (come Amministratore)**. Lo script fa tutto: PM2, node-windows, build se serve,
+registra il servizio `Flowrlink`, apre il firewall, avvia e stampa `http://IP:3000`.
+
+Verifiche rapide:
+| Cosa | Come |
 |---|---|
-| Stato | `pm2 status` |
-| Log | `pm2 logs` |
-| Riavvia | `pm2 restart workload-ufficio-progettazione` |
-| Ferma | `pm2 stop workload-ufficio-progettazione` |
+| È online? | `pm2 status` → entrambe le app `online` |
+| Perché ha riavviato? | file `logs\watchdog.log` e `logs\crash.log` |
+| Salute dal browser | apri `http://localhost:3000/api/health` → `"ok": true`, `"db": "ok"` |
+| Riparte dopo reboot? | riavvia il PC senza fare login, poi da un altro PC apri `http://IP:3000` |
+| `pm2 status` non mostra nulla? | Riapri il terminale (PM2_HOME è a livello Machine, serve una shell nuova) |
 
-> In alternativa a PM2 puoi usare **NSSM** o l'**Utilità di pianificazione** di Windows
-> per lanciare `node server/index.js` all'avvio. PM2 è il più semplice.
+Comandi utili: `pm2 logs` (log live), `pm2 restart workload-ufficio-progettazione`.
+Gestione servizio: `services.msc` → **Flowrlink** (Avvia/Arresta/Automatico).
+
+> In alternativa al servizio puoi usare NSSM. Il servizio via `install-service.ps1` è il
+> percorso consigliato perché non richiede login.
 
 ## Passo 6 — Apri la porta 3000 nel firewall
 Apri il **Prompt dei comandi come Amministratore** (tasto destro → *Esegui come amministratore*) e incolla:
