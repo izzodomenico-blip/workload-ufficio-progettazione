@@ -29,9 +29,11 @@ function Shell() {
           <div className="flex items-center gap-3">
             <Logo />
             <div className="leading-tight">
-              <div className="text-2xl font-bold tracking-tight text-slate-100">Workload</div>
-              <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
-                Ufficio Progettazione Meccanica
+              <div className="bg-gradient-to-r from-[color:var(--color-accent)] to-[color:var(--color-accent-2)] bg-clip-text text-3xl font-extrabold tracking-tight text-transparent">
+                Flowrlink
+              </div>
+              <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">
+                CRM &amp; Workload
               </div>
             </div>
           </div>
@@ -116,25 +118,13 @@ function Shell() {
 }
 
 function Logo() {
-  // Marchio "fuso" con lo sfondo: nessun riquadro, il segno sta direttamente sulla
-  // pagina. viewBox ritagliato sul tracciato (+ stroke) così riempie il box ed è grande.
   return (
-    <svg viewBox="10 16 44 32" className="h-16 w-[92px] shrink-0" aria-label="Workload" role="img">
-      <path
-        d="M14 44 L24 24 L32 36 L40 20 L50 44"
-        stroke="url(#logoGradient)"
-        strokeWidth="7"
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <defs>
-        <linearGradient id="logoGradient" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#38bdf8" />
-          <stop offset="1" stopColor="#818cf8" />
-        </linearGradient>
-      </defs>
-    </svg>
+    <img
+      src="/flowrlink-mark.png"
+      alt="Flowrlink"
+      className="h-14 w-auto shrink-0 select-none sm:h-16"
+      draggable={false}
+    />
   )
 }
 
