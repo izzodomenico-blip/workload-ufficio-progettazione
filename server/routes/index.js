@@ -345,7 +345,7 @@ export function createApiRouter() {
 
   router.put('/business-partners/:id/activate', (req, res, next) => {
     try {
-      requirePermission(req.user.permissions, 'managePeople')
+      requirePermission(req.user.permissions, 'canEditWork')
       const current = getCollection('businessPartners').find((p) => p.id === req.params.id)
       if (!current) {
         res.status(404).json({ error: 'Anagrafica non trovata.' })
@@ -355,13 +355,13 @@ export function createApiRouter() {
       scheduleAutoBackup('business-partner-activated')
       res.json(saved)
     } catch (error) {
-      next(badRequest(error))
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
   router.put('/business-partners/:id/deactivate', (req, res, next) => {
     try {
-      requirePermission(req.user.permissions, 'managePeople')
+      requirePermission(req.user.permissions, 'canEditWork')
       const current = getCollection('businessPartners').find((p) => p.id === req.params.id)
       if (!current) {
         res.status(404).json({ error: 'Anagrafica non trovata.' })
@@ -371,13 +371,13 @@ export function createApiRouter() {
       scheduleAutoBackup('business-partner-deactivated')
       res.json(saved)
     } catch (error) {
-      next(badRequest(error))
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
   router.post('/business-partners/parse-xml', (req, res, next) => {
     try {
-      requirePermission(req.user.permissions, 'managePeople')
+      requirePermission(req.user.permissions, 'canEditWork')
       const body = req.body ?? {}
       const xml = typeof body.xml === 'string' ? body.xml : null
       if (!xml || xml.trim().length === 0) {
@@ -396,7 +396,7 @@ export function createApiRouter() {
         records: result.records,
       })
     } catch (error) {
-      next(badRequest(error))
+      next(error.statusCode ? error : badRequest(error))
     }
   })
 
