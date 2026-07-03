@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../state/DataProvider'
+import { useAuth } from '../state/AuthProvider'
 import { ConsuntivoFormModal } from './ConsuntivoFormModal'
 import { ConsuntiviPricingModal } from './ConsuntiviPricingModal'
 import { ConsuntiviReportModal } from './ConsuntiviReportModal'
@@ -10,6 +11,7 @@ import type { Consuntivo, ConsuntivoMaterial } from '../types'
 
 export function ConsuntiviView() {
   const { consuntivi, deleteConsuntivo } = useData()
+  const { user } = useAuth()
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Consuntivo | null>(null)
   const [filter, setFilter] = useState('')
@@ -42,8 +44,12 @@ export function ConsuntiviView() {
         <div className="flex items-center gap-2">
           <input className="input-base w-64" placeholder="Filtra per commessa, fornitore, data…" value={filter} onChange={(e) => setFilter(e.target.value)} />
           <button className="btn-ghost" onClick={() => setLibraryOpen(true)}>Libreria profili</button>
-          <button className="btn-ghost" onClick={() => setPricingOpen(true)}>Prezzi 🔒</button>
-          <button className="btn-ghost" onClick={() => setReportOpen(true)}>Report 🔒</button>
+          {user?.permissions.viewConsuntiviPrices && (
+            <button className="btn-ghost" onClick={() => setPricingOpen(true)}>Prezzi 🔒</button>
+          )}
+          {user?.permissions.viewConsuntiviPrices && (
+            <button className="btn-ghost" onClick={() => setReportOpen(true)}>Report 🔒</button>
+          )}
           <button className="btn-primary" onClick={() => { setEditing(null); setFormOpen(true) }}>+ Nuovo consuntivo</button>
         </div>
       </div>
