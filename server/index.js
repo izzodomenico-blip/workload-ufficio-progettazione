@@ -2,7 +2,7 @@ import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DB_PATH, closeDb, getDb, isDatabaseEmpty, saveAppData } from './db.js'
+import { DB_PATH, STATE_DIR, closeDb, getDb, isDatabaseEmpty, saveAppData } from './db.js'
 import { createApiRouter } from './routes/index.js'
 import { freshSeedData } from './services/seedData.js'
 import { appendLine } from './logging.js'
@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename)
 const ROOT_DIR = path.resolve(__dirname, '..')
 const DIST_DIR = path.join(ROOT_DIR, 'dist')
 const DIST_INDEX = path.join(DIST_DIR, 'index.html')
-const CRASH_LOG = path.join(ROOT_DIR, 'logs', 'crash.log')
+const CRASH_LOG = path.join(STATE_DIR, 'logs', 'crash.log')
 const PORT = Number(process.env.PORT || 3000)
 const HOST = process.env.HOST || '0.0.0.0'
 
@@ -112,7 +112,7 @@ installProcessGuards(process, {
 })
 
 // Scheduler backup verificato: all'avvio e ogni ora, se è passato ≥ ~24h, crea uno snapshot verificato.
-const BACKUP_LOG = path.join(ROOT_DIR, 'logs', 'backup.log')
+const BACKUP_LOG = path.join(STATE_DIR, 'logs', 'backup.log')
 function runVerifiedSnapshotIfDue() {
   try {
     const latest = readLatestVerified()

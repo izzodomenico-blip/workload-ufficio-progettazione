@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { recordResult, shouldRestart } from './watchdogLogic.js'
 import { appendLine, rotateIfNeeded } from './logging.js'
+import { STATE_DIR } from './db.js'
 
 const PORT = Number(process.env.PORT || 3000)
 const APP_NAME = process.env.APP_NAME || 'workload-ufficio-progettazione'
@@ -11,7 +12,7 @@ const INTERVAL_MS = Number(process.env.HEALTH_INTERVAL_MS || 30000)
 const TIMEOUT_MS = Number(process.env.HEALTH_TIMEOUT_MS || 5000)
 const THRESHOLD = Number(process.env.HEALTH_FAIL_THRESHOLD || 3)
 const GRACE_MS = Number(process.env.RESTART_GRACE_MS || 60000)
-const LOG_FILE = path.join(process.cwd(), 'logs', 'watchdog.log')
+const LOG_FILE = path.join(STATE_DIR, 'logs', 'watchdog.log')
 
 async function defaultCheckHealth() {
   const ac = new AbortController()

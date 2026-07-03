@@ -9,9 +9,15 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 export const ROOT_DIR = path.resolve(__dirname, '..')
+
+export function resolveStateDir(env, rootDir) {
+  return env.WORKLOAD_STATE_DIR ? path.resolve(env.WORKLOAD_STATE_DIR) : rootDir
+}
+export const STATE_DIR = resolveStateDir(process.env, ROOT_DIR)
+
 export const DATA_DIR = process.env.WORKLOAD_DATA_DIR
   ? path.resolve(process.env.WORKLOAD_DATA_DIR)
-  : path.join(ROOT_DIR, 'data')
+  : path.join(STATE_DIR, 'data')
 export const DB_PATH = process.env.WORKLOAD_DB_PATH
   ? path.resolve(process.env.WORKLOAD_DB_PATH)
   : path.join(DATA_DIR, 'workload.db')
