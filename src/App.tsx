@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { DataProvider } from './state/DataProvider'
 import { ToastProvider } from './state/ToastProvider'
+import { AuthProvider, useAuth } from './state/AuthProvider'
+import { LoginScreen } from './components/LoginScreen'
 import { Dashboard } from './components/Dashboard'
 import { WorkItemFormModal } from './components/WorkItemFormModal'
 import { PeopleSettingsModal } from './components/PeopleSettingsModal'
@@ -10,10 +12,21 @@ import { NotificationsBell } from './components/NotificationsBell'
 export function App() {
   return (
     <ToastProvider>
-      <DataProvider>
-        <Shell />
-      </DataProvider>
+      <AuthProvider>
+        <AppGate />
+      </AuthProvider>
     </ToastProvider>
+  )
+}
+
+function AppGate() {
+  const { status } = useAuth()
+  if (status === 'loading') return <div className="flex min-h-screen items-center justify-center text-slate-500">Caricamento…</div>
+  if (status !== 'loggedIn') return <LoginScreen />
+  return (
+    <DataProvider>
+      <Shell />
+    </DataProvider>
   )
 }
 
@@ -88,6 +101,8 @@ function Shell() {
               <Icon path="M12 5v14M5 12h14" />
               Nuovo lavoro
             </button>
+
+            <UserMenu />
           </div>
         </div>
       </header>
@@ -133,5 +148,17 @@ function Icon({ path }: { path: string }) {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d={path} />
     </svg>
+  )
+}
+
+function UserMenu() {
+  const { user, logout } = useAuth()
+  if (!user) return null
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-slate-800/80 bg-[color:var(--color-surface-1)]/80 px-2.5 py-1.5">
+      <span className="text-sm text-slate-300">{user.username}</span>
+      <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase text-slate-400">{user.role}</span>
+      <button className="btn-ghost text-xs" onClick={() => void logout()} title="Esci">Logout</button>
+    </div>
   )
 }

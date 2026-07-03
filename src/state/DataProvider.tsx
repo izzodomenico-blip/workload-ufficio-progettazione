@@ -337,6 +337,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
           toast.error('Salvataggio bloccato: i dati condivisi erano cambiati. Ho ricaricato il database server, ripeti la modifica se serve.')
           return
         }
+        if (err instanceof Error && /permess|Riservato|amministratore/i.test(err.message)) {
+          if (pendingCommitsRef.current <= 1) {
+            dataRef.current = previous; setData(previous); saveToStorage(previous)
+          }
+          toast.error(`Operazione non consentita: ${err.message}`)
+          return
+        }
         // Rollback dello stato locale se il backend rifiuta (es. password mancante),
         // ma solo se nessuna modifica successiva ha gia' superato questo salvataggio.
         if (pendingCommitsRef.current <= 1) {
