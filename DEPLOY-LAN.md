@@ -152,6 +152,11 @@ GFS (14 giornalieri, 8 settimanali, 12 mensili). Per portarli **fuori dal PC** (
    ```
    Chiede un utente con accesso al NAS (le credenziali le tiene Windows, non il repo) e
    registra un task giornaliero che copia i backup verificati sul NAS.
+
+   > ⚠️ **Il `-Dest` deve essere una cartella dedicata SOLO a questi backup.** La copia usa
+   > `robocopy /MIR` (mirror): rende la cartella NAS identica a `backups\verified\` e
+   > **cancella dal NAS qualsiasi altro file** non presente in locale. Non puntare `-Dest`
+   > a una share condivisa con altri contenuti.
 2. Controllo salute: nell'app (admin) compare un **semaforo backup**. Verde = al sicuro.
    Giallo/Rosso = qualcosa non va (snapshot vecchio, integrità fallita, o copia NAS mancante):
    apri `http://localhost:3000/api/backup/health` o guarda `logs\backup.log`.
