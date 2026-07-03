@@ -7,6 +7,7 @@ import { createApiRouter } from './routes/index.js'
 import { freshSeedData } from './services/seedData.js'
 import { appendLine } from './logging.js'
 import { formatCrash, installProcessGuards } from './hardening.js'
+import { createVerifiedSnapshot, isSnapshotDue, readLatestVerified } from './verifiedBackup.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -109,3 +110,19 @@ installProcessGuards(process, {
     gracefulExit(1)
   },
 })
+
+// Scheduler backup verificato: all'avvio e ogni ora, se è passato ≥ ~24h, crea uno snapshot verificato.
+const BACKUP_LOG = path.join(ROOT_DIR, 'logs', 'backup.log')
+function runVerifiedSnapshotIfDue() {
+  try {
+    const latest = readLatestVerified()
+    if (!isSnapshotDue(latest?.createdAt ?? null, Date.now())) return
+    const { manifest } = createVerifiedSnapshot({ reason: 'scheduler' })
+    appendLine(BACKUP_LOG, `${new Date().toISOString()} snapshot verificato creato integrità=${manifest.integrityResult} totale=${manifest.total}`)
+  } catch (error) {
+    try { appendLine(BACKUP_LOG, `${new Date().toISOString()} snapshot verificato FALLITO: ${error instanceof Error ? error.message : String(error)}`) } catch { /* ignora */ }
+  }
+}
+runVerifiedSnapshotIfDue()
+const backupTimer = setInterval(runVerifiedSnapshotIfDue, 60 * 60 * 1000)
+backupTimer.unref()
