@@ -34,6 +34,12 @@ import {
   setConsuntiviPassword,
   verifyConsuntiviPassword,
 } from '../services/consuntiviAuth.js'
+import {
+  createSession, createUser, deleteSession, getSessionUser,
+  getUserByUsername, hasAnyUser, verifyPassword,
+} from '../services/authService.js'
+import { permissionsForRole } from '../services/permissions.js'
+import { authorizeAppDataChange, filterAppDataForUser } from '../services/appDataAuthz.js'
 
 const ADMIN_PASSWORD_HEADER = 'x-workload-admin-password'
 const DATA_REVISION_HEADER = 'x-workload-data-revision'
@@ -95,12 +101,65 @@ function extractAppDataPreservingExisting(body, options = {}) {
 export function createApiRouter() {
   const router = Router()
 
+  // Endpoint pubblici (senza sessione): health, login, setup-admin, stato-setup.
+  const PUBLIC = new Set(['/health', '/auth/login', '/auth/setup-admin', '/auth/setup-status'])
+
+  router.get('/auth/setup-status', (_req, res) => {
+    res.json({ needsSetup: !hasAnyUser() })
+  })
+
+  router.post('/auth/setup-admin', (req, res, next) => {
+    try {
+      if (hasAnyUser()) { const e = new Error('Setup già eseguito.'); e.statusCode = 409; throw e }
+      const { username, password } = req.body ?? {}
+      const user = createUser({ username, password, role: 'amministratore', linkedPersonId: '' })
+      const { token } = createSession(user.id)
+      setSessionCookie(res, token)
+      res.status(201).json({ user: { ...user, permissions: permissionsForRole(user.role) } })
+    } catch (error) { next(error.statusCode ? error : badRequest(error)) }
+  })
+
+  router.post('/auth/login', (req, res, next) => {
+    try {
+      const { username, password } = req.body ?? {}
+      const row = getUserByUsername(username)
+      if (!row || !row.active || !verifyPassword(String(password ?? ''), row)) {
+        const e = new Error('Credenziali non valide.'); e.statusCode = 401; throw e
+      }
+      const { token } = createSession(row.id)
+      setSessionCookie(res, token)
+      res.json({ user: { id: row.id, username: row.username, role: row.role, linkedPersonId: row.linkedPersonId, permissions: permissionsForRole(row.role) } })
+    } catch (error) { next(error.statusCode ? error : badRequest(error)) }
+  })
+
+  router.post('/auth/logout', (req, res) => {
+    deleteSession(parseCookies(req)[SESSION_COOKIE])
+    res.clearCookie(SESSION_COOKIE, { path: '/' })
+    res.json({ ok: true })
+  })
+
+  router.get('/auth/me', (req, res) => {
+    const user = currentUser(req)
+    if (!user) { res.status(401).json({ error: 'Non autenticato.' }); return }
+    res.json({ user })
+  })
+
+  // Guardia: tutte le altre rotte /api richiedono sessione valida.
+  router.use((req, res, next) => {
+    // il path qui è relativo al mount /api (es. '/app-data')
+    if (PUBLIC.has(req.path)) return next()
+    const user = currentUser(req)
+    if (!user) { res.status(401).json({ error: 'Sessione richiesta.', detail: 'auth-required' }); return }
+    req.user = user
+    next()
+  })
+
   router.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'workload-ufficio-progettazione', storage: 'sqlite' })
   })
 
-  router.get('/app-data', (_req, res) => {
-    sendAppData(res, getAppData())
+  router.get('/app-data', (req, res) => {
+    sendAppData(res, filterAppDataForUser(getAppData(), req.user.permissions))
   })
 
   router.put('/app-data', (req, res, next) => {
@@ -115,8 +174,9 @@ export function createApiRouter() {
       const data = extractAppDataPreservingExisting(req.body, {
         preserveEmptySharedCollections: reason.startsWith('import-'),
       })
+      const authorized = authorizeAppDataChange(getAppData(), data, req.user)
       const currentPeople = getCollection('people')
-      if (hasBaselineChanges(currentPeople, data.people)) {
+      if (hasBaselineChanges(currentPeople, authorized.people)) {
         const provided = req.get(ADMIN_PASSWORD_HEADER)
         if (!verifyAdminPassword(provided)) {
           const err = new Error('Carico base protetto: password admin richiesta o errata.')
@@ -127,15 +187,15 @@ export function createApiRouter() {
       }
       const isNormalCommit = req.get('x-workload-mutation-kind') === 'normal'
       if (isNormalCommit) {
-        const saved = saveAppData(data)
+        const saved = saveAppData(authorized)
         scheduleAutoBackup(reason)
-        sendAppData(res, saved)
+        sendAppData(res, filterAppDataForUser(saved, req.user.permissions))
         return
       }
       const backup = createPreMutationBackup(reason)
-      const saved = saveAppData(data)
+      const saved = saveAppData(authorized)
       if (backup) recordAutomaticBackupActivity(backup.reason, new Date(backup.createdAt))
-      sendAppData(res, saved)
+      sendAppData(res, filterAppDataForUser(saved, req.user.permissions))
     } catch (error) {
       next(error.statusCode ? error : badRequest(error))
     }
@@ -649,4 +709,31 @@ function badRequest(error) {
   const err = new Error(error instanceof Error ? error.message : 'Richiesta non valida.')
   err.statusCode = 400
   return err
+}
+
+const SESSION_COOKIE = 'flowrlink_session'
+
+function parseCookies(req) {
+  const raw = req.headers.cookie
+  const out = {}
+  if (!raw) return out
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=')
+    if (i > -1) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim())
+  }
+  return out
+}
+
+function currentUser(req) {
+  const token = parseCookies(req)[SESSION_COOKIE]
+  const user = getSessionUser(token)
+  if (!user) return null
+  return { ...user, permissions: permissionsForRole(user.role) }
+}
+
+function setSessionCookie(res, token) {
+  const secure = process.env.WORKLOAD_HTTPS === '1'
+  res.cookie(SESSION_COOKIE, token, {
+    httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 12 * 60 * 60 * 1000,
+  })
 }
