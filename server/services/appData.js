@@ -332,6 +332,7 @@ function normalizeWorkItem(item, index) {
     progressPercent: normalizePercent(o.progressPercent),
     acquisitionProbability: type === 'studio' && isNumber(o.acquisitionProbability) ? o.acquisitionProbability : undefined,
     blockers: stringArray(o.blockers),
+    createdByUserId: isString(o.createdByUserId) ? o.createdByUserId : '',
   }
 }
 
@@ -358,6 +359,7 @@ function normalizeTask(item, index) {
     loggedHours: numberOrZero(o.loggedHours),
     progressPercent: normalizePercent(o.progressPercent),
     blockers: stringArray(o.blockers),
+    createdByUserId: isString(o.createdByUserId) ? o.createdByUserId : '',
   }
 }
 
@@ -676,6 +678,7 @@ function normalizeConsuntivo(item) {
     notes: isString(o.notes) ? o.notes : '',
     createdAt: isNonEmptyString(o.createdAt) ? o.createdAt : now,
     updatedAt: isNonEmptyString(o.updatedAt) ? o.updatedAt : now,
+    createdByUserId: isString(o.createdByUserId) ? o.createdByUserId : '',
   }
 }
 

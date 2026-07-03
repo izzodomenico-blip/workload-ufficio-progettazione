@@ -88,6 +88,7 @@ export interface WorkItem {
   // o per clienti non ancora censiti.
   customerPartnerId?: string
   customerPartnerName?: string
+  createdByUserId?: string
 }
 
 export interface Task {
@@ -103,6 +104,7 @@ export interface Task {
   progressPercent: number
   blockers: string[]
   notes?: string
+  createdByUserId?: string
 }
 
 export type AbsenceType = 'ferie' | 'permesso' | 'malattia' | 'trasferta' | 'altro'
@@ -687,6 +689,7 @@ export interface Consuntivo {
   notes: string
   createdAt: string
   updatedAt: string
+  createdByUserId?: string
 }
 
 export interface TubeProfile {
@@ -737,4 +740,31 @@ export const CLOSED_STATUSES: Status[] = ['Completato', 'Sospeso']
 
 export function isOpen(status: Status): boolean {
   return !CLOSED_STATUSES.includes(status)
+}
+
+// === Auth / permessi (sotto-progetto B) ===
+export type Role = 'amministratore' | 'progettista' | 'officina' | 'sola_lettura'
+export type SectionId =
+  | 'dashboard' | 'planning' | 'agenda' | 'anagrafiche' | 'disegni'
+  | 'officina' | 'operai' | 'officina-planning' | 'consuntivi' | 'log' | 'utenti'
+
+export interface Permissions {
+  sections: SectionId[]
+  canCreateWork: boolean
+  canEditWork: boolean
+  canDeleteOwnWork: boolean
+  deleteAny: boolean
+  manageUsers: boolean
+  managePeople: boolean
+  viewConsuntiviPrices: boolean
+  manageBackups: boolean
+  viewLog: boolean
+}
+
+export interface AuthUser {
+  id: string
+  username: string
+  role: Role
+  linkedPersonId: string
+  permissions: Permissions
 }
