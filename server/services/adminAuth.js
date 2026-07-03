@@ -1,21 +1,18 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { STATE_DIR } from '../db.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-const CONFIG_PATH = process.env.WORKLOAD_ADMIN_CONFIG_PATH
+export const ADMIN_CONFIG_PATH = process.env.WORKLOAD_ADMIN_CONFIG_PATH
   ? path.resolve(process.env.WORKLOAD_ADMIN_CONFIG_PATH)
-  : path.resolve(__dirname, '..', 'admin.config.json')
+  : path.join(STATE_DIR, 'admin.config.json')
 
 const FORMAT_VERSION = 1
 
 function safeReadConfig() {
   try {
-    if (!fs.existsSync(CONFIG_PATH)) return null
-    const raw = fs.readFileSync(CONFIG_PATH, 'utf8')
+    if (!fs.existsSync(ADMIN_CONFIG_PATH)) return null
+    const raw = fs.readFileSync(ADMIN_CONFIG_PATH, 'utf8')
     const parsed = JSON.parse(raw)
     if (parsed && typeof parsed === 'object' && typeof parsed.passwordHash === 'string' && typeof parsed.salt === 'string') {
       return parsed
@@ -28,9 +25,9 @@ function safeReadConfig() {
 }
 
 function writeConfig(config) {
-  const tmp = `${CONFIG_PATH}.tmp`
+  const tmp = `${ADMIN_CONFIG_PATH}.tmp`
   fs.writeFileSync(tmp, JSON.stringify(config, null, 2), 'utf8')
-  fs.renameSync(tmp, CONFIG_PATH)
+  fs.renameSync(tmp, ADMIN_CONFIG_PATH)
 }
 
 function hashPassword(plain, salt) {
@@ -52,7 +49,7 @@ export function getAdminStatus() {
   const cfg = safeReadConfig()
   return {
     protected: !!cfg,
-    configPath: CONFIG_PATH,
+    configPath: ADMIN_CONFIG_PATH,
   }
 }
 
@@ -91,7 +88,7 @@ export function setAdminPassword({ currentPassword, newPassword }) {
   }
   if (newPassword.length === 0) {
     // Rimozione protezione
-    if (fs.existsSync(CONFIG_PATH)) fs.unlinkSync(CONFIG_PATH)
+    if (fs.existsSync(ADMIN_CONFIG_PATH)) fs.unlinkSync(ADMIN_CONFIG_PATH)
     return { protected: false }
   }
   if (newPassword.length < 4) {

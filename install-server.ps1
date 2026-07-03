@@ -57,12 +57,22 @@ if (-not (Test-Path $StateDb)) {
   }
   if ($migrateSrc) {
     Write-Host "Migro i dati esistenti da: $migrateSrc"
-    # copia di sicurezza dell'origine prima di toccare qualsiasi cosa
+    # copia di sicurezza coerente dell'origine prima di toccare qualsiasi cosa (cattura anche il WAL)
     $bkStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    Copy-Item $migrateSrc (Join-Path $StateDir "backups\pre-migrazione-$bkStamp.db") -Force
+    node snapshot-db.mjs "$migrateSrc" (Join-Path $StateDir "backups\pre-migrazione-$bkStamp.db")
     # snapshot COERENTE dell'origine nello stato (usa snapshot-db.mjs se il DB e in uso)
     node snapshot-db.mjs "$migrateSrc" "$StateDb"
     Write-Host 'Dati migrati in ProgramData (origine lasciata come backup).'
+  }
+  # Migra anche i file password di sezione (se presenti nella vecchia cartella codice)
+  $cfgFrom = if ($MigrateFrom) { $MigrateFrom } else { $PSScriptRoot }
+  foreach ($cfg in @('admin.config.json', 'consuntivi.config.json')) {
+    $oldCfg = Join-Path $cfgFrom "server\$cfg"
+    $newCfg = Join-Path $StateDir $cfg
+    if ((Test-Path $oldCfg) -and (-not (Test-Path $newCfg))) {
+      Copy-Item $oldCfg $newCfg -Force
+      Write-Host "Migrato config password: $cfg"
+    }
   }
 }
 
