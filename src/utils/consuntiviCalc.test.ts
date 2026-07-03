@@ -25,7 +25,7 @@ describe('sheetWeightKg — foglio PRIVATE del file CONSUNTIVO.xlsx', () => {
 describe('laserRowCost', () => {
   it('zincato 54 kg → materiale 54*2=108; azoto 3 min → 3*3=9', () => {
     const r = laserRowCost(
-      { id: 'r1', lunghezzaMm: 1500, larghezzaMm: 3000, spessoreMm: 1.5, materiale: 'zincato', tempoMin: 3, gas: 'azoto' },
+      { id: 'r1', lunghezzaMm: 1500, larghezzaMm: 3000, spessoreMm: 1.5, materiale: 'zincato', nPezzi: 1, tempoMin: 3, gas: 'azoto' },
       { ...P, densityFactorPerMaterial: { ...P.densityFactorPerMaterial, zincato: 8 } },
     )
     expect(r.kg).toBeCloseTo(54, 6)
@@ -35,12 +35,23 @@ describe('laserRowCost', () => {
   })
   it('ferro con ossigeno 10 min → gas 10*2.5=25', () => {
     const r = laserRowCost(
-      { id: 'r2', lunghezzaMm: 1000, larghezzaMm: 1000, spessoreMm: 1, materiale: 'ferro', tempoMin: 10, gas: 'ossigeno' },
+      { id: 'r2', lunghezzaMm: 1000, larghezzaMm: 1000, spessoreMm: 1, materiale: 'ferro', nPezzi: 1, tempoMin: 10, gas: 'ossigeno' },
       { ...P, densityFactorPerMaterial: { ...P.densityFactorPerMaterial, ferro: 8 } },
     )
     expect(r.kg).toBeCloseTo(8, 6) // 1*1*(1*8)
     expect(r.materialCost).toBeCloseTo(8 * 1.3, 6)
     expect(r.gasCost).toBeCloseTo(25, 6)
+  })
+  it('n° pezzi scala i kg e il costo materiale (2 pezzi = doppio), tempo/gas invariati', () => {
+    const r = laserRowCost(
+      { id: 'r3', lunghezzaMm: 1500, larghezzaMm: 1500, spessoreMm: 3, materiale: 'ferro', nPezzi: 2, tempoMin: 5, gas: 'ossigeno' },
+      { ...P, densityFactorPerMaterial: { ...P.densityFactorPerMaterial, ferro: 8 } },
+    )
+    // 1.5*1.5*(3*8) = 54 kg per lamiera → ×2 pezzi = 108
+    expect(r.kg).toBeCloseTo(108, 6)
+    expect(r.materialCost).toBeCloseTo(108 * 1.3, 6)
+    // il tempo/gas è totale, non scala coi pezzi
+    expect(r.gasCost).toBeCloseTo(5 * 2.5, 6)
   })
 })
 
@@ -75,7 +86,7 @@ describe('consuntivoTotals', () => {
     const c: Consuntivo = {
       id: 'c1', commessaNumber: 'CM-1', supplierId: '', supplierName: 'Fornitore X', date: '2026-07-02', operatorName: '',
       laserRows: [
-        { id: 'r1', lunghezzaMm: 1000, larghezzaMm: 1000, spessoreMm: 1, materiale: 'ferro', tempoMin: 10, gas: 'ossigeno' },
+        { id: 'r1', lunghezzaMm: 1000, larghezzaMm: 1000, spessoreMm: 1, materiale: 'ferro', nPezzi: 1, tempoMin: 10, gas: 'ossigeno' },
       ],
       tubeRows: [
         { id: 't1', categoria: 'tubolari', profileId: 'p', profileLabel: '40x40x3', kgPerMeter: 3.49, materiale: 'ferro', lunghezzaMm: 6000, nPezzi: 2, tempoMin: 4 },

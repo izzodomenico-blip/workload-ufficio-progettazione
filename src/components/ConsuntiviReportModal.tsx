@@ -231,7 +231,7 @@ export function ConsuntiviReportModal({ open, onClose }: Props) {
                             const rc = laserRowCost(row, pricing)
                             return (
                               <tr key={row.id}>
-                                <td>{row.lunghezzaMm}×{row.larghezzaMm}×{row.spessoreMm} mm · {row.tempoMin} min · {row.gas}</td>
+                                <td>{row.lunghezzaMm}×{row.larghezzaMm}×{row.spessoreMm} mm · {row.nPezzi} pz · {row.tempoMin} min · {row.gas}</td>
                                 <td>{CONSUNTIVO_MATERIAL_LABELS[row.materiale]}</td>
                                 <td className="r">{KG.format(rc.kg)}</td>
                                 <td className="r">{eur(rc.materialCost)}</td>

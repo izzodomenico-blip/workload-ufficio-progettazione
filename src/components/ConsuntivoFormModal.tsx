@@ -6,7 +6,7 @@ import { BusinessPartnerAutocomplete } from './BusinessPartnerAutocomplete'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
 import { mergeTubeProfiles } from '../data/tubeProfiles'
-import { sheetWeightKg, tubeWeightKg } from '../utils/consuntiviCalc'
+import { laserRowKg, tubeWeightKg } from '../utils/consuntiviCalc'
 import { emptyConsuntivoInput } from '../services/consuntiviService'
 import {
   ALL_CONSUNTIVO_GAS,
@@ -49,14 +49,14 @@ export function ConsuntivoFormModal({ open, onClose, editing, densityFactorPerMa
   const [supplierId, setSupplierId] = useState(editing?.supplierId ?? '')
   const [date, setDate] = useState(editing?.date ?? todayISO())
   const [operatorName, setOperatorName] = useState(editing?.operatorName ?? '')
-  const [laserRows, setLaserRows] = useState<LaserCutRow[]>(editing?.laserRows ?? [])
+  const [laserRows, setLaserRows] = useState<LaserCutRow[]>((editing?.laserRows ?? []).map((r) => ({ ...r, nPezzi: r.nPezzi ?? 1 })))
   const [tubeRows, setTubeRows] = useState<TubeLaserRow[]>(editing?.tubeRows ?? [])
   const [weldingRows, setWeldingRows] = useState<WeldingRow[]>(editing?.weldingRows ?? [])
   const [bendingRows, setBendingRows] = useState<BendingRow[]>(editing?.bendingRows ?? [])
   const [notes, setNotes] = useState(editing?.notes ?? '')
 
   function addLaser() {
-    setLaserRows((r) => [...r, { id: rid('r'), lunghezzaMm: 0, larghezzaMm: 0, spessoreMm: 0, materiale: 'ferro', tempoMin: 0, gas: 'ossigeno' }])
+    setLaserRows((r) => [...r, { id: rid('r'), lunghezzaMm: 0, larghezzaMm: 0, spessoreMm: 0, materiale: 'ferro', nPezzi: 1, tempoMin: 0, gas: 'ossigeno' }])
   }
   function addTube() {
     const first = profiles[0]
@@ -147,13 +147,14 @@ export function ConsuntivoFormModal({ open, onClose, editing, densityFactorPerMa
       {/* SEZIONE TAGLIO LASER */}
       <Section title="Taglio laser" onAdd={addLaser} empty={laserRows.length === 0}>
         {laserRows.map((row) => {
-          const kg = sheetWeightKg(row, densityFactorPerMaterial[row.materiale] ?? 7.85)
+          const kg = laserRowKg(row, densityFactorPerMaterial[row.materiale] ?? 7.85)
           return (
-            <div key={row.id} className="grid grid-cols-2 items-end gap-3 rounded-lg bg-slate-900/30 p-3 md:grid-cols-8">
+            <div key={row.id} className="grid grid-cols-2 items-end gap-3 rounded-lg bg-slate-900/30 p-3 md:grid-cols-9">
               <NumInput label="Lungh. (mm)" value={row.lunghezzaMm} onChange={(v) => setLaser(row.id, { lunghezzaMm: v })} />
               <NumInput label="Largh. (mm)" value={row.larghezzaMm} onChange={(v) => setLaser(row.id, { larghezzaMm: v })} />
               <NumInput label="Spess. (mm)" value={row.spessoreMm} onChange={(v) => setLaser(row.id, { spessoreMm: v })} step="0.1" />
               <SelectInput label="Materiale" value={row.materiale} options={ALL_CONSUNTIVO_MATERIALS.map((m) => [m, CONSUNTIVO_MATERIAL_LABELS[m]])} onChange={(v) => setLaser(row.id, { materiale: v as ConsuntivoMaterial })} />
+              <NumInput label="N° pezzi" value={row.nPezzi} onChange={(v) => setLaser(row.id, { nPezzi: v })} />
               <NumInput label="Tempo (min)" value={row.tempoMin} onChange={(v) => setLaser(row.id, { tempoMin: v })} step="0.1" />
               <SelectInput label="Gas" value={row.gas} options={ALL_CONSUNTIVO_GAS.map((g) => [g, g])} onChange={(v) => setLaser(row.id, { gas: v as LaserCutRow['gas'] })} />
               <KgCell kg={kg} />

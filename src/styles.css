@@ -41,7 +41,7 @@ html, body, #root {
 :root {
   /* Altezza dell'header sticky: usata per ancorare la barra di navigazione
      che resta visibile durante lo scroll, subito sotto l'header. */
-  --app-header-h: 65px;
+  --app-header-h: 88px;
 }
 
 body {

@@ -621,6 +621,8 @@ function normalizeLaserCutRow(item) {
     larghezzaMm: numberOrZero(o.larghezzaMm),
     spessoreMm: numberOrZero(o.spessoreMm),
     materiale: normalizeConsuntivoMaterial(o.materiale),
+    // Numero di lamiere identiche; default 1 per i dati legacy privi del campo.
+    nPezzi: nonNegativeInteger(o.nPezzi, 1) > 0 ? nonNegativeInteger(o.nPezzi, 1) : 1,
     tempoMin: numberOrZero(o.tempoMin),
     gas: VALID_CONSUNTIVO_GAS.has(o.gas) ? o.gas : 'ossigeno',
   }

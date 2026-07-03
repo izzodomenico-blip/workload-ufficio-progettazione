@@ -44,12 +44,25 @@ export function sheetWeightKg(
   return (num(row.lunghezzaMm) / 1000) * (num(row.larghezzaMm) / 1000) * (num(row.spessoreMm) * num(densityFactor))
 }
 
+/** Numero di pezzi valido (>=1); tollera valori mancanti/invalidi dei dati legacy. */
+function pieces(n: number | undefined): number {
+  return Number.isFinite(n) && (n as number) > 0 ? (n as number) : 1
+}
+
+/** Peso totale di una riga taglio laser = peso di una lamiera × numero di pezzi. */
+export function laserRowKg(
+  row: Pick<LaserCutRow, 'lunghezzaMm' | 'larghezzaMm' | 'spessoreMm' | 'nPezzi'>,
+  densityFactor: number,
+): number {
+  return sheetWeightKg(row, densityFactor) * pieces(row.nPezzi)
+}
+
 export function tubeWeightKg(row: Pick<TubeLaserRow, 'kgPerMeter' | 'lunghezzaMm' | 'nPezzi'>): number {
   return num(row.kgPerMeter) * (num(row.lunghezzaMm) / 1000) * num(row.nPezzi)
 }
 
 export function laserRowCost(row: LaserCutRow, pricing: ConsuntiviPricingConfig) {
-  const kg = sheetWeightKg(row, pricing.densityFactorPerMaterial[row.materiale] ?? 7.85)
+  const kg = laserRowKg(row, pricing.densityFactorPerMaterial[row.materiale] ?? 7.85)
   const materialCost = kg * (pricing.materialPricePerKg[row.materiale] ?? 0)
   const gasCost = num(row.tempoMin) * (pricing.gasCostPerMin[row.gas] ?? 0)
   return { kg, materialCost, gasCost, total: materialCost + gasCost }

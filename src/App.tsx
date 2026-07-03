@@ -29,8 +29,8 @@ function Shell() {
           <div className="flex items-center gap-3">
             <Logo />
             <div className="leading-tight">
-              <div className="text-[15px] font-semibold tracking-tight text-slate-100">Workload</div>
-              <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-slate-500">
+              <div className="text-2xl font-bold tracking-tight text-slate-100">Workload</div>
+              <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
                 Ufficio Progettazione Meccanica
               </div>
             </div>
@@ -116,25 +116,25 @@ function Shell() {
 }
 
 function Logo() {
+  // Marchio "fuso" con lo sfondo: nessun riquadro, il segno sta direttamente sulla
+  // pagina. viewBox ritagliato sul tracciato (+ stroke) così riempie il box ed è grande.
   return (
-    <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-950 ring-1 ring-sky-500/30 shadow-[0_4px_14px_-4px_rgba(56,189,248,0.45)]">
-      <svg viewBox="0 0 64 64" className="h-5 w-5">
-        <path
-          d="M14 44 L24 24 L32 36 L40 20 L50 44"
-          stroke="url(#logoGradient)"
-          strokeWidth="6"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <defs>
-          <linearGradient id="logoGradient" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#38bdf8" />
-            <stop offset="1" stopColor="#818cf8" />
-          </linearGradient>
-        </defs>
-      </svg>
-    </div>
+    <svg viewBox="10 16 44 32" className="h-16 w-[92px] shrink-0" aria-label="Workload" role="img">
+      <path
+        d="M14 44 L24 24 L32 36 L40 20 L50 44"
+        stroke="url(#logoGradient)"
+        strokeWidth="7"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <defs>
+        <linearGradient id="logoGradient" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#38bdf8" />
+          <stop offset="1" stopColor="#818cf8" />
+        </linearGradient>
+      </defs>
+    </svg>
   )
 }
 

@@ -641,6 +641,8 @@ export interface LaserCutRow {
   larghezzaMm: number
   spessoreMm: number
   materiale: ConsuntivoMaterial
+  /** Numero di lamiere identiche: i kg (e il costo materiale) scalano con questo. */
+  nPezzi: number
   tempoMin: number
   gas: ConsuntivoGas
 }
