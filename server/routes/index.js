@@ -34,8 +34,8 @@ import {
   verifyConsuntiviPassword,
 } from '../services/consuntiviAuth.js'
 import {
-  createSession, createUser, deleteSession, getSessionUser,
-  getUserByUsername, hasAnyUser, verifyPassword,
+  createSession, createUser, deleteSession, deleteUser, getSessionUser,
+  getUserByUsername, hasAnyUser, listUsers, setUserPassword, updateUser, verifyPassword,
 } from '../services/authService.js'
 import { permissionsForRole, requirePermission } from '../services/permissions.js'
 import { authorizeAppDataChange, filterAppDataForUser } from '../services/appDataAuthz.js'
@@ -226,6 +226,35 @@ export function createApiRouter() {
     } catch (error) {
       next(error.statusCode ? error : badRequest(error))
     }
+  })
+
+  // === Gestione utenti (solo amministratori) ===
+  router.get('/users', (req, res, next) => {
+    try { requirePermission(req.user.permissions, 'manageUsers'); res.json(listUsers()) } catch (e) { next(e.statusCode ? e : badRequest(e)) }
+  })
+  router.post('/users', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'manageUsers')
+      const { username, password, role, linkedPersonId } = req.body ?? {}
+      res.status(201).json(createUser({ username, password, role, linkedPersonId: linkedPersonId || '' }))
+    } catch (e) { next(e.statusCode ? e : badRequest(e)) }
+  })
+  router.put('/users/:id', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'manageUsers')
+      const { role, active, linkedPersonId } = req.body ?? {}
+      res.json(updateUser(req.params.id, { role, active, linkedPersonId }))
+    } catch (e) { next(e.statusCode ? e : badRequest(e)) }
+  })
+  router.post('/users/:id/reset-password', (req, res, next) => {
+    try {
+      requirePermission(req.user.permissions, 'manageUsers')
+      setUserPassword(req.params.id, String((req.body ?? {}).newPassword ?? ''))
+      res.json({ ok: true })
+    } catch (e) { next(e.statusCode ? e : badRequest(e)) }
+  })
+  router.delete('/users/:id', (req, res, next) => {
+    try { requirePermission(req.user.permissions, 'manageUsers'); deleteUser(req.params.id); res.status(204).end() } catch (e) { next(e.statusCode ? e : badRequest(e)) }
   })
 
   router.get('/backup/status', (req, res, next) => {
