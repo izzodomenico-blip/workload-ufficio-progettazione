@@ -4,7 +4,7 @@ Obiettivo: far girare l'app su **un PC/server Windows sempre acceso**, così tut
 colleghi in ufficio la aprono dal browser a `http://IP-DEL-SERVER:3000`.
 
 L'app è un **unico processo Node** che serve sia le pagine (la build) sia le API, su
-un'unica porta. I dati stanno in **un solo file** SQLite: `data/workload.db`.
+un'unica porta. I dati stanno in **un solo file** SQLite in `C:\ProgramData\Flowrlink\data\workload.db`.
 
 > Tempo richiesto: ~20 minuti. Serve fare i comandi **una volta sola** sul PC-server.
 
@@ -143,7 +143,7 @@ Finché non le imposti, quelle sezioni sono aperte senza password.
 
 ## Passo 9 — Backup automatici verificati + copia sul NAS
 L'app crea da sola, ogni giorno, uno **snapshot verificato** del database in
-`backups\verified\` (controlla l'integrità e calcola un checksum) e tiene una storia
+`C:\ProgramData\Flowrlink\backups\verified\` (controlla l'integrità e calcola un checksum) e tiene una storia
 GFS (14 giornalieri, 8 settimanali, 12 mensili). Per portarli **fuori dal PC** (NAS):
 
 1. Tasto destro su `install-backup-task.ps1` → **Esegui con PowerShell (Amministratore)**:
@@ -154,21 +154,21 @@ GFS (14 giornalieri, 8 settimanali, 12 mensili). Per portarli **fuori dal PC** (
    registra un task giornaliero che copia i backup verificati sul NAS.
 
    > ⚠️ **Il `-Dest` deve essere una cartella dedicata SOLO a questi backup.** La copia usa
-   > `robocopy /MIR` (mirror): rende la cartella NAS identica a `backups\verified\` e
+   > `robocopy /MIR` (mirror): rende la cartella NAS identica alla cartella dei backup verificati e
    > **cancella dal NAS qualsiasi altro file** non presente in locale. Non puntare `-Dest`
    > a una share condivisa con altri contenuti.
 2. Controllo salute: nell'app (admin) compare un **semaforo backup**. Verde = al sicuro.
    Giallo/Rosso = qualcosa non va (snapshot vecchio, integrità fallita, o copia NAS mancante):
-   apri `http://localhost:3000/api/backup/health` o guarda `logs\backup.log`.
+   apri `http://localhost:3000/api/backup/health` o guarda `C:\ProgramData\Flowrlink\logs\backup.log`.
 
 **Ripristino:** nell'app (admin) sezione backup → scegli un backup → Ripristina (crea prima
 un backup di sicurezza). Da un backup sul NAS: copia il `verified_*.db` desiderato in
-`data\workload.db` a server fermo, oppure importane il `.json` dall'app.
+`C:\ProgramData\Flowrlink\data\workload.db` a server fermo, oppure importane il `.json` dall'app.
 
 ## Passo 10 — Aggiornare l'app in futuro
 Quando c'è una nuova versione:
 ```
-git pull            (oppure riscarica lo ZIP e sostituisci i file, tenendo la cartella data\)
+git pull            (i dati stanno in C:\ProgramData\Flowrlink, separati dal codice: aggiornare non li tocca)
 npm ci
 npm run build
 pm2 restart workload-ufficio-progettazione
