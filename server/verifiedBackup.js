@@ -2,12 +2,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
-import { ROOT_DIR, getDb } from './db.js'
+import { STATE_DIR, getDb } from './db.js'
 import { timestampForFilename } from './services/appData.js'
 import { selectForRetention } from './retention.js'
 
-export const VERIFIED_DIR = path.join(ROOT_DIR, 'backups', 'verified')
-export const OFFSITE_RECEIPT_PATH = path.join(ROOT_DIR, 'backups', 'offsite-status.json')
+export const VERIFIED_DIR = path.join(STATE_DIR, 'backups', 'verified')
+export const OFFSITE_RECEIPT_PATH = path.join(STATE_DIR, 'backups', 'offsite-status.json')
 
 export function buildManifest({ stamp, sizeBytes, integrityResult, counts, sha256, now, reason }) {
   return {

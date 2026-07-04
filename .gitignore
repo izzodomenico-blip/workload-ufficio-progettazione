@@ -31,6 +31,10 @@ server/admin.config.json
 # Config sezione Consuntivi (hash password dedicata Prezzi/Report)
 server/consuntivi.config.json
 
+# Config password sezioni ora sotto STATE_DIR (radice in dev, ProgramData in prod)
+admin.config.json
+consuntivi.config.json
+
 # Output cache del tool graphify (generato, non sorgente)
 graphify-out/
 

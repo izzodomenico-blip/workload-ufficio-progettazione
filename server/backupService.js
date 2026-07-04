@@ -1,9 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { DB_PATH, ROOT_DIR, getAppData, getDb, saveAppData } from './db.js'
+import { DB_PATH, STATE_DIR, getAppData, getDb, saveAppData } from './db.js'
 import { countAppData, createBackupPayload, extractAppData, timestampForFilename } from './services/appData.js'
 
-export const BACKUPS_DIR = path.join(ROOT_DIR, 'backups')
+export const BACKUPS_DIR = path.join(STATE_DIR, 'backups')
 export const AUTO_BACKUPS_DIR = path.join(BACKUPS_DIR, 'auto')
 const STATUS_PATH = path.join(BACKUPS_DIR, 'backup-status.json')
 const DEFAULT_AUTO_BACKUP_LIMIT = 30

@@ -4,35 +4,35 @@ Obiettivo: far girare l'app su **un PC/server Windows sempre acceso**, così tut
 colleghi in ufficio la aprono dal browser a `http://IP-DEL-SERVER:3000`.
 
 L'app è un **unico processo Node** che serve sia le pagine (la build) sia le API, su
-un'unica porta. I dati stanno in **un solo file** SQLite: `data/workload.db`.
+un'unica porta. I dati stanno in **un solo file** SQLite in `C:\ProgramData\Flowrlink\data\workload.db`.
 
 > Tempo richiesto: ~20 minuti. Serve fare i comandi **una volta sola** sul PC-server.
 
 ---
 
-## ⚡ Percorso AUTOMATICO (pacchetto con lo stato attuale)
+## ⚡ Installazione in un colpo (consigliata)
 
-Se vuoi evitare i comandi a mano, ci sono due script pronti:
+1. **Su questo PC** (dove ci sono i dati): tasto destro su `make-package.ps1` →
+   **Esegui con PowerShell**. Ottieni `workload-server-<data>.zip` (contiene l'app + uno
+   snapshot coerente del database attuale come `seed/`).
+2. **Sul server**: copia lo zip, **estrailo in una cartella**, poi tasto destro su
+   `install-server.ps1` → **Esegui con PowerShell (come Amministratore)**. Fa tutto:
+   Node → build → cartella dati `C:\ProgramData\Flowrlink` → servizio Windows 24/7 →
+   firewall → (chiede se configurare il backup sul NAS) → stampa `http://IP:3000`.
+3. **Al primo avvio**: apri l'app e crea l'account amministratore (schermata setup).
+   Imposta le password sezioni (Passo 8) se servono.
 
-1. **Su questo PC** (dove ci sono i dati) crei il pacchetto — include una copia
-   coerente del database attuale:
-   ```
-   Tasto destro su  make-package.ps1  ->  "Esegui con PowerShell"
-   ```
-   Ottieni un file `workload-server-<data>.zip`.
+### Dove sono i dati
+Database, backup verificati e log stanno in **`C:\ProgramData\Flowrlink`** — SEPARATI dalla
+cartella del programma. Non vanno mai cancellati.
 
-2. **Sul server**: copia lo zip, estrailo in una cartella, poi:
-   ```
-   Tasto destro su  install-server.ps1  ->  "Esegui con PowerShell"  (come Amministratore)
-   ```
-   Lo script fa da solo: Node (se manca, via winget) → `npm ci` → build → PM2
-   (avvio automatico) → firewall → avvio. Alla fine stampa l'indirizzo `http://IP:3000`.
-
-3. Imposta le password (Passo 8) e programma il backup sul NAS (Passo 9).
-
-> Unico prerequisito non automatizzabile in sicurezza: se Node non c'è e `winget`
-> non è disponibile, installalo una volta da https://nodejs.org (2 minuti), poi rilancia.
-> I passi manuali qui sotto restano validi come riferimento/alternativa.
+### Aggiornare in sicurezza
+Per una nuova versione: rifai il pacchetto, estrai `install-server.ps1` nella **stessa
+cartella** (o una nuova) e rilancialo come Amministratore. I dati in `C:\ProgramData\Flowrlink`
+**non vengono toccati**: si aggiorna solo il codice e si riavvia il servizio. Se stai migrando
+da una vecchia installazione con i dati dentro la cartella app, passa
+`install-server.ps1 -MigrateFrom "C:\vecchia\cartella"`: copia i dati in ProgramData dopo una
+copia di sicurezza, lasciando intatta l'origine.
 
 ---
 
@@ -143,7 +143,7 @@ Finché non le imposti, quelle sezioni sono aperte senza password.
 
 ## Passo 9 — Backup automatici verificati + copia sul NAS
 L'app crea da sola, ogni giorno, uno **snapshot verificato** del database in
-`backups\verified\` (controlla l'integrità e calcola un checksum) e tiene una storia
+`C:\ProgramData\Flowrlink\backups\verified\` (controlla l'integrità e calcola un checksum) e tiene una storia
 GFS (14 giornalieri, 8 settimanali, 12 mensili). Per portarli **fuori dal PC** (NAS):
 
 1. Tasto destro su `install-backup-task.ps1` → **Esegui con PowerShell (Amministratore)**:
@@ -154,21 +154,21 @@ GFS (14 giornalieri, 8 settimanali, 12 mensili). Per portarli **fuori dal PC** (
    registra un task giornaliero che copia i backup verificati sul NAS.
 
    > ⚠️ **Il `-Dest` deve essere una cartella dedicata SOLO a questi backup.** La copia usa
-   > `robocopy /MIR` (mirror): rende la cartella NAS identica a `backups\verified\` e
+   > `robocopy /MIR` (mirror): rende la cartella NAS identica alla cartella dei backup verificati e
    > **cancella dal NAS qualsiasi altro file** non presente in locale. Non puntare `-Dest`
    > a una share condivisa con altri contenuti.
 2. Controllo salute: nell'app (admin) compare un **semaforo backup**. Verde = al sicuro.
    Giallo/Rosso = qualcosa non va (snapshot vecchio, integrità fallita, o copia NAS mancante):
-   apri `http://localhost:3000/api/backup/health` o guarda `logs\backup.log`.
+   apri `http://localhost:3000/api/backup/health` o guarda `C:\ProgramData\Flowrlink\logs\backup.log`.
 
 **Ripristino:** nell'app (admin) sezione backup → scegli un backup → Ripristina (crea prima
 un backup di sicurezza). Da un backup sul NAS: copia il `verified_*.db` desiderato in
-`data\workload.db` a server fermo, oppure importane il `.json` dall'app.
+`C:\ProgramData\Flowrlink\data\workload.db` a server fermo, oppure importane il `.json` dall'app.
 
 ## Passo 10 — Aggiornare l'app in futuro
 Quando c'è una nuova versione:
 ```
-git pull            (oppure riscarica lo ZIP e sostituisci i file, tenendo la cartella data\)
+git pull            (i dati stanno in C:\ProgramData\Flowrlink, separati dal codice: aggiornare non li tocca)
 npm ci
 npm run build
 pm2 restart workload-ufficio-progettazione

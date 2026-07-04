@@ -10,8 +10,8 @@ Set-Location $proj
 
 $stamp   = Get-Date -Format "yyyyMMdd-HHmm"
 $stage   = Join-Path $env:TEMP "workload-pkg-$stamp"
-$pkgData = Join-Path $stage "data"
-New-Item -ItemType Directory -Force -Path $pkgData | Out-Null
+$pkgSeed = Join-Path $stage "seed"
+New-Item -ItemType Directory -Force -Path $pkgSeed | Out-Null
 
 Write-Host "1/4  Copio i sorgenti (senza node_modules/dist/dati)..." -ForegroundColor Cyan
 # robocopy: /E tutte le sottocartelle; /XD escludi cartelle (PERCORSI COMPLETI, così
@@ -24,13 +24,11 @@ Write-Host "2/4  Snapshot consistente del database (include il WAL)..." -Foregro
 $dbSrc = Join-Path $proj "data\workload.db"
 if (Test-Path $dbSrc) {
   # snapshot-db.mjs crea una copia .db singola e coerente anche col WAL, a server acceso.
-  node snapshot-db.mjs "$dbSrc" (Join-Path $pkgData "workload.db")
-  Write-Host "     stato attuale incluso nel pacchetto."
+  node snapshot-db.mjs "$dbSrc" (Join-Path $pkgSeed "workload.db")
+  Write-Host "     stato attuale incluso nel pacchetto (seed/)."
 } else {
   Write-Host "     nessun database esistente: il server partira vuoto."
 }
-$keep = Join-Path $proj "data\.gitkeep"
-if (Test-Path $keep) { Copy-Item $keep $pkgData -Force }
 
 Write-Host "3/4  Comprimo..." -ForegroundColor Cyan
 $zip = Join-Path $proj "workload-server-$stamp.zip"

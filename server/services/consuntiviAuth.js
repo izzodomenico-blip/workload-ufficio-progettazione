@@ -1,23 +1,21 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { STATE_DIR } from '../db.js'
 
 // Password DEDICATA della sezione Consuntivi (Prezzi + Report), separata dal gate
 // admin globale (carico base). Stesso schema hash+salt di adminAuth, file distinto.
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
-const CONFIG_PATH = process.env.WORKLOAD_CONSUNTIVI_CONFIG_PATH
+export const CONSUNTIVI_CONFIG_PATH = process.env.WORKLOAD_CONSUNTIVI_CONFIG_PATH
   ? path.resolve(process.env.WORKLOAD_CONSUNTIVI_CONFIG_PATH)
-  : path.resolve(__dirname, '..', 'consuntivi.config.json')
+  : path.join(STATE_DIR, 'consuntivi.config.json')
 
 const FORMAT_VERSION = 1
 
 function safeReadConfig() {
   try {
-    if (!fs.existsSync(CONFIG_PATH)) return null
-    const raw = fs.readFileSync(CONFIG_PATH, 'utf8')
+    if (!fs.existsSync(CONSUNTIVI_CONFIG_PATH)) return null
+    const raw = fs.readFileSync(CONSUNTIVI_CONFIG_PATH, 'utf8')
     const parsed = JSON.parse(raw)
     if (parsed && typeof parsed === 'object' && typeof parsed.passwordHash === 'string' && typeof parsed.salt === 'string') {
       return parsed
@@ -30,9 +28,9 @@ function safeReadConfig() {
 }
 
 function writeConfig(config) {
-  const tmp = `${CONFIG_PATH}.tmp`
+  const tmp = `${CONSUNTIVI_CONFIG_PATH}.tmp`
   fs.writeFileSync(tmp, JSON.stringify(config, null, 2), 'utf8')
-  fs.renameSync(tmp, CONFIG_PATH)
+  fs.renameSync(tmp, CONSUNTIVI_CONFIG_PATH)
 }
 
 function hashPassword(plain, salt) {
@@ -47,7 +45,7 @@ function timingSafeEqualString(a, b) {
 
 export function getConsuntiviAuthStatus() {
   const cfg = safeReadConfig()
-  return { protected: !!cfg, configPath: CONFIG_PATH }
+  return { protected: !!cfg, configPath: CONSUNTIVI_CONFIG_PATH }
 }
 
 /**
@@ -83,7 +81,7 @@ export function setConsuntiviPassword({ currentPassword, newPassword }) {
     throw err
   }
   if (newPassword.length === 0) {
-    if (fs.existsSync(CONFIG_PATH)) fs.unlinkSync(CONFIG_PATH)
+    if (fs.existsSync(CONSUNTIVI_CONFIG_PATH)) fs.unlinkSync(CONSUNTIVI_CONFIG_PATH)
     return { protected: false }
   }
   if (newPassword.length < 4) {

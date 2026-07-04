@@ -42,7 +42,7 @@ if (-not (Test-Path $pm2Runtime)) { throw "pm2-runtime non trovato in $pm2Runtim
 $env:PM2_RUNTIME_PATH = $pm2Runtime
 
 # PM2_HOME condiviso (servizio LocalSystem + shell operatore) e percorso pm2 assoluto
-$pm2Home = 'C:\ProgramData\flowrlink\.pm2'
+$pm2Home = 'C:\ProgramData\Flowrlink\.pm2'
 New-Item -ItemType Directory -Force -Path $pm2Home | Out-Null
 [Environment]::SetEnvironmentVariable('PM2_HOME', $pm2Home, 'Machine')  # tutte le shell + servizio
 $env:PM2_HOME = $pm2Home
