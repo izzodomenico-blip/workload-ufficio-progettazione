@@ -36,9 +36,9 @@ import {
 } from '../services/consuntiviAuth.js'
 import {
   createSession, createUser, deleteSession, deleteUser, getSessionUser,
-  getUserByUsername, getUserSections, hasAnyUser, listUsers, setUserPassword, setUserSections, updateUser, verifyPassword,
+  getUserByUsername, getUserPermissions, getUserSections, hasAnyUser, listUsers, setUserPassword, setUserPermissions, setUserSections, updateUser, verifyPassword,
 } from '../services/authService.js'
-import { CONTENT_SECTIONS, effectiveSections, permissionsForRole, requirePermission } from '../services/permissions.js'
+import { applyGrants, CONTENT_SECTIONS, effectiveSections, permissionsForRole, requirePermission } from '../services/permissions.js'
 import { authorizeAppDataChange, filterAppDataForUser } from '../services/appDataAuthz.js'
 import { buildHealthPayload } from '../health.js'
 import { computeBackupHealth } from '../backupHealth.js'
@@ -122,6 +122,7 @@ export function createApiRouter() {
       setSessionCookie(res, token)
       const permissions = permissionsForRole(user.role)
       permissions.sections = effectiveSections(user.role, getUserSections(user.id))
+      applyGrants(permissions, getUserPermissions(user.id))
       res.status(201).json({ user: { ...user, permissions } })
     } catch (error) { next(error.statusCode ? error : badRequest(error)) }
   })
@@ -137,6 +138,7 @@ export function createApiRouter() {
       setSessionCookie(res, token)
       const permissions = permissionsForRole(row.role)
       permissions.sections = effectiveSections(row.role, getUserSections(row.id))
+      applyGrants(permissions, getUserPermissions(row.id))
       res.json({ user: { id: row.id, username: row.username, role: row.role, linkedPersonId: row.linkedPersonId, permissions } })
     } catch (error) { next(error.statusCode ? error : badRequest(error)) }
   })
@@ -278,8 +280,10 @@ export function createApiRouter() {
       const body = req.body ?? {}
       const updated = updateUser(req.params.id, { role: body.role, active: body.active, linkedPersonId: body.linkedPersonId })
       if (Array.isArray(body.sections)) setUserSections(req.params.id, body.sections)
+      if (Array.isArray(body.grants)) setUserPermissions(req.params.id, body.grants)
       const sections = getUserSections(req.params.id)
-      res.json({ ...updated, sections, visibleSections: effectiveSections(updated.role, sections).filter((s) => CONTENT_SECTIONS.includes(s)) })
+      const grants = getUserPermissions(req.params.id)
+      res.json({ ...updated, sections, grants, visibleSections: effectiveSections(updated.role, sections).filter((s) => CONTENT_SECTIONS.includes(s)) })
     } catch (e) { next(e.statusCode ? e : badRequest(e)) }
   })
   router.post('/users/:id/reset-password', (req, res, next) => {
@@ -721,6 +725,7 @@ function currentUser(req) {
   if (!user) return null
   const permissions = permissionsForRole(user.role)
   permissions.sections = effectiveSections(user.role, user.sections)
+  applyGrants(permissions, user.grants)
   return { ...user, permissions }
 }
 
