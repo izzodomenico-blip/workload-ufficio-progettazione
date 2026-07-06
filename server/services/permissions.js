@@ -19,6 +19,7 @@ function base() {
     deleteAny: false,
     manageUsers: false,
     managePeople: false,
+    manageAbsences: false,
     viewConsuntiviPrices: false,
     manageBackups: false,
     viewLog: false,
@@ -40,12 +41,12 @@ export function permissionsForRole(role) {
     return {
       sections: [...SECTIONS],
       canCreateWork: true, canEditWork: true, canDeleteOwnWork: true, deleteAny: true,
-      manageUsers: true, managePeople: true, viewConsuntiviPrices: true, manageBackups: true, viewLog: true,
+      manageUsers: true, managePeople: true, manageAbsences: true, viewConsuntiviPrices: true, manageBackups: true, viewLog: true,
     }
   }
   if (role === 'progettista') {
     return { ...p, sections: ['dashboard', 'planning', 'agenda', 'anagrafiche', 'disegni'],
-      canCreateWork: true, canEditWork: true, canDeleteOwnWork: true }
+      canCreateWork: true, canEditWork: true, canDeleteOwnWork: true, manageAbsences: true }
   }
   if (role === 'officina') {
     return { ...p, sections: ['officina', 'officina-planning', 'operai', 'consuntivi'],
@@ -69,4 +70,15 @@ export function effectiveSections(role, override) {
   const fromOverride = override.filter((s) => content.has(s))
   const specials = roleSections.filter((s) => s === 'utenti' || s === 'log')
   return [...new Set([...fromOverride, ...specials])]
+}
+
+export const GRANTABLE_PERMISSIONS = ['viewConsuntiviPrices']
+
+export function applyGrants(permissions, grants) {
+  if (Array.isArray(grants)) {
+    for (const p of GRANTABLE_PERMISSIONS) {
+      if (grants.includes(p)) permissions[p] = true
+    }
+  }
+  return permissions
 }
