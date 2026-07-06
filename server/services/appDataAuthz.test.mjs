@@ -43,10 +43,20 @@ const progettista = { id: 'u1', permissions: permissionsForRole('progettista') }
 const admin = { id: 'a1', permissions: permissionsForRole('amministratore') }
 
 describe('authorizeAppDataChange — proprietà lavoro', () => {
-  it('non-admin NON può eliminare lavoro altrui (403)', () => {
+  it('non-admin non elimina lavoro altrui: viene CONSERVATO (non blocca il salvataggio)', () => {
     const current = { ...EMPTY, workItems: [wi('w1', 'u2')] }
-    const incoming = { ...EMPTY, workItems: [] } // ha eliminato w1 (di u2)
-    expect(() => authorizeAppDataChange(current, incoming, progettista)).toThrow(/permess/i)
+    const incoming = { ...EMPTY, workItems: [] } // albero senza w1 (di u2)
+    const out = authorizeAppDataChange(current, incoming, progettista)
+    expect(out.workItems.length).toBe(1) // conservato, non eliminato
+    expect(out.workItems[0].id).toBe('w1')
+  })
+  it('REGRESSIONE: crea un lavoro con consuntivo altrui assente nell\'albero -> lavoro creato, consuntivo conservato', () => {
+    const current = { ...EMPTY, consuntivi: [{ id: 'c1', commessaNumber: 'x', date: '2026-01-01', createdByUserId: 'u2', laserRows: [], tubeRows: [], weldingRows: [], bendingRows: [] }] }
+    const incoming = { ...EMPTY, workItems: [{ id: 'wNew', type: 'commessa', code: 'x', title: 'x', status: 'In corso', dueDate: '2026-01-01' }], consuntivi: [] }
+    const out = authorizeAppDataChange(current, incoming, progettista)
+    expect(out.workItems.length).toBe(1)
+    expect(out.consuntivi.length).toBe(1)
+    expect(out.consuntivi[0].id).toBe('c1')
   })
   it('non-admin PUÒ eliminare il proprio lavoro', () => {
     const current = { ...EMPTY, workItems: [wi('w1', 'u1')] }
@@ -81,10 +91,12 @@ describe('authorizeAppDataChange — sezioni riservate', () => {
     const incoming = { ...EMPTY, people: [{ id: 'p1', name: 'MODIFICATO', weeklyCapacityHours: 40 }] }
     expect(() => authorizeAppDataChange(current, incoming, progettista)).toThrow(/permess/i)
   })
-  it('non-admin NON può eliminare un\'anagrafica (403)', () => {
+  it('non-admin non elimina un\'anagrafica: viene CONSERVATA', () => {
     const current = { ...EMPTY, businessPartners: [{ id: 'bp1', name: 'C' }] }
     const incoming = { ...EMPTY, businessPartners: [] }
-    expect(() => authorizeAppDataChange(current, incoming, progettista)).toThrow(/permess/i)
+    const out = authorizeAppDataChange(current, incoming, progettista)
+    expect(out.businessPartners.length).toBe(1)
+    expect(out.businessPartners[0].id).toBe('bp1')
   })
   it('activityLog: client vuoto NON azzera lo storico (append-only)', () => {
     const current = { ...EMPTY, activityLog: [{ id: 'l1', timestamp: 't', entityType: 'system', action: 'created', title: 'x' }] }
@@ -103,13 +115,17 @@ describe('authorizeAppDataChange — sezioni riservate', () => {
 })
 
 describe('authorizeAppDataChange — coperture adversariali aggiuntive', () => {
-  it('non-admin NON può eliminare task altrui', () => {
+  it('non-admin non elimina task altrui: viene CONSERVATO', () => {
     const current = { ...EMPTY, tasks: [{ id: 't1', workItemId: 'w', title: 't', assigneeId: 'a', status: 'In corso', dueDate: '2026-01-01', createdByUserId: 'u2' }] }
-    expect(() => authorizeAppDataChange(current, { ...EMPTY, tasks: [] }, progettista)).toThrow(/permess/i)
+    const out = authorizeAppDataChange(current, { ...EMPTY, tasks: [] }, progettista)
+    expect(out.tasks.length).toBe(1)
+    expect(out.tasks[0].id).toBe('t1')
   })
-  it('non-admin NON può eliminare consuntivo altrui', () => {
+  it('non-admin non elimina consuntivo altrui: viene CONSERVATO', () => {
     const current = { ...EMPTY, consuntivi: [{ id: 'c1', commessaNumber: 'x', date: '2026-01-01', createdByUserId: 'u2', laserRows: [], tubeRows: [], weldingRows: [], bendingRows: [] }] }
-    expect(() => authorizeAppDataChange(current, { ...EMPTY, consuntivi: [] }, progettista)).toThrow(/permess/i)
+    const out = authorizeAppDataChange(current, { ...EMPTY, consuntivi: [] }, progettista)
+    expect(out.consuntivi.length).toBe(1)
+    expect(out.consuntivi[0].id).toBe('c1')
   })
   it('sola_lettura NON può modificare un tubeProfile; officina si', () => {
     const soloLettura = { id: 'r1', permissions: permissionsForRole('sola_lettura') }

@@ -41,17 +41,21 @@ export function authorizeAppDataChange(current, incoming, user) {
     const cur = byId(current[key])
     const inc = incoming[key] || []
     const incIds = new Set(inc.map((x) => x.id))
-    // eliminazioni: presenti in current ma non in incoming
+    // eliminazioni: un elemento presente in current ma assente nell'incoming.
+    // Se l'utente NON è autorizzato a eliminarlo, lo si CONSERVA (si tiene la copia
+    // del server) invece di bloccare l'intero salvataggio: un albero client incompleto
+    // o stantìo non deve impedire operazioni non correlate (es. creare un lavoro), né
+    // può cancellare dati altrui. Solo chi è autorizzato lo elimina davvero.
+    const preserved = []
     for (const [id, item] of cur) {
       if (!incIds.has(id)) {
         const owner = item.createdByUserId || ''
-        if (!perms.deleteAny && !(perms.canDeleteOwnWork && owner === user.id)) {
-          forbid(`Non hai i permessi per eliminare ${key} altrui.`)
-        }
+        const canDelete = perms.deleteAny || (perms.canDeleteOwnWork && owner === user.id)
+        if (!canDelete) preserved.push(item)
       }
     }
     // create/update
-    out[key] = inc.map((item) => {
+    const processed = inc.map((item) => {
       const before = cur.get(item.id)
       if (!before) {
         if (!perms.canCreateWork) forbid(`Non hai i permessi per creare in ${key}.`)
@@ -63,6 +67,7 @@ export function authorizeAppDataChange(current, incoming, user) {
       }
       return { ...item, createdByUserId: before.createdByUserId || '' }
     })
+    out[key] = [...processed, ...preserved]
   }
 
   // 2) Collezioni admin-delete-only + edit con canEditWork
@@ -70,15 +75,18 @@ export function authorizeAppDataChange(current, incoming, user) {
     const cur = byId(current[key])
     const inc = incoming[key] || []
     const incIds = new Set(inc.map((x) => x.id))
-    for (const [id] of cur) {
-      if (!incIds.has(id) && !perms.deleteAny) forbid(`Non hai i permessi per eliminare in ${key}.`)
+    // eliminazioni: senza deleteAny gli elementi assenti vengono CONSERVATI (stessa logica
+    // di sopra: un albero incompleto non blocca il salvataggio né cancella dati altrui).
+    const preserved = []
+    for (const [id, item] of cur) {
+      if (!incIds.has(id) && !perms.deleteAny) preserved.push(item)
     }
     for (const item of inc) {
       const before = cur.get(item.id)
       const changed = !before || JSON.stringify(before) !== JSON.stringify(item)
       if (changed && !perms.canEditWork && !perms.deleteAny) forbid(`Non hai i permessi per modificare ${key}.`)
     }
-    out[key] = inc
+    out[key] = [...inc, ...preserved]
   }
 
   // 3) people (managePeople) + absences (manageAbsences): se non hai il permesso relativo,
