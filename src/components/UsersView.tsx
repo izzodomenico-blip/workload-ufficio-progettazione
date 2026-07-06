@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../state/DataProvider'
 import { useToast } from '../state/ToastProvider'
 import { createUserApi, deleteUserApi, fetchUsers, resetUserPasswordApi, updateUserApi, type AdminUserRow } from '../services/apiClient'
-import { ROLE_OPTIONS } from '../utils/roles'
+import { CONTENT_SECTION_OPTIONS, ROLE_OPTIONS } from '../utils/roles'
 import type { Role } from '../types'
 
 export function UsersView() {
@@ -22,6 +22,13 @@ export function UsersView() {
   }
   async function change(id: string, patch: { role?: Role; active?: boolean; linkedPersonId?: string }) {
     try { await updateUserApi(id, patch); await reload() } catch (e) { toast.error(e instanceof Error ? e.message : 'Errore.') }
+  }
+  async function toggleSection(u: AdminUserRow, section: string) {
+    const next = new Set(u.visibleSections)
+    if (next.has(section)) next.delete(section)
+    else next.add(section)
+    try { await updateUserApi(u.id, { sections: [...next] }); await reload() }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Errore.') }
   }
   async function resetPw(id: string) {
     const np = prompt('Nuova password (min 8):'); if (!np) return
@@ -52,7 +59,7 @@ export function UsersView() {
 
       <table className="w-full text-sm">
         <thead className="text-left text-[11px] uppercase text-slate-400"><tr>
-          <th className="px-2 py-1">Username</th><th className="px-2 py-1">Ruolo</th><th className="px-2 py-1">Persona</th><th className="px-2 py-1">Attivo</th><th /></tr></thead>
+          <th className="px-2 py-1">Username</th><th className="px-2 py-1">Ruolo</th><th className="px-2 py-1">Persona</th><th className="px-2 py-1">Attivo</th><th className="px-2 py-1">Sezioni visibili <span className="normal-case text-slate-500">(vuoto = come il ruolo)</span></th><th /></tr></thead>
         <tbody>
           {users.map((u) => (
             <tr key={u.id} className="border-t border-slate-800/60">
@@ -64,6 +71,16 @@ export function UsersView() {
                 <select className="input-base" value={u.linkedPersonId} onChange={(e) => change(u.id, { linkedPersonId: e.target.value })}>
                   <option value="">—</option>{people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></td>
               <td className="px-2 py-1"><input type="checkbox" checked={u.active} onChange={(e) => change(u.id, { active: e.target.checked })} /></td>
+              <td className="px-2 py-1">
+                <div className="flex max-w-[420px] flex-wrap gap-x-3 gap-y-0.5">
+                  {CONTENT_SECTION_OPTIONS.map(([id, label]) => (
+                    <label key={id} className="inline-flex items-center gap-1 text-[11px] text-slate-300">
+                      <input type="checkbox" checked={u.visibleSections.includes(id)} onChange={() => toggleSection(u, id)} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </td>
               <td className="px-2 py-1 text-right">
                 <button className="btn-ghost text-xs" onClick={() => resetPw(u.id)}>Reset password</button>
                 <button className="btn-ghost text-xs text-red-300" onClick={() => remove(u.id)}>Elimina</button>

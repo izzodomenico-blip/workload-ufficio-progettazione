@@ -56,3 +56,17 @@ export function permissionsForRole(role) {
   }
   return p
 }
+
+export const CONTENT_SECTIONS = [
+  'dashboard', 'planning', 'agenda', 'anagrafiche', 'disegni',
+  'officina', 'officina-planning', 'operai', 'consuntivi',
+]
+
+export function effectiveSections(role, override) {
+  const roleSections = permissionsForRole(role).sections
+  if (!Array.isArray(override) || override.length === 0) return roleSections
+  const content = new Set(CONTENT_SECTIONS)
+  const fromOverride = override.filter((s) => content.has(s))
+  const specials = roleSections.filter((s) => s === 'utenti' || s === 'log')
+  return [...new Set([...fromOverride, ...specials])]
+}

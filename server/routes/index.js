@@ -36,9 +36,9 @@ import {
 } from '../services/consuntiviAuth.js'
 import {
   createSession, createUser, deleteSession, deleteUser, getSessionUser,
-  getUserByUsername, hasAnyUser, listUsers, setUserPassword, updateUser, verifyPassword,
+  getUserByUsername, getUserSections, hasAnyUser, listUsers, setUserPassword, setUserSections, updateUser, verifyPassword,
 } from '../services/authService.js'
-import { permissionsForRole, requirePermission } from '../services/permissions.js'
+import { CONTENT_SECTIONS, effectiveSections, permissionsForRole, requirePermission } from '../services/permissions.js'
 import { authorizeAppDataChange, filterAppDataForUser } from '../services/appDataAuthz.js'
 import { buildHealthPayload } from '../health.js'
 import { computeBackupHealth } from '../backupHealth.js'
@@ -120,7 +120,9 @@ export function createApiRouter() {
       const user = createUser({ username, password, role: 'amministratore', linkedPersonId: '' })
       const { token } = createSession(user.id)
       setSessionCookie(res, token)
-      res.status(201).json({ user: { ...user, permissions: permissionsForRole(user.role) } })
+      const permissions = permissionsForRole(user.role)
+      permissions.sections = effectiveSections(user.role, getUserSections(user.id))
+      res.status(201).json({ user: { ...user, permissions } })
     } catch (error) { next(error.statusCode ? error : badRequest(error)) }
   })
 
@@ -133,7 +135,9 @@ export function createApiRouter() {
       }
       const { token } = createSession(row.id)
       setSessionCookie(res, token)
-      res.json({ user: { id: row.id, username: row.username, role: row.role, linkedPersonId: row.linkedPersonId, permissions: permissionsForRole(row.role) } })
+      const permissions = permissionsForRole(row.role)
+      permissions.sections = effectiveSections(row.role, getUserSections(row.id))
+      res.json({ user: { id: row.id, username: row.username, role: row.role, linkedPersonId: row.linkedPersonId, permissions } })
     } catch (error) { next(error.statusCode ? error : badRequest(error)) }
   })
 
@@ -252,7 +256,14 @@ export function createApiRouter() {
 
   // === Gestione utenti (solo amministratori) ===
   router.get('/users', (req, res, next) => {
-    try { requirePermission(req.user.permissions, 'manageUsers'); res.json(listUsers()) } catch (e) { next(e.statusCode ? e : badRequest(e)) }
+    try {
+      requirePermission(req.user.permissions, 'manageUsers')
+      const rows = listUsers().map((u) => ({
+        ...u,
+        visibleSections: effectiveSections(u.role, u.sections).filter((s) => CONTENT_SECTIONS.includes(s)),
+      }))
+      res.json(rows)
+    } catch (e) { next(e.statusCode ? e : badRequest(e)) }
   })
   router.post('/users', (req, res, next) => {
     try {
@@ -264,8 +275,11 @@ export function createApiRouter() {
   router.put('/users/:id', (req, res, next) => {
     try {
       requirePermission(req.user.permissions, 'manageUsers')
-      const { role, active, linkedPersonId } = req.body ?? {}
-      res.json(updateUser(req.params.id, { role, active, linkedPersonId }))
+      const body = req.body ?? {}
+      const updated = updateUser(req.params.id, { role: body.role, active: body.active, linkedPersonId: body.linkedPersonId })
+      if (Array.isArray(body.sections)) setUserSections(req.params.id, body.sections)
+      const sections = getUserSections(req.params.id)
+      res.json({ ...updated, sections, visibleSections: effectiveSections(updated.role, sections).filter((s) => CONTENT_SECTIONS.includes(s)) })
     } catch (e) { next(e.statusCode ? e : badRequest(e)) }
   })
   router.post('/users/:id/reset-password', (req, res, next) => {
@@ -705,7 +719,9 @@ function currentUser(req) {
   const token = parseCookies(req)[SESSION_COOKIE]
   const user = getSessionUser(token)
   if (!user) return null
-  return { ...user, permissions: permissionsForRole(user.role) }
+  const permissions = permissionsForRole(user.role)
+  permissions.sections = effectiveSections(user.role, user.sections)
+  return { ...user, permissions }
 }
 
 function setSessionCookie(res, token) {

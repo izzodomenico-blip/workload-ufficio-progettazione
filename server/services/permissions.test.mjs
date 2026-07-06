@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { permissionsForRole, requirePermission } from './permissions.js'
+import { permissionsForRole, requirePermission, effectiveSections, CONTENT_SECTIONS } from './permissions.js'
 
 describe('permissionsForRole', () => {
   it('amministratore: tutto', () => {
@@ -67,5 +67,24 @@ describe('requirePermission', () => {
       expect(err.statusCode).toBe(403)
       expect(err.detail).toBe('forbidden')
     }
+  })
+})
+
+describe('effectiveSections', () => {
+  it('nessun override o vuoto -> sezioni del ruolo', () => {
+    expect(effectiveSections('progettista', [])).toEqual(permissionsForRole('progettista').sections)
+    expect(effectiveSections('progettista', null)).toEqual(permissionsForRole('progettista').sections)
+  })
+  it('override contenuto per non-admin -> esattamente quelle', () => {
+    expect(effectiveSections('progettista', ['consuntivi'])).toEqual(['consuntivi'])
+  })
+  it('admin mantiene utenti anche con override senza utenti', () => {
+    const r = effectiveSections('amministratore', ['dashboard'])
+    expect(r).toContain('dashboard')
+    expect(r).toContain('utenti')
+    expect(r).toContain('log')
+  })
+  it('voci invalide o speciali nell override vengono ignorate', () => {
+    expect(effectiveSections('officina', ['consuntivi', 'utenti', 'inesistente'])).toEqual(['consuntivi'])
   })
 })
