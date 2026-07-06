@@ -81,10 +81,11 @@ export function authorizeAppDataChange(current, incoming, user) {
     out[key] = inc
   }
 
-  // 3) people + absences: solo managePeople. Se non hai managePeople, devono risultare INVARIATE
-  //    (a meno dei campi filtrati, che vengono reintegrati dal DB).
+  // 3) people (managePeople) + absences (manageAbsences): se non hai il permesso relativo,
+  //    devono risultare INVARIATE (a meno dei campi filtrati, reintegrati dal DB).
+  const canWrite = { people: perms.managePeople, absences: perms.manageAbsences }
   for (const key of ['people', 'absences']) {
-    if (perms.managePeople) { out[key] = incoming[key]; continue }
+    if (canWrite[key]) { out[key] = incoming[key]; continue }
     const cur = byId(current[key])
     const inc = incoming[key] || []
     if (inc.length !== cur.size) forbid(`Non hai i permessi per modificare ${key}.`)
