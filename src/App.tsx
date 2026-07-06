@@ -57,7 +57,7 @@ function Shell() {
             <div className="hidden items-center gap-1.5 rounded-lg border border-slate-800/80 bg-[color:var(--color-surface-1)]/80 px-1.5 py-1 md:flex">
               <NotificationsBell />
               <span className="h-5 w-px bg-slate-800" aria-hidden />
-              {perm?.managePeople && (
+              {perm?.manageAbsences && (
                 <button
                   onClick={() => setAbsencesOpen(true)}
                   className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-300 transition hover:bg-slate-800/70 hover:text-slate-100"
@@ -81,7 +81,7 @@ function Shell() {
 
             <div className="flex items-center gap-1.5 md:hidden">
               <NotificationsBell />
-              {perm?.managePeople && (
+              {perm?.manageAbsences && (
                 <button
                   onClick={() => setAbsencesOpen(true)}
                   className="btn-ghost"

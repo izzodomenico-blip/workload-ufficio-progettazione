@@ -30,6 +30,13 @@ export function UsersView() {
     try { await updateUserApi(u.id, { sections: [...next] }); await reload() }
     catch (e) { toast.error(e instanceof Error ? e.message : 'Errore.') }
   }
+  async function toggleGrant(u: AdminUserRow, grant: string) {
+    const next = new Set(u.grants)
+    if (next.has(grant)) next.delete(grant)
+    else next.add(grant)
+    try { await updateUserApi(u.id, { grants: [...next] }); await reload() }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Errore.') }
+  }
   async function resetPw(id: string) {
     const np = prompt('Nuova password (min 8):'); if (!np) return
     try { await resetUserPasswordApi(id, np); toast.success('Password reimpostata.') } catch (e) { toast.error(e instanceof Error ? e.message : 'Errore.') }
@@ -59,7 +66,7 @@ export function UsersView() {
 
       <table className="w-full text-sm">
         <thead className="text-left text-[11px] uppercase text-slate-400"><tr>
-          <th className="px-2 py-1">Username</th><th className="px-2 py-1">Ruolo</th><th className="px-2 py-1">Persona</th><th className="px-2 py-1">Attivo</th><th className="px-2 py-1">Sezioni visibili <span className="normal-case text-slate-500">(vuoto = come il ruolo)</span></th><th /></tr></thead>
+          <th className="px-2 py-1">Username</th><th className="px-2 py-1">Ruolo</th><th className="px-2 py-1">Persona</th><th className="px-2 py-1">Attivo</th><th className="px-2 py-1">Sezioni visibili <span className="normal-case text-slate-500">(vuoto = come il ruolo)</span></th><th className="px-2 py-1">Prezzi/Report</th><th /></tr></thead>
         <tbody>
           {users.map((u) => (
             <tr key={u.id} className="border-t border-slate-800/60">
@@ -80,6 +87,9 @@ export function UsersView() {
                     </label>
                   ))}
                 </div>
+              </td>
+              <td className="px-2 py-1">
+                <input type="checkbox" checked={u.grants.includes('viewConsuntiviPrices')} onChange={() => toggleGrant(u, 'viewConsuntiviPrices')} title="Vede i bottoni Prezzi/Report in Consuntivi (serve comunque la password Consuntivi)" />
               </td>
               <td className="px-2 py-1 text-right">
                 <button className="btn-ghost text-xs" onClick={() => resetPw(u.id)}>Reset password</button>
