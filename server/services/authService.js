@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { getDb } from '../db.js'
+import { CONTENT_SECTIONS } from './permissions.js'
 
 const SCRYPT_KEYLEN = 64
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000 // 12h sliding
@@ -62,7 +63,23 @@ export function getUserById(id, db = getDb()) {
 }
 
 export function listUsers(db = getDb()) {
-  return db.prepare('SELECT * FROM users ORDER BY username COLLATE NOCASE ASC').all().map(publicUser)
+  return db.prepare('SELECT * FROM users ORDER BY username COLLATE NOCASE ASC').all().map((row) => {
+    const pu = publicUser(row)
+    return { ...pu, sections: getUserSections(pu.id, db) }
+  })
+}
+
+export function getUserSections(userId, db = getDb()) {
+  return db.prepare('SELECT section FROM user_sections WHERE user_id = ? ORDER BY section')
+    .all(String(userId)).map((r) => r.section)
+}
+
+export function setUserSections(userId, sections, db = getDb()) {
+  const valid = new Set(CONTENT_SECTIONS)
+  const clean = [...new Set((Array.isArray(sections) ? sections : []).filter((s) => valid.has(s)))]
+  db.prepare('DELETE FROM user_sections WHERE user_id = ?').run(String(userId))
+  const ins = db.prepare('INSERT INTO user_sections (user_id, section) VALUES (?, ?)')
+  for (const s of clean) ins.run(String(userId), s)
 }
 
 export function createUser({ username, password, role, linkedPersonId = '' }, db = getDb()) {
@@ -113,6 +130,7 @@ export function deleteUser(id, db = getDb()) {
     const e = new Error("Non puoi eliminare l'ultimo amministratore."); e.statusCode = 400; throw e
   }
   db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id)
+  db.prepare('DELETE FROM user_sections WHERE user_id = ?').run(String(id))
   db.prepare('DELETE FROM users WHERE id = ?').run(id)
 }
 
@@ -138,7 +156,7 @@ export function getSessionUser(token, db = getDb()) {
   // rinnovo sliding
   db.prepare('UPDATE sessions SET expires_at = ? WHERE token = ?')
     .run(new Date(Date.now() + SESSION_TTL_MS).toISOString(), token)
-  return user
+  return { ...user, sections: getUserSections(user.id, db) }
 }
 
 export function deleteSession(token, db = getDb()) {

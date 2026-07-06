@@ -5,6 +5,7 @@ import os from 'node:os'
 import crypto from 'node:crypto'
 import { runMigrations } from '../db.js'
 import * as a from './authService.js'
+const { getUserSections, setUserSections, createUser, deleteUser } = a
 
 // DB isolato per test: le funzioni di authService accettano un `db` esplicito
 // (ultimo parametro), quindi non serve toccare la memoizzazione globale di getDb().
@@ -46,5 +47,31 @@ describe('utenti e sessioni', () => {
     const admin = a.createUser({ username: 'admin', password: 'segreta123', role: 'amministratore' }, db)
     expect(() => a.createUser({ username: 'admin', password: 'segreta123', role: 'officina' }, db)).toThrow()
     expect(() => a.deleteUser(admin.id, db)).toThrow(/ultimo amministratore/i)
+  })
+})
+
+describe('user_sections (visibilità sezioni per-utente)', () => {
+  it('set/get override e scarta voci invalide o speciali', () => {
+    const db = new DatabaseSync(':memory:'); runMigrations(db)
+    const u = createUser({ username: 'sec1', password: 'Password1', role: 'officina' }, db)
+    setUserSections(u.id, ['consuntivi', 'anagrafiche', 'utenti', 'boh'], db)
+    expect(getUserSections(u.id, db)).toEqual(['anagrafiche', 'consuntivi'])
+    db.close()
+  })
+  it('set vuoto azzera override', () => {
+    const db = new DatabaseSync(':memory:'); runMigrations(db)
+    const u = createUser({ username: 'sec2', password: 'Password1', role: 'officina' }, db)
+    setUserSections(u.id, ['consuntivi'], db)
+    setUserSections(u.id, [], db)
+    expect(getUserSections(u.id, db)).toEqual([])
+    db.close()
+  })
+  it('deleteUser rimuove anche le righe user_sections', () => {
+    const db = new DatabaseSync(':memory:'); runMigrations(db)
+    const u = createUser({ username: 'sec3', password: 'Password1', role: 'officina' }, db)
+    setUserSections(u.id, ['consuntivi'], db)
+    deleteUser(u.id, db)
+    expect(getUserSections(u.id, db)).toEqual([])
+    db.close()
   })
 })
