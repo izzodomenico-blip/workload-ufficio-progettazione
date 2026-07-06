@@ -300,12 +300,12 @@ export function apiSetupAdmin(username: string, password: string): Promise<{ use
 }
 export function apiLogout(): Promise<{ ok: boolean }> { return request('/api/auth/logout', { method: 'POST', body: '{}' }) }
 
-export interface AdminUserRow { id: string; username: string; role: Role; linkedPersonId: string; active: boolean; sections: string[]; visibleSections: string[] }
+export interface AdminUserRow { id: string; username: string; role: Role; linkedPersonId: string; active: boolean; sections: string[]; visibleSections: string[]; grants: string[] }
 export function fetchUsers(): Promise<AdminUserRow[]> { return request('/api/users') }
 export function createUserApi(input: { username: string; password: string; role: Role; linkedPersonId?: string }): Promise<AdminUserRow> {
   return request('/api/users', { method: 'POST', body: JSON.stringify(input) })
 }
-export function updateUserApi(id: string, patch: { role?: Role; active?: boolean; linkedPersonId?: string; sections?: string[] }): Promise<AdminUserRow> {
+export function updateUserApi(id: string, patch: { role?: Role; active?: boolean; linkedPersonId?: string; sections?: string[]; grants?: string[] }): Promise<AdminUserRow> {
   return request(`/api/users/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) })
 }
 export function resetUserPasswordApi(id: string, newPassword: string): Promise<{ ok: boolean }> {

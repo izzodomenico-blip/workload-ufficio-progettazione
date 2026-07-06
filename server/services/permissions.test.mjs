@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { permissionsForRole, requirePermission, effectiveSections, CONTENT_SECTIONS } from './permissions.js'
+import { permissionsForRole, requirePermission, effectiveSections, CONTENT_SECTIONS, applyGrants, GRANTABLE_PERMISSIONS } from './permissions.js'
 
 describe('permissionsForRole', () => {
   it('amministratore: tutto', () => {
@@ -86,5 +86,33 @@ describe('effectiveSections', () => {
   })
   it('voci invalide o speciali nell override vengono ignorate', () => {
     expect(effectiveSections('officina', ['consuntivi', 'utenti', 'inesistente'])).toEqual(['consuntivi'])
+  })
+})
+
+describe('applyGrants', () => {
+  it('concede viewConsuntiviPrices', () => {
+    const p = permissionsForRole('officina')
+    expect(p.viewConsuntiviPrices).toBe(false)
+    applyGrants(p, ['viewConsuntiviPrices'])
+    expect(p.viewConsuntiviPrices).toBe(true)
+  })
+  it('nessun grant -> invariato', () => {
+    const p = permissionsForRole('officina')
+    applyGrants(p, [])
+    expect(p.viewConsuntiviPrices).toBe(false)
+  })
+  it('ignora voci fuori whitelist', () => {
+    const p = permissionsForRole('officina')
+    applyGrants(p, ['manageUsers', 'deleteAny'])
+    expect(p.manageUsers).toBe(false)
+    expect(p.deleteAny).toBe(false)
+  })
+})
+describe('manageAbsences nella matrice', () => {
+  it('admin e progettista true; officina e sola_lettura false', () => {
+    expect(permissionsForRole('amministratore').manageAbsences).toBe(true)
+    expect(permissionsForRole('progettista').manageAbsences).toBe(true)
+    expect(permissionsForRole('officina').manageAbsences).toBe(false)
+    expect(permissionsForRole('sola_lettura').manageAbsences).toBe(false)
   })
 })

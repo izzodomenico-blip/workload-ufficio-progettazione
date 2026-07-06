@@ -5,7 +5,7 @@ import os from 'node:os'
 import crypto from 'node:crypto'
 import { runMigrations } from '../db.js'
 import * as a from './authService.js'
-const { getUserSections, setUserSections, createUser, deleteUser } = a
+const { getUserSections, setUserSections, createUser, deleteUser, getUserPermissions, setUserPermissions } = a
 
 // DB isolato per test: le funzioni di authService accettano un `db` esplicito
 // (ultimo parametro), quindi non serve toccare la memoizzazione globale di getDb().
@@ -72,6 +72,27 @@ describe('user_sections (visibilità sezioni per-utente)', () => {
     setUserSections(u.id, ['consuntivi'], db)
     deleteUser(u.id, db)
     expect(getUserSections(u.id, db)).toEqual([])
+    db.close()
+  })
+})
+
+describe('user_permissions (grant per-utente)', () => {
+  it('set/get grant e scarta voci fuori whitelist', () => {
+    const db = new DatabaseSync(':memory:'); runMigrations(db)
+    const u = createUser({ username: 'gr1', password: 'Password1', role: 'officina' }, db)
+    setUserPermissions(u.id, ['viewConsuntiviPrices', 'manageUsers', 'boh'], db)
+    expect(getUserPermissions(u.id, db)).toEqual(['viewConsuntiviPrices'])
+    db.close()
+  })
+  it('set vuoto azzera; deleteUser pulisce', () => {
+    const db = new DatabaseSync(':memory:'); runMigrations(db)
+    const u = createUser({ username: 'gr2', password: 'Password1', role: 'officina' }, db)
+    setUserPermissions(u.id, ['viewConsuntiviPrices'], db)
+    setUserPermissions(u.id, [], db)
+    expect(getUserPermissions(u.id, db)).toEqual([])
+    setUserPermissions(u.id, ['viewConsuntiviPrices'], db)
+    deleteUser(u.id, db)
+    expect(getUserPermissions(u.id, db)).toEqual([])
     db.close()
   })
 })

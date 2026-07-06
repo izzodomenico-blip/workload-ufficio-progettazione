@@ -127,9 +127,10 @@ describe('authorizeAppDataChange — coperture adversariali aggiuntive', () => {
     expect(out.businessPartners[0].creditLimit).toBe(50)
   })
   it('non-managePeople NON può modificare un\'assenza', () => {
+    const officina = { id: 'o1', permissions: permissionsForRole('officina') }
     const current = { ...EMPTY, absences: [{ id: 'ab1', personId: 'p1', type: 'ferie', startDate: '2026-01-01', endDate: '2026-01-02', hoursPerDay: 8 }] }
     const incoming = { ...EMPTY, absences: [{ id: 'ab1', personId: 'p1', type: 'permesso', startDate: '2026-01-01', endDate: '2026-01-02', hoursPerDay: 8 }] }
-    expect(() => authorizeAppDataChange(current, incoming, progettista)).toThrow(/permess/i)
+    expect(() => authorizeAppDataChange(current, incoming, officina)).toThrow(/permess/i)
   })
   it('notifications: non-admin puo aggiungere ma NON azzerare/modificare le esistenti', () => {
     const curN = { id: 'n1', timestamp: 't', type: 'status_changed', entityType: 'workItem', entityId: 'w', title: 'x', message: 'x', read: false }
@@ -141,5 +142,33 @@ describe('authorizeAppDataChange — coperture adversariali aggiuntive', () => {
   it('notifications: admin ha pieno controllo (puo azzerare)', () => {
     const current = { ...EMPTY, notifications: [{ id: 'n1', timestamp: 't', type: 'status_changed', entityType: 'workItem', entityId: 'w', title: 'x', message: 'x', read: false }] }
     expect(authorizeAppDataChange(current, { ...EMPTY, notifications: [] }, admin).notifications.length).toBe(0)
+  })
+})
+
+const officina = { id: 'o1', permissions: permissionsForRole('officina') }
+
+describe('authorizeAppDataChange — assenze (manageAbsences)', () => {
+  const ab = (id, type) => ({ id, personId: 'p1', type, startDate: '2026-01-01', endDate: '2026-01-02' })
+  it('progettista PUÒ modificare le assenze', () => {
+    const current = { ...EMPTY, absences: [ab('a1', 'ferie')] }
+    const incoming = { ...EMPTY, absences: [ab('a1', 'permesso')] }
+    const out = authorizeAppDataChange(current, incoming, progettista)
+    expect(out.absences[0].type).toBe('permesso')
+  })
+  it('progettista NON può modificare le persone', () => {
+    const current = { ...EMPTY, people: [{ id: 'p1', name: 'A', baselineLoadPercent: 30 }] }
+    const incoming = { ...EMPTY, people: [{ id: 'p1', name: 'MOD', baselineLoadPercent: 30 }] }
+    expect(() => authorizeAppDataChange(current, incoming, progettista)).toThrow(/permess/i)
+  })
+  it('officina NON può modificare le assenze', () => {
+    const current = { ...EMPTY, absences: [ab('a1', 'ferie')] }
+    const incoming = { ...EMPTY, absences: [ab('a1', 'permesso')] }
+    expect(() => authorizeAppDataChange(current, incoming, officina)).toThrow(/permess/i)
+  })
+  it('admin può tutto (assenze + persone)', () => {
+    const current = { ...EMPTY, absences: [ab('a1', 'ferie')], people: [{ id: 'p1', name: 'A', baselineLoadPercent: 30 }] }
+    const incoming = { ...EMPTY, absences: [ab('a1', 'permesso')], people: [{ id: 'p1', name: 'MOD', baselineLoadPercent: 50 }] }
+    const out = authorizeAppDataChange(current, incoming, admin)
+    expect(out.absences[0].type).toBe('permesso')
   })
 })

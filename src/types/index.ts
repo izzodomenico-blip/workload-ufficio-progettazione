@@ -756,6 +756,7 @@ export interface Permissions {
   deleteAny: boolean
   manageUsers: boolean
   managePeople: boolean
+  manageAbsences: boolean
   viewConsuntiviPrices: boolean
   manageBackups: boolean
   viewLog: boolean
