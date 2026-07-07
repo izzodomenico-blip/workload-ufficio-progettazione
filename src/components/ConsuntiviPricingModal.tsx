@@ -98,6 +98,19 @@ export function ConsuntiviPricingModal({ open, onClose }: Props) {
           </div>
 
           <fieldset>
+            <legend className="text-sm font-semibold text-slate-200">Coefficienti tubolari (€/kg per forma)</legend>
+            <p className="mt-1 text-[11px] text-slate-500">Stima per forma; nel report i tubolari sono marcati «da verificare».</p>
+            <div className="mt-2 grid grid-cols-3 gap-3">
+              {([['quadro', 'Quadro'], ['rettangolo', 'Rettangolare'], ['piccolo', 'Piccolo']] as const).map(([k, label]) => (
+                <FormField key={k} label={label}>
+                  <input type="number" step="0.01" className="input-base" value={config.tubeCoefficientPerKg[k]}
+                    onChange={(e) => setConfig((c) => ({ ...c, tubeCoefficientPerKg: { ...c.tubeCoefficientPerKg, [k]: num(e.target.value) } }))} />
+                </FormField>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset>
             <legend className="text-sm font-semibold text-slate-200">Densità per materiale (kg per m²·mm)</legend>
             <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
               {ALL_CONSUNTIVO_MATERIALS.map((m) => (

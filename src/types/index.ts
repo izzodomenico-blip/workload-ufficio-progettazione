@@ -703,6 +703,8 @@ export interface TubeProfile {
   updatedAt: string
 }
 
+export type TubeShape = 'quadro' | 'rettangolo' | 'piccolo'
+
 /** Config prezzi protetta — NON entra mai in AppData. Vive in meta.consuntiviConfig. */
 export interface ConsuntiviPricingConfig {
   materialPricePerKg: Record<ConsuntivoMaterial, number>
@@ -711,6 +713,7 @@ export interface ConsuntiviPricingConfig {
   weldingRatePerHour: number
   bendingRatePerHour: number
   densityFactorPerMaterial: Record<ConsuntivoMaterial, number>
+  tubeCoefficientPerKg: Record<TubeShape, number>
 }
 
 export interface Filters {

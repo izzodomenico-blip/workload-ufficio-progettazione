@@ -621,6 +621,13 @@ textarea:focus-visible,
 .cons-table tbody tr:last-child td { border-bottom: none; }
 .cons-table td.r { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+.cons-tube-warn { background: #fef9c3; }
+.cons-tube-warn th, .cons-tube-warn td { background: #fef9c3; }
+.cons-verify-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px;
+  background: #facc15; color: #422006; font-size: 10px; font-weight: 700; text-transform: uppercase;
+}
+
 /* Derivazione del totale commessa (perche si arriva al totale) */
 .cons-commessa-derivation {
   display: flex;
@@ -673,4 +680,7 @@ textarea:focus-visible,
   }
   .cons-commessa, .cons-session, .cons-table { break-inside: avoid; }
   .cons-grandtotal, .cons-commessa-derivation { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .cons-tube-warn, .cons-tube-warn th, .cons-tube-warn td, .cons-verify-badge {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
 }

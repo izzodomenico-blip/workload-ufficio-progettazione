@@ -5,6 +5,7 @@ import type {
   ConsuntivoMaterial,
   LaserCutRow,
   TubeLaserRow,
+  TubeShape,
   WeldingRow,
 } from '../types'
 import { ALL_CONSUNTIVO_MATERIALS } from '../types'
@@ -16,6 +17,7 @@ export const DEFAULT_CONSUNTIVI_PRICING: ConsuntiviPricingConfig = {
   weldingRatePerHour: 35,
   bendingRatePerHour: 60,
   densityFactorPerMaterial: { ferro: 7.85, inox: 8.0, zincato: 7.85, corten: 7.85 },
+  tubeCoefficientPerKg: { quadro: 0.91, rettangolo: 1.18, piccolo: 1.30 },
 }
 
 export interface ConsuntivoTotals {
@@ -68,11 +70,26 @@ export function laserRowCost(row: LaserCutRow, pricing: ConsuntiviPricingConfig)
   return { kg, materialCost, gasCost, total: materialCost + gasCost }
 }
 
+export function parseTubeSides(label: string): { a: number; b: number } | null {
+  const nums = String(label ?? '').replace(/,/g, '.').match(/\d+(?:\.\d+)?/g)
+  if (!nums || nums.length < 2) return null
+  return { a: Number(nums[0]), b: Number(nums[1]) }
+}
+
+export function tubeShape(label: string): TubeShape {
+  const s = parseTubeSides(label)
+  if (!s) return 'rettangolo'
+  if (s.a + s.b <= 60) return 'piccolo'
+  if (s.a === s.b) return 'quadro'
+  return 'rettangolo'
+}
+
 export function tubeRowCost(row: TubeLaserRow, pricing: ConsuntiviPricingConfig) {
   const kg = tubeWeightKg(row)
-  const materialCost = kg * (pricing.materialPricePerKg[row.materiale] ?? 0)
+  const shape = tubeShape(row.profileLabel)
+  const materialCost = kg * (pricing.tubeCoefficientPerKg?.[shape] ?? 0)
   const timeCost = num(row.tempoMin) * num(pricing.tubeLaserRatePerMin)
-  return { kg, materialCost, timeCost, total: materialCost + timeCost }
+  return { kg, shape, materialCost, timeCost, total: materialCost + timeCost }
 }
 
 export function weldingRowCost(row: WeldingRow, pricing: ConsuntiviPricingConfig): number {

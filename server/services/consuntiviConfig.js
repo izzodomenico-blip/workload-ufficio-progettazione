@@ -5,6 +5,7 @@ export const DEFAULT_CONSUNTIVI_CONFIG = {
   weldingRatePerHour: 35,
   bendingRatePerHour: 60,
   densityFactorPerMaterial: { ferro: 7.85, inox: 8.0, zincato: 7.85, corten: 7.85 },
+  tubeCoefficientPerKg: { quadro: 0.91, rettangolo: 1.18, piccolo: 1.30 },
 }
 
 const MATERIALS = ['ferro', 'inox', 'zincato', 'corten']
@@ -31,5 +32,6 @@ export function normalizeConsuntiviConfig(input) {
     weldingRatePerHour: nonNegativeNumber(o.weldingRatePerHour, d.weldingRatePerHour),
     bendingRatePerHour: nonNegativeNumber(o.bendingRatePerHour, d.bendingRatePerHour),
     densityFactorPerMaterial: numberMap(o.densityFactorPerMaterial, MATERIALS, d.densityFactorPerMaterial),
+    tubeCoefficientPerKg: numberMap(o.tubeCoefficientPerKg, ['quadro', 'rettangolo', 'piccolo'], d.tubeCoefficientPerKg),
   }
 }
