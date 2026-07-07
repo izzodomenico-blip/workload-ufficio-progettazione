@@ -16,6 +16,7 @@ export const DEFAULT_CONSUNTIVI_PRICING: ConsuntiviPricingConfig = {
   weldingRatePerHour: 35,
   bendingRatePerHour: 60,
   densityFactorPerMaterial: { ferro: 7.85, inox: 8.0, zincato: 7.85, corten: 7.85 },
+  tubeCoefficientPerKg: { quadro: 0.91, rettangolo: 1.18, piccolo: 1.30 },
 }
 
 export interface ConsuntivoTotals {
