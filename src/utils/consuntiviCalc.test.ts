@@ -4,8 +4,10 @@ import {
   bendingRowCost,
   consuntivoTotals,
   laserRowCost,
+  parseTubeSides,
   sheetWeightKg,
   tubeRowCost,
+  tubeShape,
   tubeWeightKg,
   weldingRowCost,
 } from './consuntiviCalc'
@@ -59,15 +61,45 @@ describe('tubeWeightKg / tubeRowCost', () => {
   it('kg/m 3.49 · 6 m · 2 pezzi = 41.88 kg', () => {
     expect(tubeWeightKg({ kgPerMeter: 3.49, lunghezzaMm: 6000, nPezzi: 2 })).toBeCloseTo(41.88, 6)
   })
-  it('costo materiale ferro + tempo tubo', () => {
+  it('costo materiale (coefficiente per forma, profilo 40x40x3 -> quadro) + tempo tubo', () => {
     const r = tubeRowCost(
       { id: 't1', categoria: 'tubolari', profileId: 'p', profileLabel: '40x40x3', kgPerMeter: 3.49, materiale: 'ferro', lunghezzaMm: 6000, nPezzi: 2, tempoMin: 4 },
       P,
     )
     expect(r.kg).toBeCloseTo(41.88, 6)
-    expect(r.materialCost).toBeCloseTo(41.88 * 1.3, 6)
+    expect(r.shape).toBe('quadro')
+    expect(r.materialCost).toBeCloseTo(41.88 * 0.91, 6)
     expect(r.timeCost).toBeCloseTo(4 * 2.5, 6)
-    expect(r.total).toBeCloseTo(41.88 * 1.3 + 10, 6)
+    expect(r.total).toBeCloseTo(41.88 * 0.91 + 10, 6)
+  })
+})
+
+describe('tubeShape', () => {
+  const cases: Array<[string, string]> = [
+    ['30x30x2', 'piccolo'], ['40x15x1.5', 'piccolo'],
+    ['40x40x3', 'quadro'], ['50x50x3', 'quadro'], ['70x70x3', 'quadro'], ['80x80x3', 'quadro'],
+    ['80x40x3', 'rettangolo'], ['60x20x2', 'rettangolo'],
+  ]
+  it.each(cases)('%s -> %s', (label, shape) => { expect(tubeShape(label)).toBe(shape) })
+  it('non interpretabile -> rettangolo', () => { expect(tubeShape('boh')).toBe('rettangolo') })
+  it('gestisce × e virgola', () => { expect(tubeShape('40×15×1,5')).toBe('piccolo') })
+})
+
+describe('parseTubeSides', () => {
+  it('primi due numeri', () => { expect(parseTubeSides('80 x 40 x 3')).toEqual({ a: 80, b: 40 }) })
+  it('un solo numero -> null', () => { expect(parseTubeSides('3')).toBeNull() })
+})
+
+describe('tubeRowCost per forma', () => {
+  it('quadro: kg × coeff quadro', () => {
+    // oggetto inline: validato direttamente contro TubeLaserRow (nessun cast)
+    const r = tubeRowCost(
+      { id: 't', categoria: 'tubolari', profileId: '', profileLabel: '40x40x3', kgPerMeter: 3.79, materiale: 'zincato', lunghezzaMm: 1000, nPezzi: 1, tempoMin: 0 },
+      DEFAULT_CONSUNTIVI_PRICING,
+    )
+    expect(r.shape).toBe('quadro')
+    expect(r.kg).toBeCloseTo(3.79, 2)
+    expect(r.materialCost).toBeCloseTo(3.79 * 0.91, 3)
   })
 })
 
@@ -100,7 +132,8 @@ describe('consuntivoTotals', () => {
     expect(t.kgByMaterial.ferro).toBeCloseTo(8 + 41.88, 6)
     expect(t.weldingCost).toBeCloseTo(560, 6)
     expect(t.bendingCost).toBeCloseTo(300, 6)
-    const expectedTotal = 8 * 1.3 + 25 + (41.88 * 1.3 + 10) + 560 + 300
+    // riga tubo profileLabel '40x40x3' -> shape 'quadro' -> coefficiente 0.91 (non più materialPricePerKg.ferro)
+    const expectedTotal = 8 * 1.3 + 25 + (41.88 * 0.91 + 10) + 560 + 300
     expect(t.total).toBeCloseTo(expectedTotal, 6)
   })
 })
