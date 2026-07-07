@@ -20,7 +20,9 @@ export function ConsuntiviPricingModal({ open, onClose }: Props) {
     setBusy(true)
     try {
       const cfg = await fetchConsuntiviPricing(password)
-      setConfig(cfg)
+      // Merge sopra i default: un backend/config incompleto (es. senza tubeCoefficientPerKg)
+      // non deve mandare in crash il render leggendo una chiave mancante.
+      setConfig({ ...DEFAULT_CONSUNTIVI_PRICING, ...cfg })
       setUnlocked(true)
     } catch {
       toast.error('Password errata o configurazione non accessibile.')
@@ -33,7 +35,7 @@ export function ConsuntiviPricingModal({ open, onClose }: Props) {
     setBusy(true)
     try {
       const saved = await saveConsuntiviPricing(config, password)
-      setConfig(saved)
+      setConfig({ ...DEFAULT_CONSUNTIVI_PRICING, ...saved })
       toast.success('Configurazione prezzi salvata.')
       onClose()
     } catch {
