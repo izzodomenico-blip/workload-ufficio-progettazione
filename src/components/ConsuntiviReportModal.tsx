@@ -41,6 +41,12 @@ export function ConsuntiviReportModal({ open, onClose }: Props) {
   const [password, setPassword] = useState('')
   const [pricing, setPricing] = useState<ConsuntiviPricingConfig | null>(null)
   const [busy, setBusy] = useState(false)
+  const [selectedCommessa, setSelectedCommessa] = useState<string | null>(null)
+
+  const commesse = useMemo(() => {
+    const set = new Set(consuntivi.map((c) => c.commessaNumber.trim() || '(senza commessa)'))
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [consuntivi])
 
   useEffect(() => {
     if (!open) return
@@ -62,7 +68,7 @@ export function ConsuntiviReportModal({ open, onClose }: Props) {
   }
 
   const report = useMemo(() => {
-    if (!pricing) return null
+    if (!pricing || !selectedCommessa) return null
     const groups = new Map<string, {
       commessaNumber: string
       supplierName: string
@@ -77,7 +83,8 @@ export function ConsuntiviReportModal({ open, onClose }: Props) {
     const grandCats = emptyCats()
 
     // Ordina per data crescente per una lettura cronologica dentro ogni commessa.
-    const ordered = [...consuntivi].sort((a, b) => a.date.localeCompare(b.date))
+    const filtered = consuntivi.filter((c) => (c.commessaNumber.trim() || '(senza commessa)') === selectedCommessa)
+    const ordered = [...filtered].sort((a, b) => a.date.localeCompare(b.date))
 
     for (const c of ordered) {
       const t = consuntivoTotals(c, pricing)
@@ -119,7 +126,7 @@ export function ConsuntiviReportModal({ open, onClose }: Props) {
       grandCats,
       count: ordered.length,
     }
-  }, [consuntivi, pricing])
+  }, [consuntivi, pricing, selectedCommessa])
 
   if (!open) return null
 
@@ -132,7 +139,10 @@ export function ConsuntiviReportModal({ open, onClose }: Props) {
         <div className="cons-report-bar no-print">
           <span className="text-sm font-medium text-slate-300">Report consuntivi</span>
           <div className="flex items-center gap-2">
-            {pricing && (
+            {pricing && selectedCommessa && (
+              <button className="btn-ghost" onClick={() => setSelectedCommessa(null)}>Cambia commessa</button>
+            )}
+            {pricing && selectedCommessa && (
               <button className="btn-primary" onClick={() => window.print()}>Stampa / PDF</button>
             )}
             <button className="btn-ghost" onClick={onClose}>Chiudi</button>
@@ -155,6 +165,19 @@ export function ConsuntiviReportModal({ open, onClose }: Props) {
                 />
               </FormField>
               <button className="btn-primary w-full" disabled={busy} onClick={unlock}>Genera report</button>
+            </div>
+          </div>
+        ) : !selectedCommessa ? (
+          <div className="cons-report-lock no-print">
+            <div className="w-full max-w-md space-y-3 rounded-2xl border border-slate-800/80 bg-[color:var(--color-panel)] p-6">
+              <h3 className="text-base font-semibold text-slate-100">Scegli la commessa</h3>
+              <p className="text-sm text-slate-400">Il report e il PDF riguarderanno solo la commessa selezionata.</p>
+              <div className="max-h-72 space-y-1 overflow-auto">
+                {commesse.length === 0 && <p className="text-sm text-slate-500">Nessun consuntivo presente.</p>}
+                {commesse.map((k) => (
+                  <button key={k} className="btn-ghost w-full justify-start" onClick={() => setSelectedCommessa(k)}>{k}</button>
+                ))}
+              </div>
             </div>
           </div>
         ) : report && (
@@ -244,8 +267,8 @@ export function ConsuntiviReportModal({ open, onClose }: Props) {
                     )}
 
                     {c.tubeRows.length > 0 && (
-                      <table className="cons-table">
-                        <thead><tr><th>Laser tubi</th><th>Materiale</th><th className="r">kg</th><th className="r">€ materiale</th><th className="r">€ tempo</th></tr></thead>
+                      <table className="cons-table cons-tube-warn">
+                        <thead><tr><th>Laser tubi <span className="cons-verify-badge">da verificare</span></th><th>Materiale</th><th className="r">kg</th><th className="r">€ materiale</th><th className="r">€ tempo</th></tr></thead>
                         <tbody>
                           {c.tubeRows.map((row) => {
                             const rc = tubeRowCost(row, pricing)
