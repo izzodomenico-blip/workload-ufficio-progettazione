@@ -659,6 +659,13 @@ textarea:focus-visible,
   html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
   body > *:not(.cons-report-portal) { display: none !important; }
   .no-print { display: none !important; }
+  /* Il primo blocco @media print (per gli altri report) applica
+     `body * { visibility: hidden }` e ripristina la visibilita solo per
+     `.report-print-area`. Il report consuntivi usa classi proprie, quindi
+     resterebbe invisibile -> PDF vuoto. Qui lo si rende di nuovo visibile
+     (specificita `.cons-report-portal *` (0,1,0) > `body *` (0,0,1)). */
+  .cons-report-portal,
+  .cons-report-portal * { visibility: visible !important; }
   .cons-report-portal { position: static !important; }
   .cons-report-overlay {
     position: static !important;
