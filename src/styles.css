@@ -699,3 +699,31 @@ textarea:focus-visible,
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 }
+
+/* ---- Stampa report Executive (portalato su body, come i consuntivi) ----
+   Il report Executive e' portalato su document.body con `.exec-report-portal`.
+   Cosi #root (e il resto dell'app) puo essere rimosso dal LAYOUT via
+   display:none: il report parte dall'alto nei margini A4, senza il vuoto in
+   alto / lo slittamento che aveva quando era annidato in #root. */
+@media print {
+  body:has(.exec-report-portal) > *:not(.exec-report-portal) { display: none !important; }
+  /* Contrasta il `body * { visibility: hidden }` del blocco print generico. */
+  .exec-report-portal,
+  .exec-report-portal * { visibility: visible !important; }
+  .exec-report-portal {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    background: #fff !important;
+  }
+  /* Il foglio torna a flusso normale (override dell'absolute del blocco generico). */
+  .exec-report-portal .report-print-area {
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+}

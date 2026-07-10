@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { useData } from '../state/DataProvider'
 import {
@@ -76,9 +77,12 @@ export function WeeklyReportModal({ open, onClose }: Props) {
   const personById = new Map<string, Person>(data.people.map((p) => [p.id, p]))
   const workItemById = new Map<string, WorkItem>(data.workItems.map((w) => [w.id, w]))
 
-  return (
+  // Portalato su document.body (come il report consuntivi): cosi in stampa
+  // #root puo essere rimosso dal layout senza nascondere il report, evitando
+  // il vuoto in alto / lo slittamento causati dall'annidamento in #root.
+  return createPortal(
     <div
-      className="report-print-root executive-report-print-root fixed inset-0 z-50 overflow-y-auto"
+      className="exec-report-portal report-print-root executive-report-print-root fixed inset-0 z-50 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="Anteprima report settimanale"
@@ -151,7 +155,8 @@ export function WeeklyReportModal({ open, onClose }: Props) {
           <ReportFooter generatedAt={generatedAt} />
         </div>
       </article>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
