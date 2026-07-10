@@ -518,6 +518,10 @@ textarea:focus-visible,
 .cons-report-sheet h1,
 .cons-report-sheet h2 { color: #0d1017; }
 
+/* Logo Flowrlink in cima ai report (stampabile) */
+.report-brand-logo { display: block; height: 42px; width: auto; margin: 0 0 20px; }
+.cons-doc-logo { display: block; height: 40px; width: auto; margin: 0 0 6px; }
+
 /* Intestazione */
 .cons-doc-head {
   display: flex;
@@ -657,7 +661,11 @@ textarea:focus-visible,
 @media print {
   @page { size: A4; margin: 14mm; }
   html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
-  body > *:not(.cons-report-portal) { display: none !important; }
+  /* Rimuove #root (e gli altri figli di body) dal flusso di stampa SOLO quando
+     il report consuntivi e' effettivamente aperto (il suo portal esiste in body).
+     Senza lo scope `:has()`, questa regola nascondeva #root a OGNI stampa,
+     lasciando bianchi gli altri report (es. Executive) che vivono dentro #root. */
+  body:has(.cons-report-portal) > *:not(.cons-report-portal) { display: none !important; }
   .no-print { display: none !important; }
   /* Il primo blocco @media print (per gli altri report) applica
      `body * { visibility: hidden }` e ripristina la visibilita solo per

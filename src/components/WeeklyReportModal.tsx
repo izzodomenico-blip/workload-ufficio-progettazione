@@ -116,6 +116,7 @@ export function WeeklyReportModal({ open, onClose }: Props) {
 
       <article className="report-print-area executive-report-print-area relative z-10 mx-auto my-6 max-w-[210mm] bg-white text-slate-900 shadow-2xl ring-1 ring-slate-200 print:m-0 print:max-w-none print:shadow-none print:ring-0">
         <div className="executive-report-body px-9 pt-8 pb-9 print:px-0 print:pt-2 print:pb-0">
+          <img src="/flowrlink-logo-light.png" alt="Flowrlink" className="report-brand-logo" />
           <ReportHeader current={current} generatedAt={generatedAt} />
           <div className="mt-6">
             <KpiBar current={current} />

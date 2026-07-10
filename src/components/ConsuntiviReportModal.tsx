@@ -185,6 +185,7 @@ export function ConsuntiviReportModal({ open, onClose }: Props) {
             {/* Intestazione documento */}
             <header className="cons-doc-head">
               <div>
+                <img src="/flowrlink-logo-light.png" alt="Flowrlink" className="cons-doc-logo" />
                 <div className="cons-kicker">Officina · Riepilogo costi di produzione</div>
                 <h1 className="cons-title">Consuntivo di produzione</h1>
               </div>
