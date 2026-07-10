@@ -297,20 +297,36 @@ textarea:focus-visible,
      vuoto/incompleto. In stampa lo rendiamo statico e senza clipping cosi il
      report puo distribuirsi su piu pagine. */
   .report-print-root {
-    position: static !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
     transform: none !important;
   }
 
+  /* L'app resta a layout (resa invisibile da `body * { visibility: hidden }`,
+     che pero' conserva lo spazio): senza azzerarne l'altezza, il report veniva
+     spinto in basso/pagine successive (vuoto in alto). Azzerando #root il
+     report absolute non viene ritagliato (#root e' statico, non e' il suo
+     blocco contenitore). Scoped con :has() cosi vale solo con un report aperto. */
+  #root:has(.report-print-root) {
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Flusso normale (NON absolute): l'absolute+top/left in media paginata
+     estraeva il report dal flusso, producendo un ampio vuoto in alto e uno
+     slittamento orizzontale. Statico riempie l'area di pagina A4 partendo
+     dall'alto-sinistra e pagina correttamente su piu fogli. */
   .report-print-area {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
     width: 100% !important;
     max-width: none !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     background: white !important;
     color: #0f172a !important;
@@ -335,7 +351,10 @@ textarea:focus-visible,
   /* Report Executive: layout dedicato A4.
      Gli altri report continuano a usare le classi generiche sopra. */
   .executive-report-print-root {
-    position: static !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
