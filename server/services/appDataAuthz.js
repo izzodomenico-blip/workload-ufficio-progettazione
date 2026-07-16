@@ -14,6 +14,15 @@ export function filterAppDataForUser(tree, perms) {
       return copy
     })
   }
+  // Chiusure: i valori economici congelati escono solo a chi ha il permesso prezzi.
+  if (!perms.viewConsuntiviPrices) {
+    out.consuntiviClosures = (tree.consuntiviClosures || []).map((cl) => {
+      const snap = { ...(cl.snapshot || {}) }
+      delete snap.total
+      delete snap.cats
+      return { ...cl, snapshot: snap }
+    })
+  }
   return out
 }
 
@@ -36,6 +45,12 @@ export function authorizeAppDataChange(current, incoming, user) {
   const perms = user.permissions
   const out = { ...incoming }
 
+  // Chiusure commesse: collezione SERVER-AUTORITATIVA — qualunque versione
+  // mandata dal client viene ignorata, vale quella del server.
+  out.consuntiviClosures = current.consuntiviClosures || []
+  const closedKeys = new Set((current.consuntiviClosures || []).map((cl) => cl.commessaKey))
+  const commessaKeyOf = (c) => (String(c.commessaNumber ?? '').trim() || '(senza commessa)')
+
   // 1) Collezioni con proprietà (workItems/tasks/consuntivi)
   for (const key of OWNED) {
     const cur = byId(current[key])
@@ -49,6 +64,7 @@ export function authorizeAppDataChange(current, incoming, user) {
     const preserved = []
     for (const [id, item] of cur) {
       if (!incIds.has(id)) {
+        if (key === 'consuntivi' && closedKeys.has(commessaKeyOf(item))) { preserved.push(item); continue }
         const owner = item.createdByUserId || ''
         const canDelete = perms.deleteAny || (perms.canDeleteOwnWork && owner === user.id)
         if (!canDelete) preserved.push(item)
@@ -58,8 +74,15 @@ export function authorizeAppDataChange(current, incoming, user) {
     const processed = inc.map((item) => {
       const before = cur.get(item.id)
       if (!before) {
+        if (key === 'consuntivi' && closedKeys.has(commessaKeyOf(item))) {
+          forbid(`La commessa ${commessaKeyOf(item)} è chiusa: non si possono aggiungere consuntivi.`)
+        }
         if (!perms.canCreateWork) forbid(`Non hai i permessi per creare in ${key}.`)
         return { ...item, createdByUserId: user.id } // stampa creatore
+      }
+      if (key === 'consuntivi' && JSON.stringify(before) !== JSON.stringify(item)
+        && (closedKeys.has(commessaKeyOf(before)) || closedKeys.has(commessaKeyOf(item)))) {
+        forbid(`La commessa ${commessaKeyOf(before)} è chiusa: consuntivo non modificabile.`)
       }
       // update: consentito con canEditWork; preserva createdByUserId
       if (!perms.canEditWork && JSON.stringify(before) !== JSON.stringify(item)) {
