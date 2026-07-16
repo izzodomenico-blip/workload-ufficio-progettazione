@@ -455,6 +455,7 @@ export const demoData: AppData = {
   calculatedStandardComponents: [],
   consuntivi: [],
   tubeProfiles: [],
+  consuntiviClosures: [],
 }
 
 export function freshDemoData(): AppData {

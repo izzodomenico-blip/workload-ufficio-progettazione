@@ -36,7 +36,7 @@ function emptyCats(): Record<CatKey, number> {
 }
 
 export function ConsuntiviReportModal({ open, onClose }: Props) {
-  const { consuntivi } = useData()
+  const { consuntivi, consuntiviClosures } = useData()
   const toast = useToast()
   const [password, setPassword] = useState('')
   const [pricing, setPricing] = useState<ConsuntiviPricingConfig | null>(null)
@@ -44,9 +44,10 @@ export function ConsuntiviReportModal({ open, onClose }: Props) {
   const [selectedCommessa, setSelectedCommessa] = useState<string | null>(null)
 
   const commesse = useMemo(() => {
+    const closed = new Set(consuntiviClosures.map((cl) => cl.commessaKey))
     const set = new Set(consuntivi.map((c) => c.commessaNumber.trim() || '(senza commessa)'))
-    return Array.from(set).sort((a, b) => a.localeCompare(b))
-  }, [consuntivi])
+    return Array.from(set).filter((k) => !closed.has(k)).sort((a, b) => a.localeCompare(b))
+  }, [consuntivi, consuntiviClosures])
 
   useEffect(() => {
     if (!open) return

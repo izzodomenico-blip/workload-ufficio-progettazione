@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Absence, AppData, BusinessPartner, Consuntivo, MachineType, Person, Status, TubeProfile, WorkshopAssignment, WorkshopAssignmentSourceType, WorkshopAssignmentStatus, WorkshopOutput, WorkshopWorker } from '../types'
+import type { Absence, AppData, BusinessPartner, Consuntivo, ConsuntiviClosure, MachineType, Person, Status, TubeProfile, WorkshopAssignment, WorkshopAssignmentSourceType, WorkshopAssignmentStatus, WorkshopOutput, WorkshopWorker } from '../types'
 import { freshDemoData } from '../data/demoData'
 import { downloadJSON, loadFromStorage, saveToStorage } from '../storage/localStorage'
 import {
@@ -144,6 +144,7 @@ interface DataContextValue {
   workshopWorkers: WorkshopWorker[]
   workshopAssignments: WorkshopAssignment[]
   consuntivi: Consuntivo[]
+  consuntiviClosures: ConsuntiviClosure[]
   tubeProfiles: TubeProfile[]
   // workItems
   createWorkItem: (input: CreateWorkItemInput) => string
@@ -209,6 +210,8 @@ interface DataContextValue {
   exportData: () => BackupExportResult
   /** Ricarica lo stato condiviso dal server (es. dopo un ripristino backup). */
   reloadFromServer: () => Promise<void>
+  /** Alias di reloadFromServer: ricarica l'albero dati dal server (es. dopo chiusura/riapertura commessa). */
+  refreshAppData: () => Promise<void>
   // notifications
   markNotificationAsRead: (id: string) => void
   markAllNotificationsAsRead: () => void
@@ -818,6 +821,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     workshopWorkers: data.workshopWorkers,
     workshopAssignments: data.workshopAssignments,
     consuntivi: data.consuntivi ?? [],
+    consuntiviClosures: data.consuntiviClosures ?? [],
     tubeProfiles: data.tubeProfiles ?? [],
     createWorkItem,
     updateWorkItem,
@@ -870,6 +874,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     importData,
     exportData,
     reloadFromServer,
+    refreshAppData: reloadFromServer,
     markNotificationAsRead,
     markAllNotificationsAsRead,
     clearReadNotifications,

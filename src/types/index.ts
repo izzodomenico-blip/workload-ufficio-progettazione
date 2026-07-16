@@ -614,6 +614,7 @@ export interface AppData {
   calculatedStandardComponents: CalculatedStandardComponent[]
   consuntivi: Consuntivo[]
   tubeProfiles: TubeProfile[]
+  consuntiviClosures: ConsuntiviClosure[]
 }
 
 // === Consuntivi officina (taglio laser / laser tubi / saldatura / piega) ===
@@ -690,6 +691,27 @@ export interface Consuntivo {
   createdAt: string
   updatedAt: string
   createdByUserId?: string
+}
+
+export interface ConsuntiviClosureSnapshot {
+  /** € congelati: assenti se l'utente non ha il permesso viewConsuntiviPrices. */
+  total?: number
+  totalKg: number
+  kgByMaterial: Record<ConsuntivoMaterial, number>
+  cats?: { material: number; gas: number; time: number; welding: number; bending: number }
+}
+
+export interface ConsuntiviClosure {
+  id: string
+  commessaKey: string
+  supplierName: string
+  firstDate: string
+  lastDate: string
+  consuntiviCount: number
+  closedAt: string
+  closedByUserId: string
+  closedByUsername: string
+  snapshot: ConsuntiviClosureSnapshot
 }
 
 export interface TubeProfile {
