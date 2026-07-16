@@ -37,6 +37,7 @@ const TABLES = {
   calculatedStandardComponents: 'calculated_standard_components',
   consuntivi: 'consuntivi',
   tubeProfiles: 'tube_profiles',
+  consuntiviClosures: 'consuntivi_closures',
 }
 
 let dbInstance = null
@@ -77,7 +78,7 @@ export function isDatabaseEmpty(db = getDb()) {
 
 export function getAppData(db = getDb()) {
   ensureMachineTypesPresent(db)
-  return normalizeAppData({
+  const base = normalizeAppData({
     people: readJsonRows(db, TABLES.people),
     workItems: readJsonRows(db, TABLES.workItems),
     tasks: readJsonRows(db, TABLES.tasks),
@@ -93,6 +94,7 @@ export function getAppData(db = getDb()) {
     consuntivi: readJsonRows(db, TABLES.consuntivi, 'date DESC, rowid ASC'),
     tubeProfiles: readJsonRows(db, TABLES.tubeProfiles, 'label COLLATE NOCASE ASC'),
   })
+  return { ...base, consuntiviClosures: readJsonRows(db, TABLES.consuntiviClosures, 'rowid ASC') }
 }
 
 export function saveAppData(data, db = getDb()) {
@@ -131,7 +133,7 @@ export function saveAppData(data, db = getDb()) {
     db.exec('ROLLBACK;')
     throw error
   }
-  return safeData
+  return { ...safeData, consuntiviClosures: readJsonRows(db, TABLES.consuntiviClosures, 'rowid ASC') }
 }
 
 function dropOrphanCalculatedStandards(components, workshopOutputs) {
@@ -436,4 +438,23 @@ function replaceTubeProfiles(db, rows, now) {
 
 export function emptyAppData() {
   return structuredClone(EMPTY_APP_DATA)
+}
+
+export function getConsuntiviClosures(db = getDb()) {
+  return readJsonRows(db, TABLES.consuntiviClosures, 'rowid ASC')
+}
+
+export function insertConsuntiviClosure(closure, db = getDb()) {
+  const now = new Date().toISOString()
+  db.prepare('INSERT INTO consuntivi_closures (id, commessa_key, data, updated_at) VALUES (?, ?, ?, ?)')
+    .run(closure.id, closure.commessaKey, JSON.stringify(closure), now)
+  bumpDataRevision(db, now)
+  return closure
+}
+
+export function deleteConsuntiviClosure(id, db = getDb()) {
+  const res = db.prepare('DELETE FROM consuntivi_closures WHERE id = ?').run(id)
+  const removed = Number(res.changes) > 0
+  if (removed) bumpDataRevision(db, new Date().toISOString())
+  return removed
 }
