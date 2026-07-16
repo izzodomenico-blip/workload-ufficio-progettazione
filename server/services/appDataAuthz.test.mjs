@@ -188,3 +188,53 @@ describe('authorizeAppDataChange — assenze (manageAbsences)', () => {
     expect(out.absences[0].type).toBe('permesso')
   })
 })
+
+describe('chiusure commesse (consuntiviClosures)', () => {
+  const CLOSURE = { id: 'cl1', commessaKey: 'COM9', supplierName: 'F', firstDate: '2026-07-01', lastDate: '2026-07-05', consuntiviCount: 1, closedAt: '2026-07-10T10:00:00Z', closedByUserId: 'u1', closedByUsername: 'admin', snapshot: { total: 111.23, totalKg: 47.1, kgByMaterial: { ferro: 47.1, inox: 0, zincato: 0, corten: 0 }, cats: { material: 61.23, gas: 50, time: 0, welding: 0, bending: 0 } } }
+  const consClosed = { id: 'k1', commessaNumber: 'COM9', supplierName: 'F', date: '2026-07-01', laserRows: [], tubeRows: [], weldingRows: [], bendingRows: [], createdByUserId: 'u1' }
+  const baseTree = (over = {}) => ({ people: [], workItems: [], tasks: [], absences: [], activityLog: [], notifications: [], businessPartners: [], machineTypes: [], workshopOutputs: [], workshopWorkers: [], workshopAssignments: [], tubeProfiles: [], calculatedStandardComponents: [], consuntivi: [consClosed], consuntiviClosures: [CLOSURE], ...over })
+  const fullPerms = { deleteAny: true, canCreateWork: true, canEditWork: true, canDeleteOwnWork: true, managePeople: true, manageAbsences: true, viewLog: true, viewConsuntiviPrices: true }
+  const admin = { id: 'u1', permissions: fullPerms }
+
+  it('filtro: senza viewConsuntiviPrices lo snapshot perde total e cats ma tiene i kg', () => {
+    const out = filterAppDataForUser(baseTree(), { ...fullPerms, viewConsuntiviPrices: false, managePeople: false })
+    expect(out.consuntiviClosures[0].snapshot.total).toBeUndefined()
+    expect(out.consuntiviClosures[0].snapshot.cats).toBeUndefined()
+    expect(out.consuntiviClosures[0].snapshot.totalKg).toBeCloseTo(47.1, 2)
+  })
+  it('filtro: con viewConsuntiviPrices lo snapshot resta integro', () => {
+    const out = filterAppDataForUser(baseTree(), fullPerms)
+    expect(out.consuntiviClosures[0].snapshot.total).toBeCloseTo(111.23, 2)
+  })
+  it('PUT: consuntiviClosures del client IGNORATE (server-autoritative)', () => {
+    const incoming = baseTree({ consuntiviClosures: [{ ...CLOSURE, snapshot: { ...CLOSURE.snapshot, total: 999999 } }] })
+    const out = authorizeAppDataChange(baseTree(), incoming, admin)
+    expect(out.consuntiviClosures[0].snapshot.total).toBeCloseTo(111.23, 2)
+  })
+  it('PUT: nuovo consuntivo su commessa chiusa -> 403 anche per admin', () => {
+    const nuovo = { ...consClosed, id: 'k2' }
+    const incoming = baseTree({ consuntivi: [consClosed, nuovo] })
+    expect(() => authorizeAppDataChange(baseTree(), incoming, admin)).toThrow(/chiusa/)
+  })
+  it('PUT: modifica consuntivo di commessa chiusa -> 403', () => {
+    const incoming = baseTree({ consuntivi: [{ ...consClosed, supplierName: 'MODIFICATO' }] })
+    expect(() => authorizeAppDataChange(baseTree(), incoming, admin)).toThrow(/chiusa/)
+  })
+  it('PUT: consuntivo di commessa chiusa assente dal payload -> CONSERVATO', () => {
+    const incoming = baseTree({ consuntivi: [] })
+    const out = authorizeAppDataChange(baseTree(), incoming, admin)
+    expect(out.consuntivi.map((c) => c.id)).toContain('k1')
+  })
+  it('PUT: consuntivo di commessa chiusa INVARIATO nel payload -> passa (round-trip)', () => {
+    const incoming = baseTree({ consuntivi: [JSON.parse(JSON.stringify(consClosed))] })
+    const out = authorizeAppDataChange(baseTree(), incoming, admin)
+    expect(out.consuntivi.map((c) => c.id)).toContain('k1')
+  })
+  it('PUT: spostare un consuntivo aperto DENTRO una commessa chiusa -> 403', () => {
+    const aperto = { ...consClosed, id: 'k9', commessaNumber: 'APERTA' }
+    const spostato = { ...aperto, commessaNumber: 'COM9' }
+    const cur = baseTree({ consuntivi: [consClosed, aperto] })
+    const incoming = baseTree({ consuntivi: [consClosed, spostato] })
+    expect(() => authorizeAppDataChange(cur, incoming, admin)).toThrow(/chiusa/)
+  })
+})

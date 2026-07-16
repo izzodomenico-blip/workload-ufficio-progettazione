@@ -1,4 +1,4 @@
-import type { AppData, AuthUser, ConsuntiviPricingConfig, ConsuntivoMaterial, MachineType, Role } from '../types'
+import type { AppData, AuthUser, ConsuntiviClosure, ConsuntiviPricingConfig, ConsuntivoMaterial, MachineType, Role } from '../types'
 
 export interface SaveAppDataOptions {
   risky?: boolean
@@ -258,6 +258,7 @@ function withAppDataDefaults(data: Partial<AppData>): AppData {
     calculatedStandardComponents: Array.isArray(data.calculatedStandardComponents) ? data.calculatedStandardComponents : [],
     consuntivi: Array.isArray(data.consuntivi) ? data.consuntivi : [],
     tubeProfiles: Array.isArray(data.tubeProfiles) ? data.tubeProfiles : [],
+    consuntiviClosures: Array.isArray(data.consuntiviClosures) ? data.consuntiviClosures : [],
   }
 }
 
@@ -286,6 +287,21 @@ export function saveConsuntiviPricing(config: ConsuntiviPricingConfig, password:
     method: 'PUT',
     headers: { 'x-workload-admin-password': password },
     body: JSON.stringify(config),
+  })
+}
+
+export function closeCommessa(commessaKey: string, password: string): Promise<ConsuntiviClosure> {
+  return request<ConsuntiviClosure>('/api/consuntivi-closures', {
+    method: 'POST',
+    headers: { 'x-workload-admin-password': password },
+    body: JSON.stringify({ commessaKey }),
+  })
+}
+
+export function reopenCommessa(id: string, password: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/api/consuntivi-closures/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { 'x-workload-admin-password': password },
   })
 }
 

@@ -2,10 +2,13 @@ import { Router } from 'express'
 import {
   getAppData,
   getCollection,
+  getConsuntiviClosures,
   getConsuntiviConfig,
   getDataRevision,
   getDb,
   getLastMutationAt,
+  insertConsuntiviClosure,
+  deleteConsuntiviClosure,
   saveAppData,
   saveConsuntiviConfig,
   upsertEntity,
@@ -29,6 +32,7 @@ import {
   verifyAdminPassword,
 } from '../services/adminAuth.js'
 import { DEFAULT_CONSUNTIVI_CONFIG, normalizeConsuntiviConfig } from '../services/consuntiviConfig.js'
+import { consuntivoTotals } from '../services/consuntiviTotals.js'
 import {
   getConsuntiviAuthStatus,
   setConsuntiviPassword,
@@ -394,6 +398,80 @@ export function createApiRouter() {
       saveConsuntiviConfig(cfg)
       scheduleAutoBackup('consuntivi-pricing-updated')
       res.json(cfg)
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
+  })
+
+  // Chiusura certificata commesse: snapshot calcolato SOLO server-side,
+  // protetta dalla password consuntivi. Collezione server-autoritativa.
+  const commessaKeyOf = (c) => (String(c.commessaNumber ?? '').trim() || '(senza commessa)')
+
+  router.post('/consuntivi-closures', (req, res, next) => {
+    try {
+      requireConsuntiviPassword(req)
+      const commessaKey = String((req.body ?? {}).commessaKey ?? '').trim()
+      if (!commessaKey) {
+        const err = new Error('commessaKey mancante.'); err.statusCode = 400; throw err
+      }
+      if (getConsuntiviClosures().some((cl) => cl.commessaKey === commessaKey)) {
+        const err = new Error(`La commessa ${commessaKey} è già chiusa.`); err.statusCode = 409; throw err
+      }
+      const group = (getAppData().consuntivi ?? []).filter((c) => commessaKeyOf(c) === commessaKey)
+      if (group.length === 0) {
+        const err = new Error(`Nessun consuntivo per la commessa ${commessaKey}.`); err.statusCode = 404; throw err
+      }
+      const cfg = getConsuntiviConfig() ?? DEFAULT_CONSUNTIVI_CONFIG
+      const snapshot = {
+        total: 0, totalKg: 0,
+        kgByMaterial: { ferro: 0, inox: 0, zincato: 0, corten: 0 },
+        cats: { material: 0, gas: 0, time: 0, welding: 0, bending: 0 },
+      }
+      let firstDate = ''
+      let lastDate = ''
+      for (const c of group) {
+        const t = consuntivoTotals(c, cfg)
+        snapshot.total += t.total
+        snapshot.totalKg += t.totalKg
+        for (const m of Object.keys(snapshot.kgByMaterial)) snapshot.kgByMaterial[m] += t.kgByMaterial[m] ?? 0
+        snapshot.cats.material += t.materialCost
+        snapshot.cats.gas += t.gasCost
+        snapshot.cats.time += t.timeCost
+        snapshot.cats.welding += t.weldingCost
+        snapshot.cats.bending += t.bendingCost
+        if (!firstDate || c.date < firstDate) firstDate = c.date
+        if (!lastDate || c.date > lastDate) lastDate = c.date
+      }
+      const closure = {
+        id: `cl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+        commessaKey,
+        supplierName: group.map((c) => c.supplierName).find((s) => s && s.trim()) ?? '',
+        firstDate,
+        lastDate,
+        consuntiviCount: group.length,
+        closedAt: new Date().toISOString(),
+        closedByUserId: req.user.id,
+        closedByUsername: req.user.username,
+        snapshot,
+      }
+      insertConsuntiviClosure(closure)
+      scheduleAutoBackup('consuntivi-closure-created')
+      sendDataRevisionHeaders(res)
+      res.status(201).json(closure)
+    } catch (error) {
+      next(error.statusCode ? error : badRequest(error))
+    }
+  })
+
+  router.delete('/consuntivi-closures/:id', (req, res, next) => {
+    try {
+      requireConsuntiviPassword(req)
+      if (!deleteConsuntiviClosure(String(req.params.id))) {
+        const err = new Error('Chiusura non trovata.'); err.statusCode = 404; throw err
+      }
+      scheduleAutoBackup('consuntivi-closure-reopened')
+      sendDataRevisionHeaders(res)
+      res.json({ ok: true })
     } catch (error) {
       next(error.statusCode ? error : badRequest(error))
     }
