@@ -846,7 +846,7 @@ textarea:focus-visible,
   .closure-cert-portal,
   .closure-cert-portal * { visibility: visible !important; }
   .closure-cert-portal { position: static !important; }
-  .closure-cert-overlay { position: static !important; overflow: visible !important; background: #fff !important; backdrop-filter: none !important; }
+  .closure-cert-overlay { position: static !important; display: block !important; overflow: visible !important; background: #fff !important; backdrop-filter: none !important; }
   .closure-cert-sheet { max-width: none !important; width: 100% !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; }
   .closure-cert-sheet, .closure-cert-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
