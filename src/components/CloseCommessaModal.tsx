@@ -32,7 +32,7 @@ export function CloseCommessaModal({ open, onClose }: Props) {
   }, [consuntivi, consuntiviClosures])
 
   async function submit() {
-    if (!selected) return
+    if (!selected || busy) return
     setBusy(true)
     try {
       await closeCommessa(selected, password)

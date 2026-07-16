@@ -32,7 +32,7 @@ export function ConsuntiviArchivePanel() {
   }, [consuntiviClosures, query])
 
   async function doReopen() {
-    if (!reopenFor) return
+    if (!reopenFor || busy) return
     setBusy(true)
     try {
       await reopenCommessa(reopenFor.id, password)
