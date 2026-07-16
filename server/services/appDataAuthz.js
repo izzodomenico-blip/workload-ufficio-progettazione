@@ -82,7 +82,8 @@ export function authorizeAppDataChange(current, incoming, user) {
       }
       if (key === 'consuntivi' && JSON.stringify(before) !== JSON.stringify(item)
         && (closedKeys.has(commessaKeyOf(before)) || closedKeys.has(commessaKeyOf(item)))) {
-        forbid(`La commessa ${commessaKeyOf(before)} è chiusa: consuntivo non modificabile.`)
+        const closedRef = closedKeys.has(commessaKeyOf(before)) ? commessaKeyOf(before) : commessaKeyOf(item)
+        forbid(`La commessa ${closedRef} è chiusa: consuntivo non modificabile.`)
       }
       // update: consentito con canEditWork; preserva createdByUserId
       if (!perms.canEditWork && JSON.stringify(before) !== JSON.stringify(item)) {

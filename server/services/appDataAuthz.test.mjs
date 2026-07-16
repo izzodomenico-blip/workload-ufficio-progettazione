@@ -225,4 +225,16 @@ describe('chiusure commesse (consuntiviClosures)', () => {
     const out = authorizeAppDataChange(baseTree(), incoming, admin)
     expect(out.consuntivi.map((c) => c.id)).toContain('k1')
   })
+  it('PUT: consuntivo di commessa chiusa INVARIATO nel payload -> passa (round-trip)', () => {
+    const incoming = baseTree({ consuntivi: [JSON.parse(JSON.stringify(consClosed))] })
+    const out = authorizeAppDataChange(baseTree(), incoming, admin)
+    expect(out.consuntivi.map((c) => c.id)).toContain('k1')
+  })
+  it('PUT: spostare un consuntivo aperto DENTRO una commessa chiusa -> 403', () => {
+    const aperto = { ...consClosed, id: 'k9', commessaNumber: 'APERTA' }
+    const spostato = { ...aperto, commessaNumber: 'COM9' }
+    const cur = baseTree({ consuntivi: [consClosed, aperto] })
+    const incoming = baseTree({ consuntivi: [consClosed, spostato] })
+    expect(() => authorizeAppDataChange(cur, incoming, admin)).toThrow(/chiusa/)
+  })
 })
